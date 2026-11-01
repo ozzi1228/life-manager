@@ -8,6 +8,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { HintsProvider } from "@/components/app/help";
 import { activeNav, MAIN_NAV, QUICK_ADD, titleFor } from "@/components/app/nav";
 import { ConnectionBanner } from "@/components/app/pwa";
+import { ExpenseDialogProvider, useExpenseDialog } from "@/components/money/expense-dialog";
 import { PetLayer } from "@/components/pet/pet-layer";
 import { usePetPrefs } from "@/components/pet/use-pet-prefs";
 import { Button } from "@/components/ui/button";
@@ -40,7 +41,16 @@ import { cn } from "@/lib/utils";
 
 type Props = { name: string; seenHints: string[]; children: ReactNode };
 
-export function AppFrame({ name, seenHints, children }: Props) {
+export function AppFrame(props: Props) {
+  return (
+    <ExpenseDialogProvider>
+      <Frame {...props} />
+    </ExpenseDialogProvider>
+  );
+}
+
+function Frame({ name, seenHints, children }: Props) {
+  const openExpense = useExpenseDialog();
   const path = usePathname();
   const router = useRouter();
   const active = activeNav(path);
@@ -150,11 +160,17 @@ export function AppFrame({ name, seenHints, children }: Props) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                {QUICK_ADD.map((q) => (
-                  <DropdownMenuItem key={q.href} asChild>
-                    <Link href={q.href}>{q.label}</Link>
-                  </DropdownMenuItem>
-                ))}
+                {QUICK_ADD.map((q) =>
+                  q.dialog ? (
+                    <DropdownMenuItem key={q.label} onSelect={() => openExpense()}>
+                      {q.label}
+                    </DropdownMenuItem>
+                  ) : (
+                    <DropdownMenuItem key={q.label} asChild>
+                      <Link href={q.href}>{q.label}</Link>
+                    </DropdownMenuItem>
+                  ),
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
             {profile}
@@ -165,8 +181,8 @@ export function AppFrame({ name, seenHints, children }: Props) {
           <div className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">{children}</div>
         </SidebarInset>
 
-        {/* 모바일 빠른 추가(+): 하단 탭 위 오른쪽 */}
-        <Button
+        {/* 모바일 빠른 추가(+): 하단 탭 위 오른쪽. 글 쓰는 화면에서는 저장 버튼을 가리지 않게 숨김 */}
+        {!path.startsWith("/records/journal/") && <Button
           data-pet-avoid
           size="icon-lg"
           aria-label="빠른 추가"
@@ -174,18 +190,24 @@ export function AppFrame({ name, seenHints, children }: Props) {
           onClick={() => setQuickOpen(true)}
         >
           <Plus className="size-6" />
-        </Button>
+        </Button>}
         <Drawer open={quickOpen && mobile} onOpenChange={setQuickOpen}>
           <DrawerContent>
             <DrawerHeader className="text-left">
               <DrawerTitle>빠른 추가</DrawerTitle>
             </DrawerHeader>
             <div className="grid gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
-              {QUICK_ADD.map((q) => (
-                <Button key={q.href} asChild variant="outline" size="lg" className="h-12 justify-start" onClick={() => setQuickOpen(false)}>
-                  <Link href={q.href}>{q.label}</Link>
-                </Button>
-              ))}
+              {QUICK_ADD.map((q) =>
+                q.dialog ? (
+                  <Button key={q.label} variant="outline" size="lg" className="h-12 justify-start" onClick={() => (setQuickOpen(false), openExpense())}>
+                    {q.label}
+                  </Button>
+                ) : (
+                  <Button key={q.label} asChild variant="outline" size="lg" className="h-12 justify-start" onClick={() => setQuickOpen(false)}>
+                    <Link href={q.href}>{q.label}</Link>
+                  </Button>
+                ),
+              )}
             </div>
           </DrawerContent>
         </Drawer>

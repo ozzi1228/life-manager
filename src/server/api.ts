@@ -6,13 +6,13 @@
 import { headers as nextHeaders } from "next/headers";
 import { unstable_rethrow } from "next/navigation";
 import { connection } from "next/server";
-import { z } from "zod";
 import { db } from "../db/index.ts";
 import { uuidv7 } from "../db/id.ts";
 import { apiLogs } from "../db/schema.ts";
 import { auth } from "../lib/auth.ts";
 import { AppError } from "./errors.ts";
 import { once } from "./idempotency.ts";
+export { parse } from "./validate.ts";
 import type { Ctx } from "./repo.ts";
 
 export const newRequestId = () => `req_${uuidv7().replaceAll("-", "")}`;
@@ -20,15 +20,6 @@ export const newRequestId = () => `req_${uuidv7().replaceAll("-", "")}`;
 async function userFrom(headers: Headers) {
   const s = await auth.api.getSession({ headers });
   return s?.user ?? null;
-}
-
-/** zod로 검증. 실패하면 필드별 문구와 함께 VALIDATION_FAILED */
-export function parse<S extends z.ZodType>(schema: S, input: unknown): z.infer<S> {
-  const r = schema.safeParse(input);
-  if (r.success) return r.data;
-  throw new AppError("VALIDATION_FAILED", "입력값을 확인해 주세요", {
-    fields: r.error.issues.map((i) => ({ path: i.path.join("."), rule: i.code, message: i.message })),
-  });
 }
 
 function toError(e: unknown, requestId: string) {
@@ -63,6 +54,12 @@ export function api(route: string, handler: Handler) {
         ({ status, body } = await once(userId, key, `${req.method} ${route} ${raw}`, async () => ({ status: 201, body: { data: await handler({ req, ctx, params }) } })));
       } else {
         const result = await handler({ req, ctx, params });
+        if (result instanceof Response) {
+          // 파일 같은 JSON이 아닌 응답은 그대로(로그만 남김)
+          result.headers.set("x-request-id", requestId);
+          db.insert(apiLogs).values({ requestId, userId, method: req.method, route, status: result.status, ms: Date.now() - started, errorCode: null }).catch(() => {});
+          return result;
+        }
         body = result && typeof result === "object" && "page" in result ? result : { data: result };
       }
     } catch (e) {

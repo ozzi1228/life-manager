@@ -64,8 +64,8 @@ export function defineRepo<T extends AnyTable>(table: T, entity: string) {
     },
 
     /** 바꿀 필드만 + 화면이 가진 version. 다르면 409(최신 값 포함) */
-    async update(ctx: Ctx, id: string, version: number, patch: Patch<T>): Promise<Row<T>> {
-      return db.transaction(async (tx) => {
+    async update(ctx: Ctx, id: string, version: number, patch: Patch<T>, o: { tx?: Tx } = {}): Promise<Row<T>> {
+      const run = async (tx: Tx) => {
         const [cur] = (await tx
           .select()
           .from(table as PgTable)
@@ -90,7 +90,8 @@ export function defineRepo<T extends AnyTable>(table: T, entity: string) {
           .returning();
         await writeRevision(tx, ctx, entity, id, "update", after, before);
         return row as Row<T>;
-      });
+      };
+      return o.tx ? run(o.tx) : db.transaction(run);
     },
 
     /** soft delete. 자식도 함께 지우려면 같은 batchId로 다른 저장소의 remove를 tx 안에서 부름 */

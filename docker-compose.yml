@@ -46,9 +46,12 @@ services:
       AI_KEY_SECRET: ${AI_KEY_SECRET:?.env에 AI_KEY_SECRET이 필요해요}
       OONA_OWNER_USERNAME: ${OONA_OWNER_USERNAME:-}
       OONA_AI_LOGIN_DIR: /data/ai-login
+      OONA_FILES_DIR: /data/files
     # 이 PC에서 scripts/ai-login.mts로 로그인한 구독 폴더(Claude·ChatGPT). 토큰 갱신 때 앱이 다시 씀
     volumes:
       - ${OONA_AI_LOGIN_DIR:?.env에 OONA_AI_LOGIN_DIR이 필요해요}:/data/ai-login
+      # 사진 등 첨부 파일(M-06). 백업 대상(M-21)
+      - ${OONA_FILES_DIR:?.env에 OONA_FILES_DIR이 필요해요}:/data/files
     # 이 PC에서 직접 볼 때만 쓰는 포트(127.0.0.1). 휴대폰은 Tailscale(아래)로
     ports:
       - "127.0.0.1:3331:3000"

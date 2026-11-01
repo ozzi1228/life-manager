@@ -1,8 +1,8 @@
 // 앱 테이블 (Better Auth 테이블 "user"·"account"·"session"·"verification"은 Better Auth가 관리)
 // 바꾼 뒤: npx drizzle-kit generate → scripts/migrate.mts가 적용(업데이트 스크립트가 운영 DB에도)
 import { sql } from "drizzle-orm";
-import { check, index, integer, jsonb, pgTable, text, unique, uuid } from "drizzle-orm/pg-core";
-import { at } from "./columns.ts";
+import { bigint, boolean, check, date, index, integer, jsonb, pgTable, text, unique, uniqueIndex, uuid } from "drizzle-orm/pg-core";
+import { at, userData } from "./columns.ts";
 import { uuidv7 } from "./id.ts";
 
 const userRef = () => text("user_id").notNull();
@@ -103,4 +103,164 @@ export const aiConnection = pgTable(
     unique("ai_connection_user_id_kind_key").on(t.userId, t.kind),
     check("ai_connection_kind_check", sql`${t.kind} in ('claude_plan', 'chatgpt_plan', 'anthropic_key', 'openai_key', 'gemini_key')`),
   ],
+);
+
+// ── 돈 (06 §3, 14 §4.4) ──
+// 분류: 지출·수입. 기본 분류는 처음 쓸 때 만들어짐(src/server/finance.ts). 사치만 참은 소비에 포함(20 §3)
+export const finCategories = pgTable(
+  "fin_categories",
+  {
+    ...userData(),
+    kind: text("kind", { enum: ["expense", "income"] }).notNull(),
+    name: text("name").notNull(),
+    colorHex: text("color_hex"),
+    sort: integer("sort").notNull().default(0),
+    isHidden: boolean("is_hidden").notNull().default(false),
+    countsTowardRestraint: boolean("counts_toward_restraint").notNull().default(false),
+  },
+  (t) => [uniqueIndex("fin_categories_name").on(t.userId, t.kind, t.name).where(sql`${t.deletedAt} is null`)],
+);
+
+// 결제수단: 카드·계좌·현금·간편결제
+export const paymentMethods = pgTable(
+  "payment_methods",
+  {
+    ...userData(),
+    kind: text("kind", { enum: ["card", "account", "cash", "pay"] }).notNull(),
+    name: text("name").notNull(),
+    sort: integer("sort").notNull().default(0),
+    isHidden: boolean("is_hidden").notNull().default(false),
+  },
+  (t) => [uniqueIndex("payment_methods_name").on(t.userId, t.name).where(sql`${t.deletedAt} is null`)],
+);
+
+// 지출·수입. 금액은 원 단위 양의 정수, 환불은 is_refund=true로 차감(06 §3.2)
+export const transactions = pgTable(
+  "transactions",
+  {
+    ...userData(),
+    type: text("type", { enum: ["expense", "income"] }).notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    isRefund: boolean("is_refund").notNull().default(false),
+    date: date("date").notNull(),
+    categoryId: uuid("category_id").notNull(),
+    paymentMethodId: uuid("payment_method_id"),
+    title: text("title"),
+    memo: text("memo"),
+    installmentMonths: integer("installment_months").notNull().default(1),
+  },
+  (t) => [
+    index("transactions_user_date").on(t.userId, t.date.desc()).where(sql`${t.deletedAt} is null`),
+    index("transactions_user_category").on(t.userId, t.categoryId, t.date),
+    check("transactions_amount_positive", sql`${t.amount} > 0 and ${t.amount} <= 10000000000`),
+  ],
+);
+
+// ── 목표·월간 트래커 (05, 14 §4.3) ──
+export const goalCategories = pgTable(
+  "goal_categories",
+  { ...userData(), name: text("name").notNull(), sort: integer("sort").notNull().default(0) },
+  (t) => [uniqueIndex("goal_categories_name").on(t.userId, t.name).where(sql`${t.deletedAt} is null`)],
+);
+
+// 결과 목표. 기간은 연도만(한 해·여러 해·정하지 않음, 05 §3.1). 연도별(새해) 목표는 기간에 그 해가 든 목표를 모아 봄
+export const goals = pgTable(
+  "goals",
+  {
+    ...userData(),
+    title: text("title").notNull(),
+    horizon: text("horizon", { enum: ["short", "mid", "long"] }).notNull().default("short"),
+    startYear: integer("start_year"),
+    endYear: integer("end_year"),
+    categoryId: uuid("category_id"),
+    status: text("status", { enum: ["active", "done", "paused", "dropped"] }).notNull().default("active"),
+    achievedAt: date("achieved_at"),
+    memo: text("memo"),
+    sort: integer("sort").notNull().default(0),
+  },
+  (t) => [
+    index("goals_user").on(t.userId).where(sql`${t.deletedAt} is null`),
+    check("goals_period", sql`(${t.startYear} is null and ${t.endYear} is null) or (${t.startYear} is not null and ${t.endYear} is not null and ${t.startYear} <= ${t.endYear})`),
+  ],
+);
+
+// 트래커 항목(행): 여러 달에 걸쳐 같은 항목을 씀. 색·이름은 모든 달에 반영(05 §4.1)
+export const trackerItems = pgTable("tracker_items", {
+  ...userData(),
+  name: text("name").notNull(),
+  colorHex: text("color_hex").notNull(),
+  goalId: uuid("goal_id"),
+  sort: integer("sort").notNull().default(0),
+});
+
+// 그 달에 보이는 항목. 한 달에서 빼도 칸 기록은 그대로(05 §4.6)
+export const trackerMonthItems = pgTable(
+  "tracker_month_items",
+  {
+    userId: text("user_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    month: text("month").notNull(), // YYYY-MM
+    sort: integer("sort").notNull().default(0),
+  },
+  (t) => [unique("tracker_month_items_item_month").on(t.itemId, t.month), index("tracker_month_items_user_month").on(t.userId, t.month)],
+);
+
+// 칸: 완료 여부와 메모(40자). 빈 칸(미완료·메모 없음)은 행을 지움. 마지막 저장이 이김(15 §2.5)
+// ponytail: 칸은 수가 많고 작아 변경 이력(revisions)을 남기지 않음. 필요해지면 칸 단위 이력 추가
+export const trackerCells = pgTable(
+  "tracker_cells",
+  {
+    userId: text("user_id").notNull(),
+    itemId: uuid("item_id").notNull(),
+    date: date("date").notNull(),
+    done: boolean("done").notNull().default(false),
+    memo: text("memo"),
+    updatedAt: at("updated_at").notNull().defaultNow(),
+  },
+  (t) => [unique("tracker_cells_item_date").on(t.itemId, t.date), index("tracker_cells_user_date").on(t.userId, t.date)],
+);
+
+// ── 첨부 파일 (14 §3, 15 §2.9) ──
+// 파일은 이 PC 데이터 폴더(.env OONA_FILES_DIR)에. 여기는 정보만. owner는 연결 전엔 비어 있음
+export const attachments = pgTable(
+  "attachments",
+  {
+    ...userData(),
+    purpose: text("purpose", { enum: ["journal_photo"] }).notNull(),
+    ownerType: text("owner_type"),
+    ownerId: uuid("owner_id"),
+    storageKey: text("storage_key").notNull(), // <user>/<yyyy>/<id> — 변형은 -thumb.webp, -body.webp
+    width: integer("width").notNull(),
+    height: integer("height").notNull(),
+    bytes: integer("bytes").notNull(),
+    sha256: text("sha256").notNull(),
+    sort: integer("sort").notNull().default(0),
+  },
+  (t) => [index("attachments_owner").on(t.ownerType, t.ownerId)],
+);
+
+// ── 일기 (08 §2) ──
+export const journalTopics = pgTable(
+  "journal_topics",
+  {
+    ...userData(),
+    name: text("name").notNull(),
+    colorHex: text("color_hex").notNull(),
+    sort: integer("sort").notNull().default(0),
+    isHidden: boolean("is_hidden").notNull().default(false),
+  },
+  (t) => [uniqueIndex("journal_topics_name").on(t.userId, t.name).where(sql`${t.deletedAt} is null`)],
+);
+
+// 글 하나 = 날짜 + 주제 + 제목(선택) + 본문(마크다운 텍스트, 5만 자) + 사진 0~10장. 같은 날 여러 글 가능
+export const journalEntries = pgTable(
+  "journal_entries",
+  {
+    ...userData(),
+    date: date("date").notNull(),
+    topicId: uuid("topic_id"),
+    title: text("title"),
+    bodyMd: text("body_md").notNull().default(""),
+  },
+  (t) => [index("journal_entries_user_date").on(t.userId, t.date.desc()).where(sql`${t.deletedAt} is null`)],
 );
