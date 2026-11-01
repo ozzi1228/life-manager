@@ -43,6 +43,13 @@
       "when": 1793543527929,
       "tag": "0005_recurring",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1793544525433,
+      "tag": "0006_pets",
+      "breakpoints": true
     }
   ]
 }

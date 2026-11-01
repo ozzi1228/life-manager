@@ -295,3 +295,15 @@ export const recurringPayments = pgTable(
     check("recurring_ending_has_date", sql`${t.status} <> 'ending' or ${t.lastUseDate} is not null`),
   ],
 );
+
+// 내 펫 (11 §5, 14 §4.9) 1차: 동작별 256px PNG를 데이터 폴더(<OONA_FILES_DIR>/<user>/pets/<id>/<동작>.png)에 두고 본인만 봄
+// ponytail: 동작 목록만 배열로. 업로드 화면(C-03)에서 애니메이션·프레임이 생기면 pet_actions·attachments로 나눔
+export const pets = pgTable(
+  "pets",
+  {
+    ...userData(),
+    name: text("name").notNull(),
+    poses: text("poses").array().notNull(), // idle 필수
+  },
+  (t) => [index("pets_user").on(t.userId).where(sql`${t.deletedAt} is null`)],
+);

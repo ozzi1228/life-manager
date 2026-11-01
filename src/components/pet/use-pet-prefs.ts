@@ -13,8 +13,7 @@ export function usePetPrefs() {
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    // 서버 렌더 결과와 어긋나지 않게 첫 그리기 뒤에 불러옴
-    queueMicrotask(() => {
+    const load = () => {
       try {
         const saved = JSON.parse(localStorage.getItem(KEY) ?? "null");
         if (saved) setPrefs({ ...DEFAULTS, ...saved });
@@ -22,7 +21,16 @@ export function usePetPrefs() {
         // 저장소를 쓸 수 없으면 기본값
       }
       setLoaded(true);
-    });
+    };
+    // 서버 렌더 결과와 어긋나지 않게 첫 그리기 뒤에 불러옴
+    queueMicrotask(load);
+    // 설정 화면에서 바꾸면 화면에 떠 있는 펫도 바로 바뀌게(같은 창 이벤트 + 다른 탭 storage)
+    addEventListener(KEY, load);
+    addEventListener("storage", load);
+    return () => {
+      removeEventListener(KEY, load);
+      removeEventListener("storage", load);
+    };
   }, []);
 
   const update = (patch: Partial<PetPrefs>) =>
@@ -30,6 +38,7 @@ export function usePetPrefs() {
       const next = { ...p, ...patch };
       try {
         localStorage.setItem(KEY, JSON.stringify(next));
+        queueMicrotask(() => dispatchEvent(new Event(KEY)));
       } catch {
         // 저장 실패해도 화면은 동작
       }

@@ -17,6 +17,9 @@ export const PRESET_PETS = [
   { id: "hoya", name: "호야" },
 ] as const;
 
+/** 기본 펫은 정적 파일, 내 펫은 본인만 받는 주소(src/app/api/v1/pets) */
+export const petSrc = (id: string, pose: string) => (PRESET_PETS.some((p) => p.id === id) ? `/pets/${id}/${pose}.png` : `/api/v1/pets/${id}/${pose}`);
+
 export type PetStats = { fps: number; avgMs: number; maxMs: number; state: string; overlaps: number };
 
 type Props = {
@@ -45,7 +48,7 @@ export function PetLayer({ petId, size = 80, reducedMotion, sleepAfterMs = 60_00
   useEffect(() => {
     const box = outer.current!;
     const art = inner.current!;
-    const src = (p: Pose) => `/pets/${petId}/${p}.png`;
+    const src = (p: Pose) => petSrc(petId, p);
     // 미리 불러와 디코딩해 두고 참조를 붙잡아 둠(휴대폰에서 그림을 바꿀 때 앞뒤 그림이 겹쳐 보이지 않게)
     const preloaded = POSES.map((p) => {
       const img = new Image();
