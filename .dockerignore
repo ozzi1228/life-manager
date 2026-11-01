@@ -1,0 +1,13 @@
+node_modules
+.next
+.git
+.claude
+.env
+.env.*
+docs
+scripts/.cut-*.png
+scripts/.*-preview.png
+tailscale
+Dockerfile
+docker-compose.yml
+*.log

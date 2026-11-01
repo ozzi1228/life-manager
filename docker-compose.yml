@@ -1,0 +1,68 @@
+# 우나(oona) 상시 실행 구성 (docs/planning/16 §5.2)
+# 시작·갱신: scripts/update.ps1  (또는 `docker compose up -d --build`)
+# 모든 서비스 restart: unless-stopped → Docker가 켜지면 자동으로 다시 뜬다
+name: oona
+
+services:
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: oona
+      POSTGRES_USER: oona
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?.env에 POSTGRES_PASSWORD가 필요해요}
+    # 이 PC 안에서만 접속(사설망·인터넷에 열지 않음, NFR-REL-007)
+    ports:
+      - "127.0.0.1:55440:5432"
+    volumes:
+      - oona-pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U oona -d oona"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
+    image: oona-app:latest
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgres://oona:${POSTGRES_PASSWORD}@db:5432/oona
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY}
+      VAPID_SUBJECT: ${VAPID_SUBJECT}
+      NEXT_PUBLIC_VAPID_PUBLIC_KEY: ${NEXT_PUBLIC_VAPID_PUBLIC_KEY}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?.env에 BETTER_AUTH_SECRET이 필요해요}
+      BETTER_AUTH_URL: ${OONA_URL:?.env에 OONA_URL(우나 주소)이 필요해요}
+      OONA_URL: ${OONA_URL}
+    # 이 PC에서 직접 볼 때만 쓰는 포트(127.0.0.1). 휴대폰은 Tailscale(아래)로
+    ports:
+      - "127.0.0.1:3331:3000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  # 우나 전용 Tailscale 노드(D-052): https://oona.<tailnet>.ts.net → app 컨테이너
+  # 이 PC의 기존 Tailscale 기기 설정(다른 앱의 serve·Funnel)과 분리. 이 노드는 Funnel 꺼짐(serve.json AllowFunnel=false)
+  # 로그인 상태는 oona-ts 볼륨에 저장됨(처음 한 번만 .env의 TS_AUTHKEY 사용)
+  tailscale:
+    image: tailscale/tailscale:stable
+    hostname: oona
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_HOSTNAME: oona
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+      TS_SERVE_CONFIG: /config/serve.json
+    volumes:
+      - oona-ts:/var/lib/tailscale
+      - ./tailscale/serve.json:/config/serve.json:ro
+    depends_on:
+      - app
+
+volumes:
+  oona-pg:
+  oona-ts:
