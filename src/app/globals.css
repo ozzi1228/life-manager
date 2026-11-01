@@ -72,6 +72,35 @@
   --shadow-opacity: var(--shadow-opacity);
   --color-shadow-color: var(--shadow-color);
   --color-destructive-foreground: var(--destructive-foreground);
+  /* 추가 토큰 (docs/planning/03 §3.1.2): 글자 링크(T-2), 빨간 글자(T-3), 상태 색(T-4) */
+  --color-link: var(--link);
+  --color-destructive-text: var(--destructive-text);
+  --color-success: var(--success);
+  --color-success-foreground: var(--success-foreground);
+  --color-success-text: var(--success-text);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-warning-text: var(--warning-text);
+  --color-info: var(--primary);
+  --color-overlay: var(--overlay);
+  --color-health: var(--health);
+  /* 글자 크기 (03 §3.2) */
+  --text-display: 1.75rem;
+  --text-display--line-height: 2.25rem;
+  --text-title-lg: 1.375rem;
+  --text-title-lg--line-height: 1.875rem;
+  --text-title: 1.125rem;
+  --text-title--line-height: 1.625rem;
+  --text-subtitle: 1rem;
+  --text-subtitle--line-height: 1.5rem;
+  --text-body: 0.9375rem;
+  --text-body--line-height: 1.375rem;
+  --text-body-sm: 0.875rem;
+  --text-body-sm--line-height: 1.25rem;
+  --text-caption: 0.75rem;
+  --text-caption--line-height: 1rem;
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 0.875rem;
 }
 
 :root {
@@ -92,7 +121,7 @@
   --destructive: oklch(0.6207 0.2203 24.8903);
   --border: oklch(0.9004 0.0061 223.4622);
   --input: oklch(0.9197 0.0059 239.8250);
-  --ring: oklch(0.6704 0.1369 235.2910);
+  --ring: oklch(0.45 0.12 238); /* T-9: 테마 원본(primary)은 배경과 2.84:1이라 포커스가 약함 */
   --chart-1: oklch(0.6704 0.1369 235.2910);
   --chart-2: oklch(0.5697 0.1245 260.6074);
   --chart-3: oklch(0.4691 0.0779 210.6043);
@@ -126,6 +155,16 @@
   --shadow-xl: 0px 2px 12px 0px hsl(204 11.7647% 33.3333% / 0.08), 0px 8px 10px -1px hsl(204 11.7647% 33.3333% / 0.08);
   --shadow-2xl: 0px 2px 12px 0px hsl(204 11.7647% 33.3333% / 0.20);
   --tracking-normal: 0em;
+  --link: var(--accent-foreground);
+  --destructive-text: oklch(0.52 0.20 25);
+  --success: oklch(0.62 0.14 160);
+  --success-foreground: oklch(0.16 0.01 160);
+  --success-text: oklch(0.48 0.12 160);
+  --warning: oklch(0.80 0.15 80);
+  --warning-foreground: oklch(0.20 0.03 80);
+  --warning-text: oklch(0.50 0.11 70);
+  --overlay: oklch(0.2 0.01 234 / 0.4);
+  --health: oklch(0.70 0.11 350);
 }
 
 .dark {
@@ -179,6 +218,16 @@
   --shadow-lg: 0px 4px 16px 0px hsl(0 0% 0% / 0.35), 0px 4px 6px -1px hsl(0 0% 0% / 0.35);
   --shadow-xl: 0px 4px 16px 0px hsl(0 0% 0% / 0.35), 0px 8px 10px -1px hsl(0 0% 0% / 0.35);
   --shadow-2xl: 0px 4px 16px 0px hsl(0 0% 0% / 0.88);
+  --link: var(--accent-foreground);
+  --destructive-text: oklch(0.74 0.17 22);
+  --success: oklch(0.72 0.13 160);
+  --success-foreground: oklch(0.16 0.01 160);
+  --success-text: oklch(0.78 0.12 160);
+  --warning: oklch(0.78 0.14 80);
+  --warning-foreground: oklch(0.20 0.03 80);
+  --warning-text: oklch(0.82 0.13 80);
+  --overlay: oklch(0 0 0 / 0.6);
+  --health: oklch(0.76 0.10 350);
 }
 
 @layer base {

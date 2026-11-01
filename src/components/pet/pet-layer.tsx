@@ -97,6 +97,8 @@ export function PetLayer({ petId, size = 80, reducedMotion, sleepAfterMs = 60_00
     const blocked = (x: number, y: number) => avoid.some((r) => hit({ l: x, t: y, r: x + size, b: y + size }, r));
     // 모달·입력칸 위에 있게 되면 가까운 빈자리로 깡충 비켜 감(걸어다니지 않음, 사용자 피드백 2026-11-01)
     const freeSpot = () => {
+      // 하단 탭 위 가장자리가 주 활동 영역(02 §5.1): 먼저 바로 위로, 안 되면 주변 아무 빈자리
+      for (let up = 16; up <= 320; up += 16) if (!blocked(s.x, Math.max(0, s.y - up))) return { x: s.x, y: Math.max(0, s.y - up) };
       for (let i = 0; i < 24; i++) {
         const reach = 80 + i * 30; // 가까운 곳부터
         const a = Math.random() * Math.PI * 2;

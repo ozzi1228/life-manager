@@ -1,5 +1,9 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
+import { ThemeProvider } from "next-themes";
 import "pretendard/dist/web/variable/pretendardvariable-dynamic-subset.css";
+import { PwaUpdate } from "@/components/app/pwa";
+import { Toaster } from "@/components/ui/sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -9,10 +13,20 @@ export const metadata: Metadata = {
   appleWebApp: { capable: true, title: "우나", statusBarStyle: "default" },
 };
 
+// 휴대폰 하단 안전 영역(env(safe-area-inset-bottom))을 쓰려면 cover
+export const viewport: Viewport = { viewportFit: "cover" };
+
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="ko" className="h-full antialiased">
-      <body className="min-h-full flex flex-col">{children}</body>
+    // next-themes가 html의 class를 바꿈(시스템 따라가기·밝게·어둡게, 03 §13)
+    <html lang="ko" className="h-full antialiased" suppressHydrationWarning>
+      <body className="flex min-h-full flex-col">
+        <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+          <TooltipProvider>{children}</TooltipProvider>
+          <Toaster position="top-center" />
+          <PwaUpdate />
+        </ThemeProvider>
+      </body>
     </html>
   );
 }

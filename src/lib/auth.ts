@@ -3,9 +3,12 @@
 // - Better Auth는 사용자마다 이메일을 필수로 요구한다 → 이메일이 없으면 내부용 주소(.invalid, 메일이 갈 수 없음)를 넣고 화면에는 보이지 않게
 // - 이메일이 같아도 자동으로 계정을 합치지 않음(13 §4.2): 연결은 로그인한 상태에서 명시적으로만
 import { betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware } from "better-auth/api";
 import { username } from "better-auth/plugins";
 import { hash, verify } from "@node-rs/argon2";
+import { audit } from "../server/audit.ts";
 import { pool } from "./db.ts"; // 확장자: scripts/*.mts(노드 직접 실행)도 이 파일을 불러옴
+import { passwordProblem } from "./password.ts";
 
 export const INTERNAL_EMAIL_DOMAIN = "users.oona.invalid";
 export const internalEmail = (kind: "id" | "kakao" | "naver", id: string) => `${kind}.${id}@${INTERNAL_EMAIL_DOMAIN}`;
@@ -69,7 +72,38 @@ export const auth = betterAuth({
   socialProviders: social,
   account: { accountLinking: { enabled: true, disableImplicitLinking: true } },
   session: { expiresIn: 60 * 60 * 24 * 30, updateAge: 60 * 60 * 24 }, // 로그인 유지 30일(FR-AUTH-006)
-  advanced: { cookiePrefix: "oona" },
+  advanced: {
+    cookiePrefix: "oona",
+    // Tailscale serve가 앞에 있어 실제 기기 주소는 X-Forwarded-For로 옴(요청 제한이 기기별로 걸리게)
+    ipAddress: { ipAddressHeaders: ["x-forwarded-for"] },
+  },
+  // 로그인 시도 제한(13 §3.3): 5분에 10번. ponytail: 서버 메모리 기준(재시작하면 초기화)
+  rateLimit: {
+    enabled: true,
+    customRules: {
+      "/sign-in/username": { window: 300, max: 10 },
+      "/sign-up/email": { window: 300, max: 10 },
+    },
+  },
+  hooks: {
+    // 비밀번호 규칙은 화면이 아니라 여기서 최종 확인(신뢰 경계)
+    before: createAuthMiddleware(async (ctx) => {
+      if (ctx.path === "/sign-up/email" || ctx.path === "/change-password") {
+        const body = ctx.body as { password?: string; newPassword?: string; username?: string };
+        const problem = passwordProblem(body.newPassword ?? body.password ?? "", body.username);
+        if (problem) throw new APIError("BAD_REQUEST", { message: problem, code: "WEAK_PASSWORD" });
+      }
+    }),
+    // 보안 기록(14 §1.5): 로그인·가입·로그아웃. 사용자 데이터 내용은 남기지 않음
+    after: createAuthMiddleware(async (ctx) => {
+      const event =
+        ctx.path === "/sign-in/username" ? "login.password" : ctx.path.startsWith("/callback/") ? `login.${ctx.params?.id ?? "social"}` : ctx.path === "/sign-up/email" ? "signup.password" : ctx.path === "/sign-out" ? "logout" : null;
+      if (!event) return;
+      const userId = ctx.context.newSession?.user.id ?? ctx.context.session?.user.id ?? null;
+      const failed = ctx.context.returned instanceof Error;
+      await audit(failed || (!userId && event !== "logout") ? `${event}.failed` : event, { userId, headers: ctx.request?.headers ?? (ctx.headers as Headers | undefined) });
+    }),
+  },
 });
 
 export const enabledSocialProviders = Object.keys(social);

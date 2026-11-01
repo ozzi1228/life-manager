@@ -33,6 +33,15 @@
 
 ## 3. 1단계: MVP 작업 목록
 
+> **진행 현황 (2026-11-01, 1묶음: 기반 완료)**
+> - **M-01** 프로젝트 기반: 0단계에서 완료 + `npm run check`(타입·린트), GitHub Actions 검사(`.github/workflows/check.yml`), DB 확인 스크립트(`npm run check:db`)
+> - **M-04** 데이터 기반: Drizzle 도입(`src/db/`, 마이그레이션 `drizzle/`, `scripts/migrate.mts`가 운영에도 적용). 공통 열(uuid v7·soft delete·version·source), 변경 이력·감사 로그·멱등 키·API 로그·사용자 설정 테이블. 서비스 계층 `src/server/repo.ts`(사용자 범위 강제, 버전 충돌 409, 묶음 삭제·복구, 변경 이력), `src/server/api.ts`(응답·오류 형식, 멱등 키, API 로그, Server Action 감싸기). 확인: `scripts/check-data.mts`(교차 사용자 접근·충돌·휴지통·멱등 키)
+> - **M-02** 디자인 시스템: 추가 토큰(link·destructive-text·success·warning·health 등, 글자 크기), 포커스 링 보강(T-9), 목표 팔레트(`src/lib/palette.ts`), 표시 형식(`src/lib/format.ts`), ResponsiveModal·ResponsiveDetail, InfoTip·HowToTip·GuideDialog·FirstTimeHint, AmountInput·MoneyText·BudgetBar, MonthSwitcher·QuickChips, EmptyState·Delayed·되돌리기 토스트. 모아 보기 `/dev/ui`
+> - **M-03** 앱 셸: PC·태블릿 사이드바, 모바일 상단바·하단 탭 5개·빠른 추가(+), PC `추가` 메뉴·N 단축키, 로그인 안 하면 로그인으로(`src/proxy.ts`), 펫 상주, 설정 1차(화면 모드·펫·AI 연결·로그아웃). 영역 화면은 자리만
+> - **M-05** 계정: 로그인(카카오·네이버·아이디, 로그인 유지), 간편 로그인 "처음 오셨나요?"(새로 시작·기존 계정 연결), 회원가입(중복 확인·비밀번호 규칙), 온보딩 3단계, 비밀번호 규칙 서버 검사, 보안 기록(로그인·가입·로그아웃·실패), 로그인 시도 제한
+> - **M-20** PWA: 서비스 워커(정적 파일 캐시, 화면 네트워크 우선·오프라인 화면, 푸시), 새 버전 안내 토스트, 오프라인·서버 연결 불가 띠(`/api/health`)
+> - 남은 것: 비밀번호 찾기(Q-010, P1), 설정의 연결된 로그인 관리·기기 목록(M-19), 오프라인 입력 대기열(M-09와 함께)
+
 | # | 작업 | 내용 | 의존 | 크기 |
 |---|---|---|---|---|
 | M-01 | 프로젝트 기반 | Next.js·TS·Tailwind·shadcn init, 테마, 린트·테스트·CI | V-01, V-02 | S |
