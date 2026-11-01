@@ -8,13 +8,13 @@ export default function manifest(): MetadataRoute.Manifest {
     lang: "ko",
     start_url: "/",
     display: "standalone",
-    // 테마 --background(밝은 모드)에 가까운 값
-    background_color: "#f8fbfc",
+    // theme_color: 테마 --background(밝은 모드)에 가까운 값
+    background_color: "#fdf7f1", // 시작 화면 바탕: 로고 카드색
     theme_color: "#f8fbfc",
     icons: [
-      { src: "/icons/192", sizes: "192x192", type: "image/png" },
-      { src: "/icons/512", sizes: "512x512", type: "image/png" },
-      { src: "/icons/512", sizes: "512x512", type: "image/png", purpose: "maskable" },
+      { src: "/icons/192.png", sizes: "192x192", type: "image/png" },
+      { src: "/icons/512.png", sizes: "512x512", type: "image/png" },
+      { src: "/icons/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
     ],
   };
 }

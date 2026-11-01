@@ -5,8 +5,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "우나",
   description: "우리의 나날들",
-  // iOS 홈 화면 아이콘·전체 화면 실행
-  icons: { apple: "/icons/180" },
+  // iOS 전체 화면 실행(아이콘은 app/apple-icon.png 파일 규칙)
   appleWebApp: { capable: true, title: "우나", statusBarStyle: "default" },
 };
 

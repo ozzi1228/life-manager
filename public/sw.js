@@ -4,8 +4,7 @@ self.addEventListener("push", (event) => {
   event.waitUntil(
     self.registration.showNotification(data.title || "우나", {
       body: data.body || "",
-      icon: "/icons/192",
-      badge: "/icons/192",
+      icon: "/icons/192.png",
       data: { url: data.url || "/" },
     }),
   );
