@@ -18,10 +18,13 @@ export function planEnv(plan: Plan): NodeJS.ProcessEnv {
   const env = { ...process.env };
   for (const k of ["CLAUDE_CONFIG_DIR", "CODEX_HOME", "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "OPENAI_API_KEY"]) delete env[k];
   env[plan === "claude" ? "CLAUDE_CONFIG_DIR" : "CODEX_HOME"] = loginDir(plan);
+  // Claude Code가 스스로 업데이트하며 node_modules 안의 실행 파일 이름을 바꿔 버림(2026-11-01 실제 발생) → 끔. 버전은 npm으로만 올림
+  if (plan === "claude") env.DISABLE_AUTOUPDATER = "1";
   return env;
 }
 
-const require = createRequire(import.meta.url);
+// 앱이 묶여(bundle) 실행되면 import.meta.url이 원래 파일 위치가 아니어서, 실행 위치(프로젝트·컨테이너 /app)의 node_modules에서 찾음
+const require = createRequire(join(process.cwd(), "package.json"));
 const plat = `${process.platform}-${process.arch}`;
 
 export function claudeBinary(): string | null {

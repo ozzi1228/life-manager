@@ -1,12 +1,12 @@
 // AI 연결 종류별 실행 (docs/planning/12 §3): 질문 하나 → 답 하나(글자). 도구 호출·대화 기록은 C-05에서
 // 실패는 세 가지로 나눠 돌려줌 — LIMIT(한도·크레딧 소진: 다음 연결로 넘기고 한동안 건너뜀), AUTH(로그인·키 문제), ERROR
 import { spawn } from "node:child_process";
-import { mkdtempSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import Anthropic from "@anthropic-ai/sdk";
 import { query } from "@anthropic-ai/claude-agent-sdk";
-import { claudeBinary, codexBinary, loggedIn, planEnv } from "./login.ts";
+import { claudeBinary, codexBinary, loggedIn, loginDir, planEnv } from "./login.ts";
 
 export const KINDS = ["claude_plan", "chatgpt_plan", "anthropic_key", "openai_key", "gemini_key"] as const;
 export type Kind = (typeof KINDS)[number];
@@ -93,11 +93,27 @@ const CODEX_DISABLED = [
   "skill_mcp_dependency_install", "tool_suggest", "workspace_dependencies", "worktrees", "goals", "sleep_tool",
   "realtime_conversation",
 ];
+// Codex는 실행 폴더에 sqlite 등을 만드는데, 컨테이너에서 윈도 공유 폴더(/data/ai-login) 위에서는 "Operation not permitted"로
+// 실패함(2026-11-01 확인) → 실행 폴더는 이 컴퓨터 안(tmp)에 두고 로그인 정보(auth.json)만 옮겨 씀. 토큰이 갱신되면 원래 폴더에 다시 저장
+const CODEX_RUN_HOME = join(tmpdir(), "oona-codex-home");
+function codexAuthIn() {
+  mkdirSync(CODEX_RUN_HOME, { recursive: true });
+  const saved = readFileSync(join(loginDir("codex"), "auth.json"), "utf8");
+  const run = join(CODEX_RUN_HOME, "auth.json");
+  if (!existsSync(run) || readFileSync(run, "utf8") !== saved) writeFileSync(run, saved, { mode: 0o600 });
+  return saved;
+}
+function codexAuthOut(saved: string) {
+  const now = readFileSync(join(CODEX_RUN_HOME, "auth.json"), "utf8");
+  if (now !== saved) writeFileSync(join(loginDir("codex"), "auth.json"), now);
+}
+
 async function chatgptPlan(a: Ask): Promise<Outcome> {
   if (!loggedIn("codex")) return fail("AUTH", "ChatGPT 구독 로그인이 필요해요(scripts/ai-login.mts codex)");
   const exe = codexBinary();
   if (!exe) return fail("ERROR", "Codex 실행 파일을 찾지 못했어요");
   const cwd = mkdtempSync(join(tmpdir(), "oona-codex-"));
+  const saved = codexAuthIn();
   const cfg: [string, string | number | boolean][] = [
     ["approval_policy", "never"],
     ["web_search", "disabled"],
@@ -118,7 +134,7 @@ async function chatgptPlan(a: Ask): Promise<Outcome> {
   ];
   try {
     return await new Promise<Outcome>((resolve) => {
-      const child = spawn(exe, args, { env: planEnv("codex"), stdio: ["pipe", "pipe", "pipe"] });
+      const child = spawn(exe, args, { env: { ...planEnv("codex"), CODEX_HOME: CODEX_RUN_HOME }, stdio: ["pipe", "pipe", "pipe"] });
       const timer = setTimeout(() => child.kill(), TIMEOUT_MS);
       let buf = "";
       let err = "";
@@ -153,6 +169,7 @@ async function chatgptPlan(a: Ask): Promise<Outcome> {
       child.stdin.end(`${a.system}\n\n${a.prompt}`);
     });
   } finally {
+    codexAuthOut(saved);
     rmSync(cwd, { recursive: true, force: true });
   }
 }
