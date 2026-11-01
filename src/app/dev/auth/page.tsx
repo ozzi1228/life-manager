@@ -1,11 +1,23 @@
 "use client";
 
 // 0단계 V-11: 아이디 가입·로그인(이메일 없이), 세션, 로그아웃, 간편 로그인 버튼 시험
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { authClient } from "@/lib/auth-client";
 
 const INTERNAL = "@users.oona.invalid"; // src/lib/auth.ts와 같은 값(이메일 없는 계정의 내부 주소)
+const PROVIDER = { kakao: "카카오", naver: "네이버" } as const;
+type Provider = keyof typeof PROVIDER;
+
+// 간편 로그인에서 돌아왔을 때 주소의 ?via=&error= 를 사람 말로
+function socialResult(q: URLSearchParams) {
+  const via = PROVIDER[q.get("via") as Provider];
+  const error = q.get("error");
+  if (!via || !error) return "";
+  if (error === "signup_disabled") return `${via}: 인증은 성공했어요. 처음 온 계정이라 자동 가입을 막아 둔 상태예요(정상, 13 §2.3)`;
+  if (/state/i.test(error)) return `${via}: 로그인 확인값(state)이 맞지 않아요(${error}). 같은 로그인이 두 번 들어왔거나 10분이 지났어요`;
+  return `${via}: 오류 ${error}`;
+}
 
 export default function AuthTest() {
   const { data: session, isPending, refetch } = authClient.useSession();
@@ -14,6 +26,14 @@ export default function AuthTest() {
   const [email, setEmail] = useState("");
   const [msg, setMsg] = useState("");
   const [avail, setAvail] = useState("");
+  const [social, setSocial] = useState("");
+
+  useEffect(() => {
+    queueMicrotask(() => setSocial(socialResult(new URLSearchParams(location.search))));
+  }, []);
+
+  const startSocial = (provider: Provider) =>
+    authClient.signIn.social({ provider, callbackURL: "/dev/auth", errorCallbackURL: `/dev/auth?via=${provider}` });
 
   const username = id.trim().toLowerCase();
 
@@ -100,13 +120,14 @@ export default function AuthTest() {
       <section className="space-y-2 text-sm">
         <p className="font-semibold">간편 로그인</p>
         <div className="flex gap-2">
-          <Button variant="outline" onClick={() => authClient.signIn.social({ provider: "kakao", callbackURL: "/dev/auth" })}>
+          <Button variant="outline" onClick={() => startSocial("kakao")}>
             카카오로 시작하기
           </Button>
-          <Button variant="outline" onClick={() => authClient.signIn.social({ provider: "naver", callbackURL: "/dev/auth" })}>
+          <Button variant="outline" onClick={() => startSocial("naver")}>
             네이버로 시작하기
           </Button>
         </div>
+        {social && <p className="rounded-md border p-3">{social}</p>}
         <p className="text-muted-foreground">카카오·네이버 개발자 앱을 등록하고 키를 넣은 뒤에 동작해요(V-03).</p>
       </section>
     </main>

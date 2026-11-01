@@ -37,6 +37,11 @@ services:
       BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET:?.env에 BETTER_AUTH_SECRET이 필요해요}
       BETTER_AUTH_URL: ${OONA_URL:?.env에 OONA_URL(우나 주소)이 필요해요}
       OONA_URL: ${OONA_URL}
+      # 간편 로그인(비어 있으면 버튼이 꺼짐, docs/planning/13 §4.4)
+      KAKAO_CLIENT_ID: ${KAKAO_CLIENT_ID:-}
+      KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
+      NAVER_CLIENT_ID: ${NAVER_CLIENT_ID:-}
+      NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET:-}
     # 이 PC에서 직접 볼 때만 쓰는 포트(127.0.0.1). 휴대폰은 Tailscale(아래)로
     ports:
       - "127.0.0.1:3331:3000"

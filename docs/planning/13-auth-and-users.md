@@ -87,7 +87,7 @@
 | 항목 | 카카오 | 네이버 |
 |---|---|---|
 | 앱 등록 | 카카오 디벨로퍼스 앱, 카카오 로그인 활성화(꺼져 있으면 KOE004) | 네이버 개발자센터 애플리케이션 |
-| Redirect / Callback URL | 정확히 등록(불일치 KOE006). 운영 주소는 `https://oona.<tailnet>.ts.net/api/v1/auth/oauth/kakao/callback`. 사설망 주소 등록 가능 여부·로컬 개발 주소 허용 여부 [미확인] → V-03 | 동일(ts.net 주소, 정확히 일치) |
+| Redirect / Callback URL | 정확히 등록(불일치 KOE006). 운영 주소는 `https://oona.<tailnet>.ts.net/api/auth/callback/kakao`(네이버는 `.../callback/naver`, Better Auth 기본 경로 — 15의 `/api/v1/auth/oauth/...`는 인증 라이브러리 결정 전 설계). 개발은 `http://localhost:3330/api/auth/callback/<kakao·naver>`. ts.net 주소·localhost 모두 등록 가능(V-03 확인). 콜백이 두 번 들어와 두 번째가 state 불일치로 실패할 수 있음(안드로이드에서 크롬으로 로그인할 때 설치한 앱에도 열림) → 오류로 돌아온 화면은 세션을 확인해 이미 로그인됐으면 그대로 진행 | 동일(ts.net 주소, 정확히 일치) |
 | 연결 끊기 알림 | (Tailscale 운영에서는 수신 불가 → 위 §4.3 대체 처리) | 동일 |
 | 동의 항목 | 닉네임(필수), 프로필 사진(선택) | 식별자, 닉네임 |
 | 공개 범위 | 1단계: 테스트(팀 멤버)로 충분 | 1단계: '개발 중' + 멤버 등록 |
