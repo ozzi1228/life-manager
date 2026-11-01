@@ -14,8 +14,8 @@
 | V-06 | 펫 업로드 변환 | **완료** (2026-11-01) | `src/lib/pet-convert.ts`: PNG·WebP(한 장)·GIF·움직이는 WebP → 256px 프레임을 가로로 늘어놓은 WebP 띠. 모든 프레임을 한 상자로 잘라 같은 배율로 줄임(동작 안에서 발 위치 유지), 발은 기본 펫과 같은 줄. 확인(`scripts/check-pet-convert.mts`, 시험 화면 `/dev/pet-upload`): GIF·WebP 4프레임 → 8fps·반복 인식, 밝은·어두운 바탕에서 가장자리 깨짐 없음, 용량 4프레임 46~50KB(WebP 품질 90·투명도 무손실, 무손실 135KB 대비 약 1/3 → 동작 15종 2MB 목표 충족 예상), 흰 배경은 경고, 2MB 초과·빈 그림·JPEG·그림 아닌 파일은 거부. **한계**: APNG는 첫 장만 읽힘(sharp/libvips 미지원) → 형식 목록에서 빼기를 제안(Q-112), 흰 바탕으로 저장된 GIF의 흰 테두리는 지우지 못함(가이드 문구로 안내) | 개발 |
 | V-07 | 기본 펫 제작 | **완료** (2026-11-01) | 사용자가 캐릭터 시트를 참고해 ChatGPT로 5종 × 8동작을 1024px 투명 PNG로 생성(`assets/pets-hd/<id>/<동작>.png`). `scripts/fit-pets.mjs`로 256px에 맞춤(서 있는 동작은 키를 같게, 발은 같은 줄). 걷기도 정면 두 발 그림이 생겨 그림 바꿔 끼우기 표(`ART`)와 "따라오기" 그림 삭제 | 사용자 → 개발 |
 | V-08 | 구글 캘린더 | 대기 | Google Cloud 콘솔 프로젝트·OAuth 동의 화면(Production, 미검증) | **사용자**(콘솔) → 개발 |
-| V-09 | AI 3사 API 키 | 대기 | 사용할 API 키 발급 | **사용자** → 개발 |
-| V-10 | ChatGPT 계정 플랜 사용 | 대기 | V-01 주소 확정 후 | 개발 + 사용자(로그인) |
+| V-09 | AI 연결 | **틀 완성** (2026-11-01, D-060) | 연결 저장(사용자별 순서, API 키 암호화)·자동 전환 체인·시험 화면 `/dev/ai` 완성. 운영 컨테이너에서 Claude Code 2.1.282·Codex 0.157.0 실행 확인, 로그인 폴더 연결·쓰기 확인, 로그인 전에는 "로그인 필요"로 다음 연결로 넘어가는 것 확인. **남은 것**: 사용자가 구독 로그인(`node --env-file=.env scripts/ai-login.mts claude`·`codex`) 후 실제 답 확인, API 키는 나중에 넣으면 됨. 도구 호출·선택지(카드 상담)는 C-05 | 사용자(로그인) → 개발 |
+| V-10 | ChatGPT 계정 플랜 사용 | **대체**(D-060) | "Sign in with ChatGPT" 대신 agent-company와 같은 Codex CLI 로그인으로 ChatGPT 구독을 씀(V-09에 포함) | — |
 | V-11 | 인증 라이브러리 | **완료** (2026-11-01) | Better Auth 1.7.15로 결정(Q-132). 확인: ① 이메일 없이 아이디·비밀번호 가입·로그인(이메일 칸은 내부 주소 `id.<아이디>@users.oona.invalid`로 채우고 화면엔 "없음") ② 아이디 규칙 검사·중복 확인·같은 아이디 재가입 차단 ③ 틀린 비밀번호에 구분 없는 문구 ④ 비밀번호 Argon2id(`m=19456,t=2,p=1`), 운영 컨테이너(alpine)에서도 동작 ⑤ 세션 DB 저장·30일·HttpOnly 쿠키 ⑥ 카카오·네이버 기본 지원, 이메일 요청 끄고 내부 주소로 대체 가능(코드 확인) ⑦ 이메일이 같아도 자동 병합 안 함·명시적 연결(link-social)·마지막 로그인 수단 해제 차단(기본 내장) ⑧ 간편 로그인 자동 가입 막고 "처음 오셨나요?" 선택 가능(disableImplicitSignUp + requestSignUp). 실제 카카오·네이버 로그인은 V-03(개발자 앱 등록) 후. 주의: 라이브러리 오류 문구가 영어라 화면용 한국어 문구표 필요 | 개발 |
 | V-12 | 상시 가동 | **설정 확인 완료, 재부팅 시험 대기** | 이 PC의 기존 설정으로 충족: AC 전원 절전 안 함, Windows 자동 로그인 켜짐, Docker Desktop 로그인 시 자동 시작, 컨테이너 3개 모두 `unless-stopped`. 남은 일: 실제 재부팅 후 휴대폰 접속 확인(사용자, 2026-11-01 "나중에" — 다음 재부팅 때 확인), 하트비트 감시 서비스 가입·연결(사용자 계정 필요) | 사용자 |
 | V-13 | 백업·복원 | 대기 | 외장 드라이브 연결, 클라우드 드라이브 종류 | **사용자** → 개발 |
@@ -45,7 +45,8 @@
 | `C:\oona-data\backups\` | 업데이트 직전 DB 백업(`pre-update-<시각>.dump`) |
 | `src/lib/auth.ts`, `src/lib/auth-client.ts`, `src/app/api/auth/[...all]/route.ts` | 인증(Better Auth): 아이디 로그인, Argon2id, 카카오·네이버(키 있을 때만), 명시적 계정 연결 |
 | `src/app/dev/auth/page.tsx` | 로그인 시험 페이지(개발용) |
-| `scripts/migrate-auth.mts` | 인증 테이블 만들기·갱신. 업데이트 스크립트가 운영 DB에 자동 실행 |
+| `scripts/migrate.mts` | 인증 테이블 + 앱 테이블(ai_connection) 만들기·갱신. 업데이트 스크립트가 운영 DB에 자동 실행 |
+| `src/lib/ai/`, `src/app/dev/ai/`, `scripts/ai-login.mts`, `scripts/check-ai.mts` | AI 연결(D-060): 엔진 5종(Claude·ChatGPT 구독, Claude·OpenAI·Gemini API 키), 순서대로 시도하는 체인, 키 암호화, 구독 로그인, 시험 화면 |
 | DB `oona_dev` | 개발 서버 전용 DB(같은 Postgres 컨테이너). 운영은 `oona` — 개발 시험이 운영 데이터를 건드리지 않음 |
 | `.env` 추가 값 | `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`(개발 주소). 운영 주소는 docker-compose.yml에서 지정 |
 | `next.config.ts` | 보안 헤더, `sw.js` 캐시 금지 |

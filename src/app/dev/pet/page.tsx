@@ -18,10 +18,10 @@ export default function PetTest() {
     <main className="mx-auto w-full max-w-3xl space-y-6 p-6">
       <h1 className="text-2xl font-bold">펫 렌더러 시험</h1>
       <ul className="text-muted-foreground list-disc space-y-1 pl-5 text-sm">
-        <li>펫은 혼자 쉬거나 천천히 돌아다녀요.</li>
-        <li>끌어서 옮길 수 있어요. 놓은 자리에서 다시 가고 싶은 곳으로 가요.</li>
+        <li>펫은 걸어다니지 않고 놓인 자리에서 쉬거나 앉거나 두리번거려요.</li>
+        <li>끌어서 옮길 수 있어요. 놓은 자리에 그대로 있어요.</li>
         <li>펫 위에 올리면 애교, 누르면 놀라요. 한동안 아무것도 안 하면 잠들어요.</li>
-        <li>아래 상자와 입력 중인 칸 위로는 들어오지 않아요.</li>
+        <li>아래 상자나 입력 중인 칸에 겹치면 가까운 빈자리로 깡충 비켜요.</li>
       </ul>
 
       <section className="space-y-2">

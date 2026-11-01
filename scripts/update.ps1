@@ -36,7 +36,7 @@ if ($LASTEXITCODE -ne 0) { Write-Host "빌드 실패: 지금 실행 중인 버�
 Step "운영 DB 마이그레이션(인증 테이블)"
 $pw = ((Get-Content .env | Where-Object { $_ -match '^POSTGRES_PASSWORD=' }) -split '=', 2)[1]
 $env:DATABASE_URL = "postgres://oona:$pw@127.0.0.1:55440/oona" # .env보다 이 값이 우선
-node --env-file=.env scripts/migrate-auth.mts
+node --env-file=.env scripts/migrate.mts
 $migrateExit = $LASTEXITCODE
 Remove-Item Env:DATABASE_URL
 if ($migrateExit -ne 0) { Write-Host "마이그레이션 실패: 지금 실행 중인 버전을 그대로 둡니다." -ForegroundColor Red; exit 1 }

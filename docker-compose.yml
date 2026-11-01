@@ -42,6 +42,13 @@ services:
       KAKAO_CLIENT_SECRET: ${KAKAO_CLIENT_SECRET:-}
       NAVER_CLIENT_ID: ${NAVER_CLIENT_ID:-}
       NAVER_CLIENT_SECRET: ${NAVER_CLIENT_SECRET:-}
+      # AI(D-060): API 키 암호화 마스터 키, 구독 연결을 쓸 주인 계정, 구독 로그인 폴더(아래 volumes)
+      AI_KEY_SECRET: ${AI_KEY_SECRET:?.env에 AI_KEY_SECRET이 필요해요}
+      OONA_OWNER_USERNAME: ${OONA_OWNER_USERNAME:-}
+      OONA_AI_LOGIN_DIR: /data/ai-login
+    # 이 PC에서 scripts/ai-login.mts로 로그인한 구독 폴더(Claude·ChatGPT). 토큰 갱신 때 앱이 다시 씀
+    volumes:
+      - ${OONA_AI_LOGIN_DIR:?.env에 OONA_AI_LOGIN_DIR이 필요해요}:/data/ai-login
     # 이 PC에서 직접 볼 때만 쓰는 포트(127.0.0.1). 휴대폰은 Tailscale(아래)로
     ports:
       - "127.0.0.1:3331:3000"

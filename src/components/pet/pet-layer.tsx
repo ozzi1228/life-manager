@@ -1,12 +1,12 @@
 "use client";
 
 // 펫 렌더러 + 상태 머신 (docs/planning/11-pet-system.md §4)
-// 그림: 캐릭터 시트(D-053)를 참고해 만든 동작별 한 장(assets/pets-hd → scripts/fit-pets.mjs). 걷기는 정면으로 선 그림(두 발). 움직임은 앱 효과(11 §5.1 대체 효과)
-// D-055: 커서 따라오기 없음. 끌어서 옮길 수 있고, 놓은 자리에서 다시 스스로 천천히 돌아다님
+// 그림: 캐릭터 시트(D-053)를 참고해 만든 동작별 한 장(assets/pets-hd → scripts/fit-pets.mjs). 움직임은 앱 효과(11 §5.1 대체 효과)
+// D-055: 커서 따라오기 없음. 끌어서 옮길 수 있음. 걸어다니지 않고 놓은 자리에서 쉼·앉기·두리번(사용자 피드백 2026-11-01)
 // 원칙: rAF 루프 1개, transform만 매 프레임 변경(리플로우 없음), 그림은 동작이 바뀔 때만 교체
 import { useEffect, useRef } from "react";
 
-const POSES = ["idle", "walk", "sit", "surprised", "happy", "sleep", "hover", "discover"] as const;
+const POSES = ["idle", "sit", "surprised", "happy", "sleep", "hover", "discover"] as const;
 type Pose = (typeof POSES)[number];
 
 export const PRESET_PETS = [
@@ -28,10 +28,6 @@ type Props = {
   onStats?: (s: PetStats) => void;
 };
 
-const WALK_SPEED = 22; // px/s — 천천히 (D-055)
-const STEP_HZ = 2.8; // 초당 걸음 수(아장아장)
-const WADDLE_DEG = 6; // 걸음마다 디딘 발 쪽으로 기우는 각도
-const FEET_LINE = 86; // 그림 높이의 이 % 아래를 발로 보고 좌우로 나눠 따로 움직임
 const DRAG_THRESHOLD = 6;
 const JUMP_TIME = 0.45;
 
@@ -41,7 +37,6 @@ const hit = (a: Rect, b: Rect) => a.l < b.r && a.r > b.l && a.t < b.b && a.b > b
 export function PetLayer({ petId, size = 80, reducedMotion, sleepAfterMs = 60_000, onClick, onStats }: Props) {
   const outer = useRef<HTMLDivElement>(null);
   const inner = useRef<HTMLDivElement>(null);
-  const layers = useRef<HTMLDivElement[]>([]); // [몸통, 왼발, 오른발] — 같은 그림을 잘라 보이는 영역만 다름
   const cb = useRef({ onClick, onStats });
   useEffect(() => {
     cb.current = { onClick, onStats };
@@ -50,7 +45,6 @@ export function PetLayer({ petId, size = 80, reducedMotion, sleepAfterMs = 60_00
   useEffect(() => {
     const box = outer.current!;
     const art = inner.current!;
-    const [, footL, footR] = layers.current;
     const src = (p: Pose) => `/pets/${petId}/${p}.png`;
     // 미리 불러와 디코딩해 두고 참조를 붙잡아 둠(휴대폰에서 그림을 바꿀 때 앞뒤 그림이 겹쳐 보이지 않게)
     const preloaded = POSES.map((p) => {
@@ -70,7 +64,6 @@ export function PetLayer({ petId, size = 80, reducedMotion, sleepAfterMs = 60_00
       t: 0,
       restPose: "idle" as Pose,
       rest: 3,
-      target: null as null | { x: number; y: number },
       hover: false,
       jumpLeft: 0,
       drag: null as null | { dx: number; dy: number; sx: number; sy: number; moved: boolean },
@@ -80,7 +73,7 @@ export function PetLayer({ petId, size = 80, reducedMotion, sleepAfterMs = 60_00
       if (s.pose === p) return;
       s.pose = p;
       s.t = 0;
-      for (const l of layers.current) l.style.backgroundImage = `url(${src(p)})`;
+      art.style.backgroundImage = `url(${src(p)})`;
     };
     const newRest = (sec: number) => {
       const r = Math.random();
@@ -102,16 +95,14 @@ export function PetLayer({ petId, size = 80, reducedMotion, sleepAfterMs = 60_00
     refreshAvoid();
     const avoidTimer = setInterval(refreshAvoid, 500);
     const blocked = (x: number, y: number) => avoid.some((r) => hit({ l: x, t: y, r: x + size, b: y + size }, r));
-    // 가고 싶은 곳: 지금 서 있는 높이에서 좌우로만 걷는다(땅 위를 걷는 느낌, 떠다니지 않게).
-    // 모달·입력칸 위에 놓인 경우에만 위아래로도 비켜 감
-    const pickTarget = () => {
-      const escaping = blocked(s.x, s.y);
-      for (let i = 0; i < 16; i++) {
-        const reach = i < 8 ? 1 : 2.5; // 가까운 곳이 없으면 더 멀리
-        const dir = Math.random() < 0.5 ? -1 : 1;
-        const x = Math.max(0, Math.min(maxX(), s.x + dir * (80 + Math.random() * 180) * reach));
-        const y = escaping ? Math.max(0, Math.min(maxY(), s.y + (Math.random() - 0.5) * 260 * reach)) : s.y;
-        if (!blocked(x, y) && Math.abs(x - s.x) > 20) return { x, y };
+    // 모달·입력칸 위에 있게 되면 가까운 빈자리로 깡충 비켜 감(걸어다니지 않음, 사용자 피드백 2026-11-01)
+    const freeSpot = () => {
+      for (let i = 0; i < 24; i++) {
+        const reach = 80 + i * 30; // 가까운 곳부터
+        const a = Math.random() * Math.PI * 2;
+        const x = Math.max(0, Math.min(maxX(), s.x + Math.cos(a) * reach));
+        const y = Math.max(0, Math.min(maxY(), s.y + Math.sin(a) * reach));
+        if (!blocked(x, y)) return { x, y };
       }
       return null;
     };
@@ -146,9 +137,8 @@ export function PetLayer({ petId, size = 80, reducedMotion, sleepAfterMs = 60_00
       const d = s.drag;
       s.drag = null;
       if (!d) return;
-      s.target = null;
       if (d.moved) {
-        newRest(2 + Math.random() * 4); // 놓은 자리에 고정하지 않음: 쉬었다가 다시 스스로 움직임
+        newRest(4 + Math.random() * 8); // 놓은 자리에서 쉼
       } else {
         s.jumpLeft = JUMP_TIME;
         cb.current.onClick?.();
@@ -181,8 +171,6 @@ export function PetLayer({ petId, size = 80, reducedMotion, sleepAfterMs = 60_00
       last = now;
       s.t += dt;
       let fx = ""; // 그림에 줄 효과(아래 가운데 기준)
-      let feet = [0, 0]; // 왼발·오른발 들어 올림(px, 음수가 위)
-      let origin = "50% 100%"; // 기울기 중심(걸을 때는 디딘 발)
 
       if (reduce) {
         mode = "reduced";
@@ -209,49 +197,23 @@ export function PetLayer({ petId, size = 80, reducedMotion, sleepAfterMs = 60_00
           setPose("sleep");
           fx = `scaleY(${1 + Math.sin(s.t * 1.6) * 0.025})`;
         }
-      } else if (s.target) {
-        mode = "walk";
-        setPose("walk");
-        // 두 발로 아장아장(사용자 피드백): 정면 그림으로, 한 발을 들면 디딘 발을 축으로 몸이 그쪽으로 뒤뚱 기움.
-        // 발을 드는 동안만 앞으로 나아가고, 디딜 때 살짝 눌림. 정면 그림이라 방향을 뒤집지 않음(뒷걸음질 없음)
-        const ph = s.t * STEP_HZ;
-        const lift = Math.sin(Math.PI * (ph % 1)); // 0(디딤) → 1(발 듦) → 0
-        const leftStep = Math.floor(ph) % 2 === 0; // 왼발을 드는 걸음
-        const squash = 0.04 * (1 - lift);
-        origin = leftStep ? "68% 100%" : "32% 100%"; // 디딘 발 위치
-        fx = `rotate(${(leftStep ? 1 : -1) * WADDLE_DEG * lift}deg) translateY(${-1.5 * lift}px) scale(${1 + squash}, ${1 - squash})`;
-        feet = [leftStep ? -3 * lift : 0, leftStep ? 0 : -3 * lift];
-        const dx = s.target.x - s.x;
-        const dy = s.target.y - s.y;
-        const dist = Math.hypot(dx, dy);
-        const step = Math.min(dist, WALK_SPEED * 1.57 * lift * dt); // 평균 속도는 WALK_SPEED
-        const nx = s.x + (dx / (dist || 1)) * step;
-        const ny = s.y + (dy / (dist || 1)) * step;
-        // 이미 안전 영역 안이면(그 위에 놓인 경우) 빠져나가는 걸음은 막지 않음
-        if (dist < 1 || (blocked(nx, ny) && !blocked(s.x, s.y))) {
-          s.target = null;
-          newRest(5 + Math.random() * 12); // 오래 쉬다가 가끔 움직임
-        } else {
-          s.x = nx;
-          s.y = ny;
-        }
       } else {
         mode = "rest";
         setPose(s.restPose);
         fx = `scaleY(${1 + Math.sin(s.t * 2.2) * 0.02})`;
-        if (blocked(s.x, s.y)) s.rest = Math.min(s.rest, 1); // 모달·입력칸 위에 놓였으면 곧 비켜 감
-        s.rest -= dt;
-        if (s.rest <= 0) {
-          s.target = pickTarget();
-          if (!s.target) newRest(3);
+        const spot = blocked(s.x, s.y) ? freeSpot() : null;
+        if (spot) {
+          s.x = spot.x;
+          s.y = spot.y;
+          s.jumpLeft = JUMP_TIME;
         }
+        s.rest -= dt;
+        if (s.rest <= 0) newRest(5 + Math.random() * 12); // 대기·앉기·두리번을 번갈아
+
       }
 
       box.style.transform = `translate3d(${s.x}px, ${s.y}px, 0)`;
-      art.style.transformOrigin = origin;
       art.style.transform = reduce ? "" : fx;
-      footL.style.transform = feet[0] ? `translateY(${feet[0]}px)` : "";
-      footR.style.transform = feet[1] ? `translateY(${feet[1]}px)` : "";
       if (!s.drag && blocked(s.x, s.y)) overlaps++;
 
       const work = performance.now() - t0;
@@ -300,24 +262,9 @@ export function PetLayer({ petId, size = 80, reducedMotion, sleepAfterMs = 60_00
     >
       <div
         ref={inner}
-        className="relative h-full w-full"
+        className="h-full w-full bg-contain bg-bottom bg-no-repeat"
         style={{ transformOrigin: "50% 100%", filter: "drop-shadow(0 1px 1px rgb(0 0 0 / 0.12))" }}
-      >
-        {[
-          `inset(0 0 ${100 - FEET_LINE}% 0)`, // 몸통
-          `inset(${FEET_LINE}% 50% 0 0)`, // 왼발
-          `inset(${FEET_LINE}% 0 0 50%)`, // 오른발
-        ].map((clip, i) => (
-          <div
-            key={i}
-            ref={(e) => {
-              if (e) layers.current[i] = e;
-            }}
-            className="absolute inset-0 bg-contain bg-bottom bg-no-repeat"
-            style={{ clipPath: clip }}
-          />
-        ))}
-      </div>
+      />
     </div>
   );
 }

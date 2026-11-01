@@ -4,6 +4,8 @@ const nextConfig: NextConfig = {
   // 컨테이너 상시 실행용 최소 서버(.next/standalone) — Dockerfile 참고
   output: "standalone",
   cacheComponents: true,
+  // 자식 프로세스로 Claude Code·Codex를 띄우는 패키지는 묶지 않고 node_modules에서 그대로 씀
+  serverExternalPackages: ["@anthropic-ai/claude-agent-sdk", "@openai/codex"],
   partialPrefetching: true,
   async headers() {
     return [

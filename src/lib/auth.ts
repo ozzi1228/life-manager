@@ -5,7 +5,7 @@
 import { betterAuth } from "better-auth";
 import { username } from "better-auth/plugins";
 import { hash, verify } from "@node-rs/argon2";
-import { Pool } from "pg";
+import { pool } from "./db.ts"; // 확장자: scripts/*.mts(노드 직접 실행)도 이 파일을 불러옴
 
 export const INTERNAL_EMAIL_DOMAIN = "users.oona.invalid";
 export const internalEmail = (kind: "id" | "kakao" | "naver", id: string) => `${kind}.${id}@${INTERNAL_EMAIL_DOMAIN}`;
@@ -43,7 +43,7 @@ const social = {
 };
 
 export const auth = betterAuth({
-  database: new Pool({ connectionString: process.env.DATABASE_URL }),
+  database: pool,
   secret: process.env.BETTER_AUTH_SECRET,
   baseURL: process.env.BETTER_AUTH_URL,
   // 운영 주소는 .env의 OONA_URL(저장소에 이 PC의 주소를 남기지 않음)
