@@ -1,7 +1,7 @@
 "use client";
 
 // 펫 렌더러 + 상태 머신 (docs/planning/11-pet-system.md §4)
-// 그림: 사용자 캐릭터 시트(D-053)에서 잘라낸 동작별 한 장(scripts/cut-pets.mjs). 움직임은 앱 효과(11 §5.1 대체 효과)
+// 그림: 캐릭터 시트(D-053)를 참고해 만든 동작별 한 장(assets/pets-hd → scripts/fit-pets.mjs). 걷기는 정면으로 선 그림(두 발). 움직임은 앱 효과(11 §5.1 대체 효과)
 // D-055: 커서 따라오기 없음. 끌어서 옮길 수 있고, 놓은 자리에서 다시 스스로 천천히 돌아다님
 // 원칙: rAF 루프 1개, transform만 매 프레임 변경(리플로우 없음), 그림은 동작이 바뀔 때만 교체
 import { useEffect, useRef } from "react";
@@ -31,17 +31,6 @@ type Props = {
 const WALK_SPEED = 22; // px/s — 천천히 (D-055)
 const STEP_HZ = 2.8; // 초당 걸음 수(아장아장)
 const WADDLE_DEG = 6; // 걸음마다 디딘 발 쪽으로 기우는 각도
-// 펫별 그림 바꿔 끼우기(사용자 피드백 2026-11-01, docs/planning/11 §3.1)
-// - 걷기: 시트의 "걷기"는 옆·네 발 그림이 많아 뒷걸음질·네 발 걸음으로 보임 → 정면으로 선 그림으로 두 발 걸음
-// - 포몽 "애교"는 귀가 처져 강아지처럼 보임 → "기뻐하기"
-// - 멍이 "앉기"·"무언가 발견"은 곰처럼, "따라오기"는 머리에 덩어리가 보임 → "대기"
-const ART: Record<string, Partial<Record<Pose, string>>> = { // 값 = public/pets/<id>/의 그림 파일 이름
-  pomong: { walk: "follow", hover: "happy" },
-  komong: { walk: "follow" },
-  piyo: { walk: "follow" },
-  meongi: { walk: "hover", sit: "idle", discover: "idle" },
-  hoya: { walk: "follow" },
-};
 const FEET_LINE = 86; // 그림 높이의 이 % 아래를 발로 보고 좌우로 나눠 따로 움직임
 const DRAG_THRESHOLD = 6;
 const JUMP_TIME = 0.45;
@@ -62,7 +51,7 @@ export function PetLayer({ petId, size = 80, reducedMotion, sleepAfterMs = 60_00
     const box = outer.current!;
     const art = inner.current!;
     const [, footL, footR] = layers.current;
-    const src = (p: Pose) => `/pets/${petId}/${ART[petId]?.[p] ?? p}.png`;
+    const src = (p: Pose) => `/pets/${petId}/${p}.png`;
     // 미리 불러와 디코딩해 두고 참조를 붙잡아 둠(휴대폰에서 그림을 바꿀 때 앞뒤 그림이 겹쳐 보이지 않게)
     const preloaded = POSES.map((p) => {
       const img = new Image();
