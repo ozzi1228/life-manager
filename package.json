@@ -7,8 +7,8 @@
     "build": "next build",
     "start": "next start -p 3331 -H 127.0.0.1",
     "lint": "eslint",
-    "typecheck": "tsc --noEmit",
-    "check": "tsc --noEmit && eslint",
+    "typecheck": "next typegen && tsc --noEmit",
+    "check": "next typegen && tsc --noEmit && eslint",
     "check:db": "node --env-file=.env scripts/check-data.mts && node --env-file=.env scripts/check-ai.mts",
     "db:generate": "node --env-file=.env node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file=.env scripts/migrate.mts"

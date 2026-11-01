@@ -2,7 +2,6 @@
 
 // 온보딩 (SCR-AUTH-04, 04 §2.4): 최대 3단계, 모두 건너뛸 수 있음
 import { CalendarDays, HeartPulse, NotebookPen, Target, Wallet } from "lucide-react";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { completeOnboarding } from "@/app/actions/onboarding";
 import { PRESET_PETS } from "@/components/pet/pet-layer";
@@ -23,7 +22,6 @@ const AREAS = [
 ];
 
 export default function OnboardingPage() {
-  const router = useRouter();
   const { data: session } = authClient.useSession();
   const { update: updatePet } = usePetPrefs();
   const [step, setStep] = useState(0);
@@ -44,7 +42,8 @@ export default function OnboardingPage() {
       setMsg(r.error.message);
       return;
     }
-    router.replace("/");
+    // 로그인 화면 묶음 → 앱 화면 묶음으로 넘어갈 때 클라이언트 이동이 중간에 끊기는 일이 있어(운영에서 멈춤) 새로 불러옴
+    location.replace("/");
   };
   const nextStep = () => (step < 2 ? setStep(step + 1) : finish());
 
