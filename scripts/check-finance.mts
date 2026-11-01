@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { inArray } from "drizzle-orm";
 import { db } from "../src/db/index.ts";
-import { finCategories, paymentMethods, revisions, transactions } from "../src/db/schema.ts";
+import { finCategories, paymentMethods, recurringPayments, revisions, transactions } from "../src/db/schema.ts";
 import { AppError } from "../src/server/errors.ts";
 import { createTransaction, formData, monthTransactions, totals } from "../src/server/finance.ts";
 import type { Ctx } from "../src/server/repo.ts";
@@ -44,8 +44,44 @@ try {
   assert.deepEqual(totals(nov), { expense: 12000 + 50000 - 2000, income: 100000 });
   assert.equal((await monthTransactions(B, "2026-11")).length, 0);
   console.log("지출 규칙 확인 통과");
+
+  // 고정 지출: 주기별 필수 값, 해지 예정·해지됨, 남의 결제수단 불가
+  const { createRecurring, scheduleEnd, endNow, cancelEnd, recurringList, upcoming, paysBetween } = await import("../src/server/recurring.ts");
+  const { todayIn } = await import("../src/server/time.ts");
+  const { addDays } = await import("../src/lib/recurring.ts");
+  const today = todayIn();
+  assert.equal(await code(createRecurring(A, { name: "넷플릭스", amount: 13500, cycle: "monthly" })), "VALIDATION_FAILED", "매월인데 날짜 없음");
+  const pmB = (await formData(B)).paymentMethods[0];
+  assert.equal(await code(createRecurring(A, { name: "x", amount: 1, cycle: "monthly", dayOfMonth: 1, paymentMethodId: pmB.id })), "VALIDATION_FAILED", "남의 결제수단 불가");
+  const tomorrow = addDays(today, 1);
+  const r = await createRecurring(A, { name: "넷플릭스", amount: 13500, cycle: "monthly", dayOfMonth: Number(tomorrow.slice(8)), weekday: 3, memo: "네이버플러스에 포함" });
+  assert.equal(r.weekday, null, "주기에 필요 없는 값은 버림");
+  let list = await recurringList(A);
+  assert.equal(list[0].next, tomorrow);
+  assert.equal(list[0].label, `매월 ${Number(tomorrow.slice(8))}일`);
+  assert.deepEqual((await upcoming(A)).map((u) => u.date), [tomorrow]);
+  assert.equal(await code(scheduleEnd(A, r.id, r.version, addDays(today, -1))), "VALIDATION_FAILED", "지난 날로 해지 예정 불가");
+  const e = await scheduleEnd(A, r.id, r.version, today);
+  list = await recurringList(A);
+  assert.deepEqual([list[0].status, list[0].next], ["ending", null], "마지막 이용일 뒤 결제는 예정에서 빠짐");
+  assert.equal(paysBetween({ ...e, lastUseDate: addDays(today, -1) }, today, addDays(today, 60)).length, 0);
+  assert.equal(list[0].perMonth, 13500);
+  const c = await cancelEnd(A, r.id, e.version);
+  const n = await endNow(A, r.id, c.version);
+  list = await recurringList(A);
+  assert.deepEqual([list[0].status, list[0].perMonth, list[0].endedAt], ["ended", 0, today]);
+  assert.equal(n.status, "ended");
+  assert.equal((await recurringList(B)).length, 0);
+  const { recurringRepo } = await import("../src/server/recurring.ts");
+  const { restore } = await import("../src/server/repo.ts");
+  await recurringRepo.remove(A, r.id);
+  assert.equal((await recurringList(A)).length, 0);
+  await restore(A, "recurring_payment", r.id);
+  assert.equal((await recurringList(A)).length, 1, "삭제 되돌리기");
+  console.log("고정 지출 규칙 확인 통과");
 } finally {
   await db.delete(transactions).where(inArray(transactions.userId, users));
+  await db.delete(recurringPayments).where(inArray(recurringPayments.userId, users));
   await db.delete(finCategories).where(inArray(finCategories.userId, users));
   await db.delete(paymentMethods).where(inArray(paymentMethods.userId, users));
   await db.delete(revisions).where(inArray(revisions.userId, users));

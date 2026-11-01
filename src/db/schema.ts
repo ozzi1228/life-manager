@@ -264,3 +264,34 @@ export const journalEntries = pgTable(
   },
   (t) => [index("journal_entries_user_date").on(t.userId, t.date.desc()).where(sql`${t.deletedAt} is null`)],
 );
+
+// 고정 지출 (06 §5, 14 §4.4). 해지해도 지우지 않고 상태로(이용 중 → 해지 예정(마지막 이용일) → 해지됨)
+export const recurringPayments = pgTable(
+  "recurring_payments",
+  {
+    ...userData(),
+    name: text("name").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    variableAmount: boolean("variable_amount").notNull().default(false),
+    cycle: text("cycle", { enum: ["monthly", "yearly", "every_n_months", "weekly"] }).notNull(),
+    dayOfMonth: integer("day_of_month"), // 1~31, 0 = 말일
+    monthOfYear: integer("month_of_year"),
+    intervalMonths: integer("interval_months"),
+    anchorMonth: text("anchor_month"), // YYYY-MM
+    weekday: integer("weekday"),
+    paymentMethodId: uuid("payment_method_id"),
+    categoryId: uuid("category_id"),
+    memo: text("memo"),
+    status: text("status", { enum: ["active", "ending", "ended"] }).notNull().default("active"),
+    lastUseDate: date("last_use_date"),
+    endedAt: date("ended_at"),
+    startedAt: date("started_at").notNull(),
+    notify: boolean("notify").notNull().default(true),
+    autoRecord: boolean("auto_record").notNull().default(false),
+  },
+  (t) => [
+    index("recurring_payments_user").on(t.userId).where(sql`${t.deletedAt} is null`),
+    check("recurring_amount_positive", sql`${t.amount} > 0 and ${t.amount} <= 10000000000`),
+    check("recurring_ending_has_date", sql`${t.status} <> 'ending' or ${t.lastUseDate} is not null`),
+  ],
+);

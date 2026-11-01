@@ -1,0 +1,33 @@
+CREATE TABLE "recurring_payments" (
+	"id" uuid PRIMARY KEY NOT NULL,
+	"user_id" text NOT NULL,
+	"created_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"updated_at" timestamp with time zone DEFAULT now() NOT NULL,
+	"deleted_at" timestamp with time zone,
+	"deleted_by" text,
+	"delete_batch_id" uuid,
+	"version" integer DEFAULT 1 NOT NULL,
+	"source" text DEFAULT 'manual' NOT NULL,
+	"name" text NOT NULL,
+	"amount" bigint NOT NULL,
+	"variable_amount" boolean DEFAULT false NOT NULL,
+	"cycle" text NOT NULL,
+	"day_of_month" integer,
+	"month_of_year" integer,
+	"interval_months" integer,
+	"anchor_month" text,
+	"weekday" integer,
+	"payment_method_id" uuid,
+	"category_id" uuid,
+	"memo" text,
+	"status" text DEFAULT 'active' NOT NULL,
+	"last_use_date" date,
+	"ended_at" date,
+	"started_at" date NOT NULL,
+	"notify" boolean DEFAULT true NOT NULL,
+	"auto_record" boolean DEFAULT false NOT NULL,
+	CONSTRAINT "recurring_amount_positive" CHECK ("recurring_payments"."amount" > 0 and "recurring_payments"."amount" <= 10000000000),
+	CONSTRAINT "recurring_ending_has_date" CHECK ("recurring_payments"."status" <> 'ending' or "recurring_payments"."last_use_date" is not null)
+);
+--> statement-breakpoint
+CREATE INDEX "recurring_payments_user" ON "recurring_payments" USING btree ("user_id") WHERE "recurring_payments"."deleted_at" is null;

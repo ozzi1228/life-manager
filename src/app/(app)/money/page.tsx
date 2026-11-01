@@ -1,4 +1,4 @@
-// 자산 · 한눈에 (SCR-FIN-01) 1차: 이번 달 쓴 돈·수입, 분류별 상위, 최근 지출. 예산·결제 예정·참은 소비는 3묶음에서
+// 자산 · 한눈에 (SCR-FIN-01): 이번 달 쓴 돈·수입, 7일 안 결제 예정, 분류별 상위, 최근 지출. 예산·참은 소비는 3묶음에서
 import Link from "next/link";
 import { Page } from "@/components/app/page-shell";
 import { EmptyState } from "@/components/app/states";
@@ -6,15 +6,16 @@ import { AddExpenseButton } from "@/components/money/controls";
 import { MoneyTabs } from "@/components/money/money-tabs";
 import { TxList } from "@/components/money/tx-list";
 import { Button } from "@/components/ui/button";
-import { money } from "@/lib/format";
+import { dayLabel, fromYmd, money } from "@/lib/format";
 import { monthTransactions, nameMaps, todayIn, totals, toRow } from "@/server/finance";
+import { upcoming } from "@/server/recurring";
 import { pageCtx } from "@/server/session";
 
 export default async function MoneyHome() {
   const ctx = await pageCtx();
   const today = todayIn();
   const month = today.slice(0, 7);
-  const [rows, names] = await Promise.all([monthTransactions(ctx, month), nameMaps(ctx)]);
+  const [rows, names, soon] = await Promise.all([monthTransactions(ctx, month), nameMaps(ctx), upcoming(ctx)]);
   const sum = totals(rows);
 
   // 분류별 지출(환불 차감) 상위 5개
@@ -26,6 +27,31 @@ export default async function MoneyHome() {
   return (
     <Page>
       <MoneyTabs />
+      {soon.length > 0 && (
+        <section className="bg-card space-y-2 rounded-xl border p-5 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h2 className="text-subtitle font-semibold">7일 안 결제 예정</h2>
+            <Button asChild variant="link" size="sm">
+              <Link href="/money/fixed">고정 지출</Link>
+            </Button>
+          </div>
+          <ul className="space-y-1.5">
+            {soon.map((u) => (
+              <li key={u.id + u.date} className="flex items-center gap-3 text-sm">
+                <span className="text-muted-foreground w-20 shrink-0">{upLabel(u.date, today)}</span>
+                <span className="min-w-0 flex-1 truncate">
+                  {u.name}
+                  {u.memo && <span className="text-muted-foreground"> · {u.memo.split("\n")[0]}</span>}
+                </span>
+                <span className="shrink-0 tabular-nums">
+                  {u.variableAmount && "약 "}
+                  {money(u.amount)}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
       {rows.length === 0 ? (
         <EmptyState title="이번 달 지출이 아직 없어요" description="결제하고 바로 기록하면 15초면 끝나요." action={<AddExpenseButton />} pet="pomong" />
       ) : (
@@ -67,4 +93,10 @@ export default async function MoneyHome() {
       )}
     </Page>
   );
+}
+
+// 오늘·내일·모레, 그 뒤는 날짜
+function upLabel(d: string, today: string) {
+  const diff = Math.round((fromYmd(d).getTime() - fromYmd(today).getTime()) / 86_400_000);
+  return diff === 0 ? "오늘" : diff === 1 ? "내일" : diff === 2 ? "모레" : dayLabel(d, fromYmd(today));
 }
