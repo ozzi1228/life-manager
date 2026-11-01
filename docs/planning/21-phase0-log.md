@@ -32,7 +32,7 @@
 | `.env` / `.env.example` | DB 비밀번호(무작위 생성, `.env`는 저장소 제외) |
 | `.claude/launch.json` | 미리보기용 개발 서버 설정 |
 | `docker-compose.yml` `tailscale` 서비스 + `tailscale/serve.json` | 우나 전용 Tailscale 노드(`oona`), 443 → 이 PC 3331, Funnel 꺼짐 |
-| `src/app/manifest.ts`, `src/app/icon.png`·`apple-icon.png`, `public/icons/`, `scripts/make-icons.mjs`, `public/sw.js` | 홈 화면 설치 정보, 로고(`assets/logo.png`)에서 만든 앱 아이콘(로고 바꾸면 스크립트 다시 실행), 푸시 수신 서비스 워커 |
+| `src/app/manifest.ts`, `src/app/icon.png`·`apple-icon.png`, `public/icons/`, `scripts/make-icons.mjs`, `public/sw.js` | 홈 화면 설치 정보, 로고(`assets/logo.png`)에서 만든 앱 아이콘, 탭·알림용 작은 다이어리 아이콘(`assets/logo-small.svg`)(로고 바꾸면 스크립트 다시 실행), 푸시 수신 서비스 워커 |
 | `src/app/dev/push/` | 푸시 시험 페이지·서버 액션(개발용) |
 | `docs/planning/assets/pets-reference.png` | 사용자 제공 기본 펫 캐릭터 시트(D-053, 원본) |
 | `scripts/cut-pets.mjs` | 시트에서 동작 그림을 잘라 배경을 투명하게(가장자리에서 배경색 채우기, 외곽선에서 멈춤). `--debug`로 결과 모아 보기 |
