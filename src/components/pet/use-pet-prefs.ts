@@ -5,8 +5,9 @@
 import { useEffect, useState } from "react";
 
 const KEY = "oona.pet-prefs";
-export type PetPrefs = { petId: string; visible: boolean };
-const DEFAULTS: PetPrefs = { petId: "meongi", visible: true };
+// motion: 기기 설정 따르기(움직임 줄이기면 멈춤, 11 §6) / 움직이기 / 멈추기(11 §9 "움직임")
+export type PetPrefs = { petId: string; visible: boolean; motion: "system" | "on" | "off" };
+const DEFAULTS: PetPrefs = { petId: "meongi", visible: true, motion: "system" };
 
 export function usePetPrefs() {
   const [prefs, setPrefs] = useState<PetPrefs>(DEFAULTS);

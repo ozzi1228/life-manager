@@ -233,7 +233,7 @@ function Frame({ name, seenHints, children }: Props) {
           </ul>
         </nav>
 
-        {petLoaded && prefs.visible && <PetLayer petId={prefs.petId} />}
+        {petLoaded && prefs.visible && <PetLayer petId={prefs.petId} reducedMotion={prefs.motion === "system" ? undefined : prefs.motion === "off"} />}
       </SidebarProvider>
     </HintsProvider>
   );

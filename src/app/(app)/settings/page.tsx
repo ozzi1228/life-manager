@@ -64,6 +64,17 @@ export default function SettingsPage() {
           </span>
           <Switch checked={prefs.visible} disabled={!loaded} onCheckedChange={(v) => update({ visible: v })} />
         </label>
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
+          <span>
+            <span className="block font-medium">움직임</span>
+            <span className="text-muted-foreground text-sm">기기에서 애니메이션을 끄면 펫도 멈춰요</span>
+          </span>
+          <ToggleGroup type="single" variant="outline" size="sm" value={prefs.motion} disabled={!loaded} onValueChange={(v) => v && update({ motion: v as typeof prefs.motion })} aria-label="펫 움직임">
+            <ToggleGroupItem value="system">기기 설정</ToggleGroupItem>
+            <ToggleGroupItem value="on">움직이기</ToggleGroupItem>
+            <ToggleGroupItem value="off">멈추기</ToggleGroupItem>
+          </ToggleGroup>
+        </div>
         <div className="grid grid-cols-5 gap-2" role="radiogroup" aria-label="오늘의 펫">
           {PRESET_PETS.map(petButton)}
         </div>
