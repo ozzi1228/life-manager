@@ -25,6 +25,10 @@ try {
     const pet = await createPet(ctx, name, files);
     console.log(`추가함: ${name} (${pet.poses.join(", ")})`);
   }
+} catch (e) {
+  // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄
+  console.error(e);
+  process.exitCode = 1;
 } finally {
   process.exit(process.exitCode ?? 0);
 }

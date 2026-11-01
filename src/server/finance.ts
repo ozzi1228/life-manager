@@ -2,7 +2,7 @@
 import { and, asc, desc, eq, gte, isNull, lt, max, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
-import { finCategories, paymentMethods, transactions } from "../db/schema.ts";
+import { finCategories, paymentMethods, plannedExpenses, transactions } from "../db/schema.ts";
 import { parse } from "./validate.ts";
 import { AppError } from "./errors.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
@@ -10,6 +10,7 @@ import { defineRepo, type Ctx } from "./repo.ts";
 export const categoryRepo = defineRepo(finCategories, "fin_category");
 export const paymentRepo = defineRepo(paymentMethods, "payment_method");
 export const txRepo = defineRepo(transactions, "transaction");
+export const plannedRepo = defineRepo(plannedExpenses, "planned_expense");
 
 // 기본 분류(04 §6.13). 사치만 참은 소비에 포함(20 §3)
 const DEFAULT_EXPENSE = ["식비", "카페·간식", "교통", "쇼핑", "사치", "생활", "문화·여가", "건강·의료", "교육", "경조사·선물", "여행", "구독·고정", "기타"];
@@ -39,11 +40,12 @@ export async function formData(ctx: Ctx) {
       .from(transactions)
       .where(and(eq(transactions.userId, ctx.userId), isNull(transactions.deletedAt), gte(transactions.date, since)))
       .groupBy(col);
-  const [cats, pms, catUse, pmUse] = await Promise.all([
+  const [cats, pms, catUse, pmUse, planned] = await Promise.all([
     categoryRepo.list(ctx, { where: eq(finCategories.isHidden, false), orderBy: [asc(finCategories.sort)] }),
     paymentRepo.list(ctx, { where: eq(paymentMethods.isHidden, false), orderBy: [asc(paymentMethods.sort), asc(paymentMethods.createdAt)] }),
     lastUse(transactions.categoryId),
     lastUse(transactions.paymentMethodId),
+    plannedRepo.list(ctx, { where: gte(plannedExpenses.month, since.slice(0, 7)), orderBy: [asc(plannedExpenses.createdAt)] }),
   ]);
   const recent = (uses: { id: string | null; last: Date | null }[]) => new Map(uses.map((u) => [u.id, u.last?.getTime() ?? 0]));
   const byRecent = <T extends { id: string; sort: number }>(list: T[], use: Map<string | null, number>) =>
@@ -54,6 +56,7 @@ export async function formData(ctx: Ctx) {
     categories: byRecent(cats, recent(catUse)).map((c) => ({ id: c.id, kind: c.kind, name: c.name, restraint: c.countsTowardRestraint })),
     paymentMethods: orderedPm.map((p) => ({ id: p.id, kind: p.kind, name: p.name })),
     lastPaymentMethodId: pmRecent.size ? orderedPm[0]?.id ?? null : null,
+    planned: planned.map((p) => ({ id: p.id, month: p.month, name: p.name })),
   };
 }
 
@@ -67,19 +70,21 @@ export const txInput = z.object({
   paymentMethodId: z.uuid().nullable().default(null),
   title: z.string().trim().max(60, "내용은 60자까지 쓸 수 있어요").nullable().default(null),
   memo: z.string().trim().max(1000).nullable().default(null),
+  plannedExpenseId: z.uuid().nullable().default(null),
 });
 export type TxInput = z.input<typeof txInput>;
 
 /** 분류·결제수단이 내 것이고 종류가 맞는지(교차 사용자 참조 방지, 14 §7) */
-async function checkRefs(ctx: Ctx, v: { type: string; categoryId: string; paymentMethodId: string | null }) {
+async function checkRefs(ctx: Ctx, v: { type: string; categoryId: string; paymentMethodId: string | null; plannedExpenseId: string | null }) {
   const cat = await categoryRepo.get(ctx, v.categoryId).catch(() => null);
   if (!cat || cat.kind !== v.type) throw new AppError("VALIDATION_FAILED", "분류를 골라 주세요", { fields: [{ path: "categoryId", rule: "exists", message: "분류를 골라 주세요" }] });
   if (v.paymentMethodId && !(await paymentRepo.get(ctx, v.paymentMethodId).catch(() => null)))
     throw new AppError("VALIDATION_FAILED", "결제수단을 다시 골라 주세요", { fields: [{ path: "paymentMethodId", rule: "exists", message: "결제수단을 다시 골라 주세요" }] });
+  if (v.plannedExpenseId && !(await plannedRepo.get(ctx, v.plannedExpenseId).catch(() => null))) throw new AppError("VALIDATION_FAILED", "큰 지출을 다시 골라 주세요");
   return cat;
 }
 
-const clean = (v: z.infer<typeof txInput>) => ({ ...v, title: v.title || null, memo: v.memo || null, isRefund: v.type === "expense" && v.isRefund });
+const clean = (v: z.infer<typeof txInput>) => ({ ...v, title: v.title || null, memo: v.memo || null, isRefund: v.type === "expense" && v.isRefund, plannedExpenseId: v.type === "expense" ? v.plannedExpenseId : null });
 
 export async function createTransaction(ctx: Ctx, input: unknown) {
   const v = clean(parse(txInput, input));
@@ -165,4 +170,5 @@ export const toRow = (r: typeof transactions.$inferSelect) => ({
   paymentMethodId: r.paymentMethodId,
   title: r.title,
   memo: r.memo,
+  plannedExpenseId: r.plannedExpenseId,
 });

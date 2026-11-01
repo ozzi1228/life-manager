@@ -148,6 +148,7 @@ export const transactions = pgTable(
     title: text("title"),
     memo: text("memo"),
     installmentMonths: integer("installment_months").notNull().default(1),
+    plannedExpenseId: uuid("planned_expense_id"), // 큰 지출에 연결되면 분류별 예산 사용에서 빠짐(06 §4.1)
   },
   (t) => [
     index("transactions_user_date").on(t.userId, t.date.desc()).where(sql`${t.deletedAt} is null`),
@@ -306,4 +307,33 @@ export const pets = pgTable(
     poses: text("poses").array().notNull(), // idle 필수
   },
   (t) => [index("pets_user").on(t.userId).where(sql`${t.deletedAt} is null`)],
+);
+
+// 월별 예산 (06 §4, 14 §4.4). 분류별 예산은 한 행의 jsonb({분류 id: 금액})로 — 예산 저장이 한 번에 되고 버전 충돌도 한 곳에서
+// ponytail: 14의 budget_lines 테이블 대신 jsonb. 분류별 예산을 따로 묻는 쿼리가 필요해지면 나눔
+export const budgets = pgTable(
+  "budgets",
+  {
+    ...userData(),
+    month: text("month").notNull(), // YYYY-MM
+    lines: jsonb("lines").$type<Record<string, number>>().notNull().default({}),
+    copyNext: boolean("copy_next").notNull().default(true), // 다음 달 첫 진입 때 분류별 예산 복사(큰 지출은 복사 안 함)
+  },
+  (t) => [uniqueIndex("budgets_month").on(t.userId, t.month).where(sql`${t.deletedAt} is null`)],
+);
+
+// 큰 지출: 그 달에만 크게 나가는 돈의 계획(여행, 경조사). 지출을 연결하면 사용 금액이 잡힘
+export const plannedExpenses = pgTable(
+  "planned_expenses",
+  {
+    ...userData(),
+    month: text("month").notNull(),
+    name: text("name").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    manuallyDone: boolean("manually_done").notNull().default(false),
+  },
+  (t) => [
+    index("planned_expenses_month").on(t.userId, t.month).where(sql`${t.deletedAt} is null`),
+    check("planned_amount_positive", sql`${t.amount} > 0 and ${t.amount} <= 10000000000`),
+  ],
 );

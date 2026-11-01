@@ -50,6 +50,13 @@
       "when": 1793544525433,
       "tag": "0006_pets",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1793545368281,
+      "tag": "0007_budget",
+      "breakpoints": true
     }
   ]
 }

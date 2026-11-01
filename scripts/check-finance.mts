@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { inArray } from "drizzle-orm";
 import { db } from "../src/db/index.ts";
-import { finCategories, paymentMethods, recurringPayments, revisions, transactions } from "../src/db/schema.ts";
+import { budgets, finCategories, paymentMethods, plannedExpenses, recurringPayments, revisions, transactions } from "../src/db/schema.ts";
 import { AppError } from "../src/server/errors.ts";
 import { createTransaction, formData, monthTransactions, totals } from "../src/server/finance.ts";
 import type { Ctx } from "../src/server/repo.ts";
@@ -79,9 +79,49 @@ try {
   await restore(A, "recurring_payment", r.id);
   assert.equal((await recurringList(A)).length, 1, "삭제 되돌리기");
   console.log("고정 지출 규칙 확인 통과");
+
+  // 예산: 저장·큰 지출 고치기·지난달 자동 복사·넘는 순간 알림·남의 분류 불가
+  const { saveBudget, budgetView, budgetEffect, prevMonth } = await import("../src/server/budget.ts");
+  const month = today.slice(0, 7);
+  const prev = prevMonth(month);
+  const fb = (await formData(B)).categories.find((c) => c.name === "식비")!;
+  assert.equal(await code(saveBudget(A, prev, null, { lines: { [fb.id]: 1000 } })), "VALIDATION_FAILED", "남의 분류로 예산 불가");
+  await saveBudget(A, prev, null, { lines: { [food.id]: 100000 }, planned: [{ name: "지난달 여행", amount: 50000 }], copyNext: true });
+  assert.equal(await code(saveBudget(A, prev, null, { lines: {} })), "VERSION_CONFLICT", "같은 달 예산 두 번 만들기 불가");
+  let view = await budgetView(A, month);
+  assert.deepEqual(view.budget?.lines, { [food.id]: 100000 }, "이번 달 첫 진입: 분류별 예산 자동 복사");
+  assert.equal(view.budget?.copied, true);
+  assert.equal(view.planned.length, 0, "큰 지출은 복사 안 함");
+  const used0 = view.summary.categories[0].used; // 위에서 넣은 이번 달 식비
+  const line = used0 + 20000;
+  const b1 = await saveBudget(A, month, view.budget!.version, { lines: { [food.id]: line }, planned: [{ name: "선물", amount: 30000 }, { name: "여행", amount: 300000 }], copyNext: false });
+  view = await budgetView(A, month);
+  const trip = view.planned.find((p) => p.name === "여행")!;
+  await saveBudget(A, month, b1.version, { lines: { [food.id]: line }, planned: [{ id: trip.id, name: "여행", amount: 250000 }] });
+  view = await budgetView(A, month);
+  assert.deepEqual(view.planned.map((p) => [p.name, p.amount]), [["여행", 250000]], "빠진 큰 지출은 지움, 있는 건 고침");
+  assert.equal(view.summary.total, view.summary.fixed + 250000 + line);
+  await createTransaction(A, { ...base, date: today, amount: 15000 });
+  const t1 = { categoryId: food.id, date: today, amount: 15000, isRefund: false, plannedExpenseId: null };
+  assert.equal(await budgetEffect(A, t1), null, "아직 안 넘음");
+  await createTransaction(A, { ...base, date: today, amount: 8000 });
+  assert.deepEqual(await budgetEffect(A, { ...t1, amount: 8000 }), { category: "식비", over: 3000 }, "이번 저장으로 넘음");
+  await createTransaction(A, { ...base, date: today, amount: 100000, plannedExpenseId: trip.id });
+  view = await budgetView(A, month);
+  assert.equal(view.summary.categories[0].used, used0 + 23000, "큰 지출에 연결한 지출은 분류 사용에서 빠짐");
+  assert.equal(view.summary.planned[0].used, 100000);
+  const pb = (await saveBudget(B, month, null, { planned: [{ name: "b", amount: 1 }] }), (await budgetView(B, month)).planned[0]);
+  assert.equal(await code(createTransaction(A, { ...base, date: today, amount: 1, plannedExpenseId: pb.id })), "VALIDATION_FAILED", "남의 큰 지출 연결 불가");
+  console.log("예산 규칙 확인 통과");
+} catch (e) {
+  // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄
+  console.error(e);
+  process.exitCode = 1;
 } finally {
   await db.delete(transactions).where(inArray(transactions.userId, users));
   await db.delete(recurringPayments).where(inArray(recurringPayments.userId, users));
+  await db.delete(budgets).where(inArray(budgets.userId, users));
+  await db.delete(plannedExpenses).where(inArray(plannedExpenses.userId, users));
   await db.delete(finCategories).where(inArray(finCategories.userId, users));
   await db.delete(paymentMethods).where(inArray(paymentMethods.userId, users));
   await db.delete(revisions).where(inArray(revisions.userId, users));

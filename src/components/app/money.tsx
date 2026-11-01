@@ -68,7 +68,8 @@ export function AmountInput({
 }
 
 /** 예산 막대: 쓴 돈(+계획된 돈) / 예산. 80% 이상 주의, 100% 넘으면 초과 */
-export function BudgetBar({ used, planned = 0, budget, label }: { used: number; planned?: number; budget: number; label?: string }) {
+/** compact: 막대만(남음·초과 문구는 바깥에서 보여 줄 때) */
+export function BudgetBar({ used, planned = 0, budget, label, compact }: { used: number; planned?: number; budget: number; label?: string; compact?: boolean }) {
   const pct = budget > 0 ? (used / budget) * 100 : used > 0 ? 100 : 0;
   const over = used > budget;
   const warn = !over && pct >= 80;
@@ -89,17 +90,19 @@ export function BudgetBar({ used, planned = 0, budget, label }: { used: number; 
         <div className={cn("h-full rounded-full", over ? "bg-destructive" : warn ? "bg-warning" : "bg-primary")} style={{ width: `${usedW}%` }} />
         {plannedW > 0 && <div className="bg-primary/30 absolute inset-y-0" style={{ left: `${usedW}%`, width: `${plannedW}%` }} title="계획된 지출" />}
       </div>
-      <div className="text-caption flex justify-between">
-        <span className="text-muted-foreground tabular-nums">{Math.round(pct)}% 사용</span>
-        {over ? (
-          <span className="text-destructive-text inline-flex items-center gap-1 tabular-nums">
-            <CircleAlert className="size-3.5" aria-hidden />
-            {money(used - budget)} 초과
-          </span>
-        ) : (
-          <span className={cn("tabular-nums", warn ? "text-warning-text" : "text-muted-foreground")}>{money(budget - used)} 남음</span>
-        )}
-      </div>
+      {!compact && (
+        <div className="text-caption flex justify-between">
+          <span className="text-muted-foreground tabular-nums">{Math.round(pct)}% 사용</span>
+          {over ? (
+            <span className="text-destructive-text inline-flex items-center gap-1 tabular-nums">
+              <CircleAlert className="size-3.5" aria-hidden />
+              {money(used - budget)} 초과
+            </span>
+          ) : (
+            <span className={cn("tabular-nums", warn ? "text-warning-text" : "text-muted-foreground")}>{money(budget - used)} 남음</span>
+          )}
+        </div>
+      )}
     </div>
   );
 }

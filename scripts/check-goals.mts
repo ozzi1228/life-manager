@@ -61,6 +61,10 @@ try {
   assert.equal(done.achievedAt, today);
   assert.equal((await setGoalStatus(A, g.id, done.version, "active")).achievedAt, null);
   console.log("목표·트래커 규칙 확인 통과");
+} catch (e) {
+  // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄
+  console.error(e);
+  process.exitCode = 1;
 } finally {
   for (const t of [trackerCells, trackerMonthItems, trackerItems, goals, goalCategories, revisions]) await db.delete(t).where(inArray(t.userId, users));
   process.exit(process.exitCode ?? 0);

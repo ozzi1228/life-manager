@@ -2,6 +2,7 @@
 
 // 지출 입력·수정·삭제 (SCR-FIN-03). 규칙은 서비스 계층(src/server/finance.ts)에
 import { action } from "@/server/api";
+import { budgetEffect } from "@/server/budget";
 import { createCategory, createPaymentMethod, createTransaction, formData, txRepo, updateTransaction, type TxInput } from "@/server/finance";
 import { once } from "@/server/idempotency";
 import { restore } from "@/server/repo";
@@ -15,9 +16,10 @@ export async function addTransaction(key: string, input: TxInput) {
   return action(async (ctx) => {
     const { body } = await once(ctx.userId, `tx:${key}`, JSON.stringify(input), async () => {
       const { row, restraint } = await createTransaction(ctx, input);
-      return { status: 201, body: { id: row.id, restraint } };
+      const budget = row.type === "expense" ? await budgetEffect(ctx, row) : null;
+      return { status: 201, body: { id: row.id, restraint, budget } };
     });
-    return body as { id: string; restraint: boolean };
+    return body as { id: string; restraint: boolean; budget: { category: string; over: number } | null };
   });
 }
 

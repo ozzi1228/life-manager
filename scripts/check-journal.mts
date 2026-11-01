@@ -54,6 +54,10 @@ try {
   assert.equal((await monthEntries(B, "2026-11")).length, 0);
   assert.equal(await code(createEntry(B, { date: "2026-11-01", bodyMd: "x", topicId: topics[0].id })), "VALIDATION_FAILED", "남의 주제 불가");
   console.log("일기·사진 규칙 확인 통과", `(사진 파일 ${readdirSync(join(dir, A.userId), { recursive: true }).length}개)`);
+} catch (e) {
+  // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄
+  console.error(e);
+  process.exitCode = 1;
 } finally {
   for (const t of [journalEntries, journalTopics, attachments, revisions]) await db.delete(t).where(inArray(t.userId, users));
   rmSync(dir, { recursive: true, force: true });

@@ -25,10 +25,11 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { dayLabel, fromYmd, ymd } from "@/lib/format";
+import { dayLabel, fromYmd, money, ymd } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type TxEdit = {
@@ -42,6 +43,7 @@ export type TxEdit = {
   paymentMethodId: string | null;
   title: string | null;
   memo: string | null;
+  plannedExpenseId?: string | null;
 };
 type FormData = Extract<Awaited<ReturnType<typeof expenseFormData>>, { ok: true }>["data"];
 
@@ -80,6 +82,7 @@ function ExpenseForm({ edit, close }: { edit?: TxEdit; close: () => void }) {
   const [date, setDate] = useState(edit?.date ?? ymd(new Date()));
   const [title, setTitle] = useState(edit?.title ?? "");
   const [memo, setMemo] = useState(edit?.memo ?? "");
+  const [plannedId, setPlannedId] = useState<string | null>(edit?.plannedExpenseId ?? null);
   const [allCats, setAllCats] = useState(false);
   const [newCat, setNewCat] = useState<string | null>(null);
   const [newPm, setNewPm] = useState<string | null>(null);
@@ -103,13 +106,16 @@ function ExpenseForm({ edit, close }: { edit?: TxEdit; close: () => void }) {
   const picked = cats.find((c) => c.id === categoryId);
   const future = date > ymd(new Date());
   const canSave = !!amount && !busy;
+  // 큰 지출 연결: 고른 날짜가 든 달의 큰 지출만(06 §3.1)
+  const plannedOpts = type === "expense" ? (data?.planned.filter((p) => p.month === date.slice(0, 7)) ?? []) : [];
+  const linked = plannedOpts.some((p) => p.id === plannedId) ? plannedId : null;
 
   async function save() {
     if (!amount) return;
     if (!categoryId) return setError({ field: "category", message: "분류를 골라 주세요" });
     setBusy(true);
     setError(null);
-    const input = { type, amount, isRefund: type === "expense" && refund, date, categoryId, paymentMethodId: paymentId, title: title.trim() || null, memo: memo.trim() || null };
+    const input = { type, amount, isRefund: type === "expense" && refund, date, categoryId, paymentMethodId: paymentId, title: title.trim() || null, memo: memo.trim() || null, plannedExpenseId: linked };
     const r = edit ? await editTransaction(edit.id, edit.version, input) : await addTransaction(key, input);
     setBusy(false);
     if (!r.ok) {
@@ -128,7 +134,8 @@ function ExpenseForm({ edit, close }: { edit?: TxEdit; close: () => void }) {
       router.refresh();
     };
     const label = type === "income" ? "수입을 기록했어요" : refund ? "환불을 기록했어요" : "지출을 기록했어요";
-    if ("restraint" in r.data && r.data.restraint) toast(`사치 지출을 기록했어요 · 이번 달 참아야 할 금액에 더해져요`, { duration: 6000, action: { label: "되돌리기", onClick: undo } });
+    if ("budget" in r.data && r.data.budget) toast.warning(`${r.data.budget.category} 예산을 ${money(r.data.budget.over)} 넘었어요`, { duration: 5000, action: { label: "되돌리기", onClick: undo } });
+    else if ("restraint" in r.data && r.data.restraint) toast(`사치 지출을 기록했어요 · 이번 달 참아야 할 금액에 더해져요`, { duration: 6000, action: { label: "되돌리기", onClick: undo } });
     else toastUndo(label, undo);
     if (repeat) {
       // 연속 입력: 비우고 다시 금액부터
@@ -331,6 +338,25 @@ function ExpenseForm({ edit, close }: { edit?: TxEdit; close: () => void }) {
           <FieldLabel htmlFor="tx-title">내용</FieldLabel>
           <Input id="tx-title" maxLength={60} placeholder={picked ? picked.name : "예: 점심"} className="h-11 text-base md:h-9 md:text-sm" value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
+
+        {plannedOpts.length > 0 && (
+          <Field orientation="horizontal" className="items-center">
+            <FieldLabel className="shrink-0">큰 지출</FieldLabel>
+            <Select value={linked ?? "none"} onValueChange={(v) => setPlannedId(v === "none" ? null : v)}>
+              <SelectTrigger aria-label="큰 지출 연결" className="min-w-0 flex-1">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">연결 안 함</SelectItem>
+                {plannedOpts.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </Field>
+        )}
 
         <Collapsible defaultOpen={!!edit?.memo}>
           <CollapsibleTrigger asChild>

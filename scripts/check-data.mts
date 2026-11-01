@@ -78,6 +78,10 @@ try {
   assert.equal(runs, 2, "키는 사용자마다 따로");
 
   console.log("공통 데이터 규칙 확인 통과");
+} catch (e) {
+  // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄
+  console.error(e);
+  process.exitCode = 1;
 } finally {
   await db.execute(sql`drop table if exists zz_check_item`);
   await db.delete(revisions).where(inArray(revisions.userId, ["check-a", "check-b"]));
