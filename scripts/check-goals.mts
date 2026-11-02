@@ -5,7 +5,8 @@ import { db } from "../src/db/index.ts";
 import { goalCategories, goals, revisions, trackerCells, trackerItems, trackerMonthItems } from "../src/db/schema.ts";
 import { GOAL_PALETTE } from "../src/lib/palette.ts";
 import { AppError } from "../src/server/errors.ts";
-import { addItem, createGoal, goalCategoryList, removeFromMonth, setCell, setGoalStatus, startMonthWith, suggestColor, trackerMonth } from "../src/server/goals.ts";
+import { addItem, createGoal, createPeriodGoal, goalCategoryList, periodGoals, removeFromMonth, setCell, setGoalStatus, startMonthWith, suggestColor, trackerMonth } from "../src/server/goals.ts";
+import { periodKey } from "../src/server/calendar.ts";
 import type { Ctx } from "../src/server/repo.ts";
 import { todayIn } from "../src/server/time.ts";
 
@@ -60,6 +61,26 @@ try {
   assert.equal(done.status, "done");
   assert.equal(done.achievedAt, today);
   assert.equal((await setGoalStatus(A, g.id, done.version, "active")).achievedAt, null);
+
+  // 월·주·일 목표(D-072): 일정 메모와 같은 key로 묶임, 연 목표와 섞이지 않음
+  const mk = periodKey("month", today);
+  const mg = await createPeriodGoal(A, "month", mk, "이번 달 책 2권");
+  assert.equal(mg.startYear, null, "기간 목표는 연도 비움");
+  assert.deepEqual((await periodGoals(A, "month", mk)).map((x) => x.title), ["이번 달 책 2권"]);
+  assert.equal((await periodGoals(B, "month", mk)).length, 0, "남의 목표는 안 보임");
+  assert.equal((await periodGoals(A, "year", "2027")).some((x) => x.id === mg.id), false, "연 보기엔 연 목표만");
+  assert.deepEqual((await periodGoals(A, "year", "2027")).map((x) => x.id), [g.id]);
+  const mDone = await setGoalStatus(A, mg.id, mg.version, "done");
+  assert.equal(mDone.achievedAt, today);
+  assert.equal((await periodGoals(A, "month", mk))[0].status, "done");
+  const wk = periodKey("week", today);
+  await createPeriodGoal(A, "week", wk, "주 3회 운동");
+  assert.equal((await periodGoals(A, "week", wk)).length, 1);
+  assert.equal((await periodGoals(A, "day", today)).length, 0);
+  assert.equal((await createPeriodGoal(A, "year", "2030", "올해 목표")).endYear, 2030);
+  assert.equal(await code(createPeriodGoal(A, "week", today === wk ? tomorrow : today, "x")), "BAD_REQUEST", "주 key는 일요일");
+  assert.equal(await code(createPeriodGoal(A, "month", "2026-13", "x")), "BAD_REQUEST");
+  assert.equal(await code(createGoal(A, { title: "x", horizon: "short", startYear: 2027, endYear: 2027, periodScope: "month", periodKey: mk })), "VALIDATION_FAILED", "기간 목표에 연도 불가");
   console.log("목표·트래커 규칙 확인 통과");
 } catch (e) {
   // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄

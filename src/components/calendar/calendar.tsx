@@ -1,8 +1,9 @@
 "use client";
 
-// 일정 (SCR-CAL-01~03, 04 §4): 월·주·일 보기, 선택한 날 목록, 상세, 추가·수정(반복), 반복 범위 고르기, 내 캘린더 관리
-// 주소: /calendar?view=month|week|day&date=YYYY-MM-DD. 키보드: T 오늘, M/W/D 보기
+// 일정 (SCR-CAL-01~03, 04 §4): 연(연간 계획표)·월·주·일 보기, 선택한 날 목록, 상세, 추가·수정(반복), 반복 범위 고르기, 내 캘린더 관리
+// 주소: /calendar?view=year|month|week|day&date=YYYY-MM-DD. 키보드: T 오늘, Y/M/W/D 보기
 // ponytail: 칩 끌어 옮기기·주간 드래그로 시간 고르기·모바일 스와이프는 아직 — 빈 칸 누르기(PC 두 번 클릭)로 그 날·그 시간 추가
+import { PeriodGoals, type PeriodGoal } from "@/components/goals/period-goals";
 import { ChevronLeft, ChevronRight, Clock, MapPin, Plus, Repeat, Settings2, StickyNote } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -681,53 +682,95 @@ function NotePanel({ note, title }: { note: Note; title: string }) {
   );
 }
 
-// ── 연 보기 ──
+// ── 연 보기: 연간 계획표(가로 1~12월 × 세로 1~31일) ──
+// 칸을 누르면 그 날 일정 추가, 칩을 누르면 상세, +N은 그 달 보기. 없는 날(2월 30일 등)은 회색
+// ponytail: 공휴일 데이터가 없어 일요일만 분홍 — 공휴일 목록이 생기면 같은 색으로 칠하기
 
-function YearGrid({ year, today, items, open }: { year: string; today: string; items: Instance[]; open: (v: View, d: string) => void }) {
-  // 일정 있는 날(여러 날 일정은 그 사이 모든 날)
-  const busy = new Set<string>();
-  for (const e of items) for (let d = e.startDate; d <= e.endDate && d <= `${year}-12-31`; d = addDays(d, 1)) busy.add(d);
+function YearPlanner({ year, focus, today, items, color, open, add, month }: { year: string; focus: string; today: string; items: Instance[]; color: (e: Instance) => string; open: (e: Instance) => void; add: (d: string) => void; month: (d: string) => void }) {
+  // 날짜별 일정(여러 날 일정은 그 사이 모든 날 — 같은 색이 세로 띠로 이어짐)
+  const byDay = new Map<string, Instance[]>();
+  for (const e of items) {
+    for (let d = e.startDate < `${year}-01-01` ? `${year}-01-01` : e.startDate; d <= e.endDate && d <= `${year}-12-31`; d = addDays(d, 1)) {
+      const list = byDay.get(d);
+      if (list) list.push(e);
+      else byDay.set(d, [e]);
+    }
+  }
+  // 처음엔 보던 날(오늘)이 든 달·줄이 보이게(모바일은 가로로, 둘 다 세로로 스크롤)
+  const scroller = (el: HTMLDivElement | null) => {
+    if (!el || el.dataset.scrolled) return;
+    el.dataset.scrolled = "1";
+    // 그려진 뒤에(화면 위 위치 기준으로) 옮김
+    requestAnimationFrame(() => {
+      const cell = el.querySelector<HTMLElement>(`[data-day="${focus}"]`);
+      const corner = el.querySelector<HTMLElement>("[data-corner]");
+      if (!cell || !corner) return;
+      const c = cell.getBoundingClientRect();
+      const box = el.getBoundingClientRect();
+      const head = corner.getBoundingClientRect();
+      el.scrollLeft += c.left - box.left - head.width;
+      el.scrollTop += c.top - box.top - head.height - c.height * 2;
+    });
+  };
+  const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
+  const lengths = months.map((_, i) => new Date(Date.UTC(+year, i + 1, 0)).getUTCDate());
   return (
-    <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
-      {Array.from({ length: 12 }, (_, i) => {
-        const first = `${year}-${String(i + 1).padStart(2, "0")}-01`;
-        const days = new Date(Date.UTC(+year, i + 1, 0)).getUTCDate();
-        return (
-          <section key={first} className="space-y-1">
-            <button type="button" onClick={() => open("month", first)} className="hover:text-link font-semibold">
-              {i + 1}월
+    <div ref={scroller} className="bg-card relative max-h-[75dvh] overflow-auto overscroll-x-contain rounded-lg border" role="region" aria-label={`${year}년 연간 계획표`} tabIndex={-1}>
+      <div className="grid w-max min-w-full auto-rows-[minmax(2rem,auto)] grid-cols-[1.75rem_repeat(12,minmax(5.5rem,1fr))] md:grid-cols-[2rem_repeat(12,minmax(4.5rem,1fr))]">
+        <div data-corner className="bg-card sticky top-0 left-0 z-30 border-b" />
+        {months.map((m) => (
+          <div key={m} className="bg-card sticky top-0 z-20 border-b border-l">
+            <button type="button" onClick={() => month(`${m}-01`)} aria-label={`${+m.slice(5)}월 보기`} className={cn("hover:bg-accent/50 size-full py-1.5 text-sm font-semibold", m === today.slice(0, 7) && "text-link")}>
+              {+m.slice(5)}월
             </button>
-            <div className="grid grid-cols-7 text-center text-micro">
-              {WEEK.map((w, k) => (
-                <span key={w} className={k === 0 ? "text-destructive-text" : "text-muted-foreground"}>
-                  {w}
+          </div>
+        ))}
+        {Array.from({ length: 31 }, (_, k) => [
+          <div key={`n${k}`} className="bg-card text-muted-foreground sticky left-0 z-10 border-b pt-1 text-center text-caption tabular-nums">
+            {k + 1}
+          </div>,
+          ...months.map((m, i) => {
+            if (k >= lengths[i]) return <div key={`${m}-x${k}`} aria-hidden className="bg-muted/70 border-b border-l" />;
+            const d = `${m}-${String(k + 1).padStart(2, "0")}`;
+            const w = dayOfWeek(d);
+            const list = byDay.get(d) ?? [];
+            const max = list.length > 2 ? 1 : 2;
+            return (
+              <div key={d} data-day={d} className={cn("relative flex gap-0.5 border-b border-l p-0.5", w === 6 && "bg-primary/10", w === 0 && "bg-destructive/10", d === today && "ring-primary ring-2 ring-inset")}>
+                <button
+                  type="button"
+                  aria-label={`${md(d)} ${WEEK[w]}요일${d === today ? ", 오늘" : ""}, ${list.length ? `일정 ${list.length}개` : "일정 없음"}`}
+                  title={`${dayTitle(d)} 일정 추가`}
+                  onClick={() => add(d)}
+                  className="hover:bg-accent/50 focus-visible:ring-ring absolute inset-0 outline-none focus-visible:ring-2 focus-visible:ring-inset"
+                />
+                <span aria-hidden className={cn("pointer-events-none relative w-3.5 shrink-0 pt-px text-center text-micro", d === today ? "text-link font-bold" : w === 6 ? "text-link" : w === 0 ? "text-destructive-text" : "text-muted-foreground")}>
+                  {WEEK[w]}
                 </span>
-              ))}
-              {Array.from({ length: dayOfWeek(first) }, (_, k) => (
-                <span key={`e${k}`} />
-              ))}
-              {Array.from({ length: days }, (_, k) => {
-                const d = addDays(first, k);
-                return (
-                  <button
-                    key={d}
-                    type="button"
-                    aria-label={`${dayTitle(d)}${busy.has(d) ? ", 일정 있음" : ""}`}
-                    onClick={() => open("month", d)}
-                    className={cn(
-                      "hover:bg-accent relative mx-auto flex size-6 items-center justify-center rounded-full tabular-nums",
-                      d === today ? "bg-primary text-primary-foreground font-semibold" : dayOfWeek(d) === 0 && "text-destructive-text",
-                    )}
-                  >
-                    {k + 1}
-                    {busy.has(d) && d !== today && <span className="bg-primary absolute bottom-0 size-1 rounded-full" />}
-                  </button>
-                );
-              })}
-            </div>
-          </section>
-        );
-      })}
+                <div className="pointer-events-none relative min-w-0 flex-1 space-y-px">
+                  {list.slice(0, max).map((e) => (
+                    <button
+                      key={e.id + e.occurrenceDate}
+                      type="button"
+                      onClick={() => open(e)}
+                      title={`${e.title} · ${whenLabel(e)}`}
+                      className="pointer-events-auto block w-full truncate rounded-[3px] px-0.5 text-left text-micro leading-3.5 hover:brightness-95"
+                      style={e.startDate === d ? tint(color(e)) : { background: `${color(e)}26` }}
+                    >
+                      {e.title}
+                    </button>
+                  ))}
+                  {list.length > max && (
+                    <button type="button" onClick={() => month(d)} aria-label={`${md(d)} 일정 ${list.length - max}개 더 보기`} className="text-muted-foreground hover:text-foreground pointer-events-auto block px-0.5 text-micro leading-3.5">
+                      +{list.length - max}
+                    </button>
+                  )}
+                </div>
+              </div>
+            );
+          }),
+        ])}
+      </div>
     </div>
   );
 }
@@ -740,7 +783,7 @@ function newDraft(calendarId: string, d: string, time?: string): Draft {
   return { calendarId, title: "", allDay: false, startDate: d, startTime: start, endDate: d, endTime: toHm(Math.min(minutes(start) + 60, 1439)), rrule: null, location: null, memo: null };
 }
 
-export function CalendarView({ view, date, from, today, calendars, instances, note, startNew }: { view: View; date: string; from: string; today: string; calendars: CalendarItem[]; instances: Instance[]; note: Note; startNew?: boolean }) {
+export function CalendarView({ view, date, from, today, calendars, instances, note, goals, startNew }: { view: View; date: string; from: string; today: string; calendars: CalendarItem[]; instances: Instance[]; note: Note; goals: PeriodGoal[]; startNew?: boolean }) {
   const router = useRouter();
   const mobile = useIsMobile();
   const [selected, setSelected] = useState(date);
@@ -828,6 +871,9 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
         ? `${md(from)} ~ ${addDays(from, 6).slice(5, 7) === from.slice(5, 7) ? `${+addDays(from, 6).slice(8)}일` : md(addDays(from, 6))}`
         : dayTitle(date);
   const dayItems = (d: string) => visible.filter((e) => onDay(e, d));
+  // 보는 기간의 목표(목표 메뉴의 기간별 목표와 같은 것): 바로 추가·달성 체크
+  const goalLabel = view === "year" ? `${date.slice(0, 4)}년` : view === "month" ? `${+date.slice(5, 7)}월` : view === "week" ? label : md(date);
+  const goalPanel = <PeriodGoals key={`goals-${view}-${note.key}`} scope={view} periodKey={note.key} label={goalLabel} goals={goals} />;
   const noteTitle = view === "year" ? `${date.slice(0, 4)}년 메모` : view === "month" ? `${+date.slice(5, 7)}월 메모` : view === "week" ? `${label} 메모` : `${md(date)} 메모`;
 
   return (
@@ -877,15 +923,28 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
         </Button>
       </div>
 
-      {view !== "month" && <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />}
+      {(view === "week" || view === "day") && (
+        <div className="grid gap-4 lg:grid-cols-2">
+          <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
+          {goalPanel}
+        </div>
+      )}
       {view === "year" ? (
-        <YearGrid year={date.slice(0, 4)} today={today} items={visible} open={go} />
+        <>
+          <YearPlanner key={date} year={date.slice(0, 4)} focus={date} today={today} items={visible} color={colorOf} open={setDetail} add={(d) => (setSelected(d), addAt(d))} month={(d) => go("month", d)} />
+          {/* 연 메모 옆(모바일은 아래)에 올해 목표 */}
+          <div className="grid gap-4 lg:grid-cols-2">
+            <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
+            {goalPanel}
+          </div>
+        </>
       ) : view === "month" ? (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <MonthGrid from={from} month={date.slice(0, 7)} selected={selected} today={today} items={visible} color={colorOf} select={setSelected} open={setDetail} add={addAt} mobile={mobile} />
           {/* 모바일은 고른 날 일정 → 메모 순 */}
           <div className="flex flex-col gap-4">
-            <div className="max-lg:order-last">
+            <div className="flex flex-col gap-4 max-lg:order-last">
+              {goalPanel}
               <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
             </div>
             <DayList day={selected} items={dayItems(selected)} color={colorOf} open={setDetail} add={() => addAt(selected)} today={today} />

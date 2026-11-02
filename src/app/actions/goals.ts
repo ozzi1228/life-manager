@@ -5,6 +5,7 @@ import { action } from "@/server/api";
 import {
   addItem,
   createGoal,
+  createPeriodGoal,
   goalRepo,
   itemRepo,
   removeFromMonth,
@@ -61,10 +62,15 @@ export async function startTrackerMonth(month: string, itemIds: string[]) {
   return action((ctx) => startMonthWith(ctx, month, itemIds.slice(0, 50)));
 }
 
-type GoalIn = { title: string; horizon: "short" | "mid" | "long"; startYear: number | null; endYear: number | null; categoryId: string | null; memo: string | null };
+type GoalIn = { title: string; horizon: "short" | "mid" | "long"; startYear: number | null; endYear: number | null; categoryId: string | null; memo: string | null; periodScope?: "month" | "week" | "day" | null; periodKey?: string | null };
 
 export async function addGoal(input: GoalIn) {
   return action(async (ctx) => ({ id: (await createGoal(ctx, input)).id }));
+}
+
+/** 기간 목표 빠른 추가(목표 월별·주간·일간, 일정 화면) */
+export async function addPeriodGoal(scope: "year" | "month" | "week" | "day", key: string, title: string) {
+  return action(async (ctx) => ({ id: (await createPeriodGoal(ctx, scope, key, title)).id }));
 }
 
 export async function editGoal(id: string, version: number, input: GoalIn) {

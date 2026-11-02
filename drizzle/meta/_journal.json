@@ -155,6 +155,13 @@
       "when": 1793603722049,
       "tag": "0021_card_benefits_drop",
       "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1793604616422,
+      "tag": "0022_goal_period",
+      "breakpoints": true
     }
   ]
 }

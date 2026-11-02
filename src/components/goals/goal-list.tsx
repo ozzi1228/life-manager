@@ -21,6 +21,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
+import { periodLabel } from "@/lib/period";
 
 export type Goal = {
   id: string;
@@ -33,12 +34,14 @@ export type Goal = {
   status: "active" | "done" | "paused" | "dropped";
   achievedAt: string | null;
   memo: string | null;
+  periodScope: "month" | "week" | "day" | null;
+  periodKey: string | null;
 };
 type Category = { id: string; name: string };
 const HORIZON = { short: "단기", mid: "중기", long: "장기" } as const;
 const STATUS = { paused: "보류", dropped: "포기", done: "달성", active: "진행 중" } as const;
 
-const period = (g: Goal) => (g.startYear === null ? "언젠가" : g.startYear === g.endYear ? `${g.startYear}` : `${g.startYear}~${g.endYear}`);
+const period = (g: Goal, thisYear: number) => (g.periodScope && g.periodKey ? periodLabel(g.periodScope, g.periodKey, thisYear) : g.startYear === null ? "언젠가" : g.startYear === g.endYear ? `${g.startYear}` : `${g.startYear}~${g.endYear}`);
 
 /** view: 없으면 전체 목표, years = 연도별(모든 해를 위에서 아래로), done = 달성한 목표를 달성한 해별로 */
 export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[]; categories: Category[]; view?: "years" | "done"; thisYear: number }) {
@@ -60,7 +63,10 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
 
   // 연도별은 올해 칸이 맨 위에 오게(앞으로의 해가 위에 있을 때만 스크롤)
   useEffect(() => {
-    if (view === "years" && years[0] !== thisYear) document.getElementById(`y${thisYear}`)?.scrollIntoView({ block: "start" });
+    // 일정 화면에서 #y2026처럼 해를 짚어 오면 그 해로
+    const target = view === "years" && location.hash && document.getElementById(location.hash.slice(1));
+    if (target) target.scrollIntoView({ block: "start" });
+    else if (view === "years" && years[0] !== thisYear) document.getElementById(`y${thisYear}`)?.scrollIntoView({ block: "start" });
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 처음 열 때 한 번만
   }, []);
 
@@ -99,7 +105,7 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
         <span className={g.status === "done" && view !== "done" ? "text-muted-foreground line-through" : undefined}>{g.title}</span>
         <span className="text-muted-foreground block text-caption">
           {/* 연도별 화면에서 그 해 한 해짜리면 연도는 이미 보이니 뺌 */}
-          {[catName(g.categoryId), y !== undefined && g.startYear === g.endYear ? null : period(g), view ? HORIZON[g.horizon] : null].filter(Boolean).join(" · ")}
+          {[catName(g.categoryId), y !== undefined && g.startYear === g.endYear ? null : period(g, thisYear), view ? HORIZON[g.horizon] : null].filter(Boolean).join(" · ")}
         </span>
       </button>
       {view === "done" && g.achievedAt && <span className="text-muted-foreground shrink-0 text-sm tabular-nums">{`${+g.achievedAt.slice(5, 7)}월 ${+g.achievedAt.slice(8, 10)}일`}</span>}
@@ -283,7 +289,8 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
   );
 }
 
-function GoalDialog({ goal, preset, defaultYear, categories, close, done }: { goal: Goal | null; preset: string; defaultYear: number; categories: Category[]; close: () => void; done: () => void }) {
+/** 목표 추가·수정 창. 월·주·일 목표는 기간이 정해져 있어 연도·기간 구분을 묻지 않음 */
+export function GoalDialog({ goal, preset, defaultYear, categories, close, done }: { goal: Goal | null; preset: string; defaultYear: number; categories: Category[]; close: () => void; done: () => void }) {
   const [title, setTitle] = useState(goal?.title ?? preset);
   const [horizon, setHorizon] = useState<Goal["horizon"]>(goal?.horizon ?? "short");
   const [kind, setKind] = useState<"none" | "one" | "range">(goal ? (goal.startYear === null ? "none" : goal.startYear === goal.endYear ? "one" : "range") : "one");
@@ -294,6 +301,7 @@ function GoalDialog({ goal, preset, defaultYear, categories, close, done }: { go
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const years = Array.from({ length: 16 }, (_, i) => defaultYear - 5 + i);
+  const fixed = !!goal?.periodScope; // 월·주·일 목표
 
   async function save() {
     setBusy(true);
@@ -304,6 +312,8 @@ function GoalDialog({ goal, preset, defaultYear, categories, close, done }: { go
       endYear: kind === "none" ? null : kind === "one" ? start : end,
       categoryId: categoryId === "none" ? null : categoryId,
       memo: memo.trim() || null,
+      periodScope: goal?.periodScope ?? null,
+      periodKey: goal?.periodKey ?? null,
     };
     const r = goal ? await editGoal(goal.id, goal.version, input) : await addGoal(input);
     setBusy(false);
@@ -349,32 +359,36 @@ function GoalDialog({ goal, preset, defaultYear, categories, close, done }: { go
           <Input id="goal-title" autoFocus={!goal} maxLength={60} placeholder="예: 연간 독서 24권" className="h-11 text-base md:h-9 md:text-sm" value={title} onChange={(e) => setTitle(e.target.value)} />
           {error && <FieldError>{error}</FieldError>}
         </Field>
-        <Field>
-          <FieldLabel>기간 구분</FieldLabel>
-          <ToggleGroup type="single" variant="outline" aria-label="기간 구분" value={horizon} onValueChange={(v) => v && setHorizon(v as Goal["horizon"])}>
-            <ToggleGroupItem value="short">단기</ToggleGroupItem>
-            <ToggleGroupItem value="mid">중기</ToggleGroupItem>
-            <ToggleGroupItem value="long">장기</ToggleGroupItem>
-          </ToggleGroup>
-        </Field>
-        <Field>
-          <FieldLabel>연도</FieldLabel>
-          <ToggleGroup type="single" variant="outline" aria-label="연도" value={kind} onValueChange={(v) => v && setKind(v as typeof kind)}>
-            <ToggleGroupItem value="one">한 해</ToggleGroupItem>
-            <ToggleGroupItem value="range">여러 해</ToggleGroupItem>
-            <ToggleGroupItem value="none">정하지 않음</ToggleGroupItem>
-          </ToggleGroup>
-          {kind !== "none" && (
-            <div className="flex items-center gap-2">
-              {yearSelect(start, (n) => (setStart(n), n > end && setEnd(n)), "시작 연도")}
-              {kind === "range" && (
-                <>
-                  ~ {yearSelect(end, (n) => (setEnd(n), n < start && setStart(n)), "끝 연도")}
-                </>
+        {!fixed && (
+          <>
+            <Field>
+              <FieldLabel>기간 구분</FieldLabel>
+              <ToggleGroup type="single" variant="outline" aria-label="기간 구분" value={horizon} onValueChange={(v) => v && setHorizon(v as Goal["horizon"])}>
+                <ToggleGroupItem value="short">단기</ToggleGroupItem>
+                <ToggleGroupItem value="mid">중기</ToggleGroupItem>
+                <ToggleGroupItem value="long">장기</ToggleGroupItem>
+              </ToggleGroup>
+            </Field>
+            <Field>
+              <FieldLabel>연도</FieldLabel>
+              <ToggleGroup type="single" variant="outline" aria-label="연도" value={kind} onValueChange={(v) => v && setKind(v as typeof kind)}>
+                <ToggleGroupItem value="one">한 해</ToggleGroupItem>
+                <ToggleGroupItem value="range">여러 해</ToggleGroupItem>
+                <ToggleGroupItem value="none">정하지 않음</ToggleGroupItem>
+              </ToggleGroup>
+              {kind !== "none" && (
+                <div className="flex items-center gap-2">
+                  {yearSelect(start, (n) => (setStart(n), n > end && setEnd(n)), "시작 연도")}
+                  {kind === "range" && (
+                    <>
+                      ~ {yearSelect(end, (n) => (setEnd(n), n < start && setStart(n)), "끝 연도")}
+                    </>
+                  )}
+                </div>
               )}
-            </div>
-          )}
-        </Field>
+            </Field>
+          </>
+        )}
         <Field>
           <FieldLabel htmlFor="goal-category">카테고리</FieldLabel>
           <Select value={categoryId} onValueChange={setCategoryId}>

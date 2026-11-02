@@ -1,8 +1,9 @@
-// 일정 (SCR-CAL-01): ?view=year|month|week|day&date=YYYY-MM-DD, 보는 기간의 메모 함께
+// 일정 (SCR-CAL-01): ?view=year|month|week|day&date=YYYY-MM-DD, 보는 기간의 메모·목표 함께(D-072)
 import { CalendarView } from "@/components/calendar/calendar";
 import { Page } from "@/components/app/page-shell";
 import { addDays, dayOfWeek } from "@/lib/calendar";
 import { getNote, periodKey, rangeView } from "@/server/calendar";
+import { periodGoals } from "@/server/goals";
 import { pageCtx } from "@/server/session";
 import { todayIn } from "@/server/time";
 
@@ -17,11 +18,11 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
   const from = view === "year" ? `${date.slice(0, 4)}-01-01` : view === "day" ? date : addDays(first, -dayOfWeek(first));
   const to = view === "year" ? `${date.slice(0, 4)}-12-31` : view === "month" ? addDays(from, 41) : view === "week" ? addDays(from, 6) : date;
   const key = periodKey(view, date);
-  const [{ calendars, instances }, saved] = await Promise.all([rangeView(ctx, from, to), getNote(ctx, view, key)]);
+  const [{ calendars, instances }, saved, goals] = await Promise.all([rangeView(ctx, from, to), getNote(ctx, view, key), periodGoals(ctx, view, key)]);
   const note = { scope: view, key, id: saved?.id ?? null, version: saved?.version ?? null, body: saved?.body ?? "" };
   return (
     <Page>
-      <CalendarView view={view} date={date} from={from} today={today} calendars={calendars} instances={instances} note={note} startNew={q.new === "1"} />
+      <CalendarView view={view} date={date} from={from} today={today} calendars={calendars} instances={instances} note={note} goals={goals} startNew={q.new === "1"} />
     </Page>
   );
 }

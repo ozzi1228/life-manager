@@ -3,6 +3,7 @@ import { and, asc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
 import { goalCategories, goals, trackerCells, trackerItems, trackerMonthItems } from "../db/schema.ts";
+import { validPeriodKey, type PeriodScope } from "../lib/period.ts";
 import { GOAL_PALETTE } from "../lib/palette.ts";
 import { AppError } from "./errors.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
@@ -170,10 +171,17 @@ export const goalInput = z
     endYear: year.nullable().default(null),
     categoryId: z.uuid().nullable().default(null),
     memo: z.string().trim().max(1000).nullable().default(null),
+    // 월·주·일 목표(D-072). 있으면 연도는 비움
+    periodScope: z.enum(["month", "week", "day"]).nullable().default(null),
+    periodKey: z.string().nullable().default(null),
   })
   .refine((g) => (g.startYear === null) === (g.endYear === null) && (g.startYear === null || g.startYear <= (g.endYear as number)), {
     message: "기간을 다시 골라 주세요",
     path: ["endYear"],
+  })
+  .refine((g) => (g.periodScope === null ? g.periodKey === null : g.startYear === null && g.periodKey !== null && validPeriodKey(g.periodScope, g.periodKey)), {
+    message: "기간을 다시 골라 주세요",
+    path: ["periodKey"],
   });
 
 async function checkCategory(ctx: Ctx, categoryId: string | null) {
@@ -199,8 +207,32 @@ export async function setGoalStatus(ctx: Ctx, id: string, version: number, statu
   return goalRepo.update(ctx, id, version, { status, achievedAt: status === "done" ? todayIn() : null });
 }
 
-export async function goalList(ctx: Ctx) {
-  return goalRepo.list(ctx, { orderBy: [asc(goals.sort), asc(goals.createdAt)], limit: 1000 });
+/** 기간 목표 빠른 추가(목표 화면·일정 화면). 연은 그 해 한 해짜리 단기 목표, 월·주·일은 그 기간 목표 */
+export async function createPeriodGoal(ctx: Ctx, scope: PeriodScope, key: string, title: unknown) {
+  if (!["year", "month", "week", "day"].includes(scope) || !validPeriodKey(scope, key)) throw new AppError("BAD_REQUEST", "잠시 후 다시 시도해 주세요");
+  const y = scope === "year" ? Number(key) : null;
+  return createGoal(ctx, { title, horizon: "short", startYear: y, endYear: y, periodScope: scope === "year" ? null : scope, periodKey: scope === "year" ? null : key });
+}
+
+/** 그 기간의 목표(일정 화면). 연은 기간에 그 해가 든 연 목표, 월·주·일은 그 기간 목표. 보류·포기는 뺌 */
+export async function periodGoals(ctx: Ctx, scope: PeriodScope, key: string) {
+  if (!validPeriodKey(scope, key)) throw new AppError("BAD_REQUEST", "잠시 후 다시 시도해 주세요");
+  const where =
+    scope === "year"
+      ? and(isNull(goals.periodScope), lte(goals.startYear, Number(key)), gte(goals.endYear, Number(key)))
+      : and(eq(goals.periodScope, scope), eq(goals.periodKey, key));
+  const list = await goalRepo.list(ctx, { where: and(where, inArray(goals.status, ["active", "done"])), orderBy: [asc(goals.sort), asc(goals.createdAt)], limit: 500 });
+  return list.map(toGoal);
+}
+
+/** 목표 화면 월별·주간·일간: 그 단위의 목표 전부 */
+export async function periodGoalList(ctx: Ctx, scope: "month" | "week" | "day") {
+  return (await goalRepo.list(ctx, { where: eq(goals.periodScope, scope), orderBy: [asc(goals.sort), asc(goals.createdAt)], limit: 1000 })).map(toGoal);
+}
+
+/** yearOnly: 연·미정 목표만(월·주·일 목표 빼고) — 전체 목표·연도별 화면(D-072) */
+export async function goalList(ctx: Ctx, yearOnly = false) {
+  return goalRepo.list(ctx, { where: yearOnly ? isNull(goals.periodScope) : undefined, orderBy: [asc(goals.sort), asc(goals.createdAt)], limit: 1000 });
 }
 
 /** 화면으로 보낼 목표(필요한 열만) */
@@ -215,4 +247,6 @@ export const toGoal = (g: typeof goals.$inferSelect) => ({
   status: g.status,
   achievedAt: g.achievedAt,
   memo: g.memo,
+  periodScope: g.periodScope,
+  periodKey: g.periodKey,
 });

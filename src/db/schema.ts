@@ -184,9 +184,13 @@ export const goals = pgTable(
     achievedAt: date("achieved_at"),
     memo: text("memo"),
     sort: integer("sort").notNull().default(0),
+    // 월·주·일 목표(D-072): 일정 기간 메모와 같은 key(월 "2026-11" · 주는 그 주 일요일 · 일). 이때 연도는 비움
+    periodScope: text("period_scope", { enum: ["month", "week", "day"] }),
+    periodKey: text("period_key"),
   },
   (t) => [
     index("goals_user").on(t.userId).where(sql`${t.deletedAt} is null`),
+    index("goals_period_key").on(t.userId, t.periodScope, t.periodKey).where(sql`${t.deletedAt} is null`),
     check("goals_period", sql`(${t.startYear} is null and ${t.endYear} is null) or (${t.startYear} is not null and ${t.endYear} is not null and ${t.startYear} <= ${t.endYear})`),
   ],
 );

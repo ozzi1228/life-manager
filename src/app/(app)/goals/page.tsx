@@ -1,4 +1,4 @@
-// 전체 목표 (SCR-GOAL-05). 목표 영역 첫 탭(D-069)
+// 전체 목표 (SCR-GOAL-05). 목표 영역 첫 탭(D-069). 월·주·일 목표는 기간별 탭에서만(D-072)
 import { Page } from "@/components/app/page-shell";
 import { GoalList } from "@/components/goals/goal-list";
 import { GoalsTabs } from "@/components/goals/goals-tabs";
@@ -8,7 +8,7 @@ import { todayIn } from "@/server/time";
 
 export default async function GoalsPage() {
   const ctx = await pageCtx();
-  const [list, cats] = await Promise.all([goalList(ctx), goalCategoryList(ctx)]);
+  const [list, cats] = await Promise.all([goalList(ctx, true), goalCategoryList(ctx)]);
   return (
     <Page>
       <GoalsTabs />
