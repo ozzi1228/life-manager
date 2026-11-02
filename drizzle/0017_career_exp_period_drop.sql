@@ -1,0 +1,1 @@
+ALTER TABLE "career_experiences" DROP COLUMN "period";

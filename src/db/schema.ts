@@ -595,23 +595,34 @@ export const periodNotes = pgTable(
 );
 
 // ── 커리어 ──
-// 경험 정리: 앱 안에서 직접 쓰는 경험 카드(Notion 데이터베이스 대신). 본문은 마크다운 텍스트
+// 경험 정리: 취업 준비에서 흔히 쓰는 경험 정리 양식(D-064). 사용자가 Notion에 쓰던 칸(이름·유형·기간·내용·비고)도 모두 담김
+// 기본(경험명·분류·기관·역할·기간) · 내용(주요 활동·성과·배운 점·역량 키워드) · STAR · 자격·점수(점수·발급 기관·번호·유효기간) · 비고·링크
+// 기간은 "2024.06" 또는 "2024.06.01" 글자 그대로(정밀도 유지), 정렬은 시작일(period_start)로
 export const careerExperiences = pgTable(
   "career_experiences",
   {
     ...userData(),
     title: text("title").notNull(),
-    type: text("type", { enum: ["work", "project", "intern", "activity", "education", "award", "certificate", "other"] }).notNull().default("project"),
-    organization: text("organization"),
-    role: text("role"),
-    startMonth: text("start_month"), // YYYY-MM
-    endMonth: text("end_month"), // 비면 진행 중
-    tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
-    summary: text("summary"),
-    body: text("body").notNull().default(""),
+    categories: text("categories").array().notNull().default(sql`'{}'::text[]`), // 분류(예: 교육·아르바이트·자격증·IT)
+    organization: text("organization"), // 기관·소속
+    role: text("role"), // 역할·직무
+    startText: text("start_text"), // YYYY.MM 또는 YYYY.MM.DD
+    endText: text("end_text"),
+    ongoing: boolean("ongoing").notNull().default(false),
+    periodStart: date("period_start"), // 시작일(정렬용)
+    body: text("body").notNull().default(""), // 주요 활동·업무
+    achievement: text("achievement"), // 성과·결과
+    learned: text("learned"), // 배운 점·느낀 점
+    tags: text("tags").array().notNull().default(sql`'{}'::text[]`), // 역량 키워드
+    star: jsonb("star").$type<{ situation?: string; task?: string; action?: string; result?: string }>().notNull().default({}),
+    score: text("score"), // 점수·등급(자격·어학)
+    issuer: text("issuer"), // 발급 기관
+    certNo: text("cert_no"), // 자격·수험 번호
+    validUntil: text("valid_until"), // 유효기간(까지)
+    note: text("note"), // 비고
     links: text("links").array().notNull().default(sql`'{}'::text[]`),
   },
-  (t) => [index("career_experiences_user").on(t.userId, t.startMonth).where(sql`${t.deletedAt} is null`)],
+  (t) => [index("career_experiences_user").on(t.userId, t.periodStart).where(sql`${t.deletedAt} is null`)],
 );
 
 // 문서(이력서·자소서·포트폴리오): 문서 1개 → 버전 n개 → 버전마다 형식 여러 개(링크·파일)

@@ -182,7 +182,7 @@ function Frame({ name, seenHints, children }: Props) {
         </SidebarInset>
 
         {/* 모바일 빠른 추가(+): 하단 탭 위 오른쪽. 글 쓰는 화면에서는 저장 버튼을 가리지 않게 숨김 */}
-        {!path.startsWith("/records/journal/") && <Button
+        {!/^\/(records\/journal|career\/exp)\//.test(path) && <Button
           data-pet-avoid
           size="icon-lg"
           aria-label="빠른 추가"

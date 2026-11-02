@@ -1,16 +1,23 @@
 // 커리어 화면 규칙: 경험 유형·문서 종류 이름, 링크·파일의 형식 이름(Notion·PDF·Word·PPT…). 서버·화면 공용
-export const EXP_TYPES = [
-  { value: "work", label: "업무" },
-  { value: "project", label: "프로젝트" },
-  { value: "intern", label: "인턴" },
-  { value: "activity", label: "대외활동" },
-  { value: "education", label: "교육" },
-  { value: "award", label: "수상" },
-  { value: "certificate", label: "자격증" },
-  { value: "other", label: "기타" },
-] as const;
-export type ExpType = (typeof EXP_TYPES)[number]["value"];
-export const expTypeLabel = (t: string) => EXP_TYPES.find((x) => x.value === t)?.label ?? "기타";
+/** 분류 고르기 기본 목록(사용자가 쓴 분류가 먼저, 그다음 이것) */
+export const DEFAULT_CATEGORIES = ["경력", "인턴", "아르바이트", "프로젝트", "교육", "대외활동", "동아리", "자격증", "어학", "수상", "봉사"];
+/** 이 분류가 붙으면 자격·점수 칸을 펼쳐 둠 */
+export const CERT_CATEGORIES = ["자격증", "어학"];
+
+/** "2024.6.1", "2024-06", "2024년 6월 1일" → "2024.06.01" / "2024.06". 없는 날이면 null */
+export function normDate(text: string | null | undefined) {
+  const m = (text ?? "").trim().match(/^(\d{4})\s*[.\-/년]\s*(\d{1,2})\s*(?:[.\-/월]\s*(?:(\d{1,2})\s*일?)?)?\.?$/);
+  if (!m) return null;
+  const [y, mo, d] = [m[1], m[2].padStart(2, "0"), m[3]?.padStart(2, "0")];
+  const iso = `${y}-${mo}-${d ?? "01"}`;
+  if (new Date(`${iso}T00:00:00Z`).toISOString().slice(0, 10) !== iso) return null;
+  return d ? `${y}.${mo}.${d}` : `${y}.${mo}`;
+}
+/** "2024.06" → "2024-06-01"(정렬용) */
+export const dateKey = (t: string | null) => (t ? `${t.replaceAll(".", "-")}${t.length === 7 ? "-01" : ""}` : null);
+/** "2024.06.01 ~ 2024.10.10" / "2025.03 ~ 진행 중" / "2024.10.13"(하루) */
+export const periodLabel = (start: string | null, end: string | null, ongoing: boolean) =>
+  !start && !end ? "" : ongoing ? `${start ?? ""} ~ 진행 중` : !end || end === start ? (start ?? end ?? "") : `${start ?? ""} ~ ${end}`;
 
 export const DOC_KINDS = [
   { value: "resume", label: "이력서" },
@@ -48,6 +55,3 @@ export function formatOf(item: { type: "link" | "file"; url: string | null; name
   if (host.endsWith("figma.com")) return "Figma";
   return "웹";
 }
-
-/** "2024-03" ~ "2025-02" → "2024.03 ~ 2025.02", 끝이 없으면 "~ 진행 중" */
-export const periodLabel = (start: string | null, end: string | null) => (start ? `${start.replace("-", ".")} ~ ${end ? end.replace("-", ".") : "진행 중"}` : end ? `~ ${end.replace("-", ".")}` : "");

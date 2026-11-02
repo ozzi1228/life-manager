@@ -2,7 +2,7 @@
 import { Page } from "@/components/app/page-shell";
 import { CareerTabs } from "@/components/career/career-tabs";
 import { ExperienceList } from "@/components/career/experiences";
-import { expList } from "@/server/career";
+import { expCategories, expList } from "@/server/career";
 import { pageCtx } from "@/server/session";
 
 export default async function CareerPage() {
@@ -10,7 +10,7 @@ export default async function CareerPage() {
   return (
     <Page>
       <CareerTabs />
-      <ExperienceList items={await expList(ctx)} />
+      <ExperienceList items={await expList(ctx)} categories={await expCategories(ctx)} />
     </Page>
   );
 }

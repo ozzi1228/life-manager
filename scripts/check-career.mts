@@ -1,5 +1,5 @@
 // 커리어·기간 메모 규칙(src/server/career.ts·calendar.ts 메모) 확인: node --env-file=.env scripts/check-career.mts (개발 DB, 파일은 임시 폴더)
-// 경험 검증, 문서·버전(링크+파일 여러 형식), 이름만 바꾼 파일 막기, 문서 지우면 버전도 함께, 영구 삭제 때 파일까지, 메모 저장·충돌
+// 경험 양식 검증(날짜·STAR·자격), 문서·버전(링크+파일 여러 형식), 이름만 바꾼 파일 막기, 문서 지우면 버전도 함께, 영구 삭제 때 파일까지, 메모 저장·충돌
 import assert from "node:assert/strict";
 import { mkdtempSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -32,14 +32,25 @@ try {
   assert.equal(formatOf({ type: "link", url: "https://docs.google.com/document/d/1", name: null }), "Google");
   assert.equal(formatOf({ type: "file", url: null, name: "이력서_v3.PPTX" }), "PPT");
 
-  // 경험
-  assert.equal(await code(career.createExp(A, { title: " " })), "제목을 입력해 주세요");
-  assert.equal(await code(career.createExp(A, { title: "x", startMonth: "2025-03", endMonth: "2024-01" })), "끝난 달이 시작한 달보다 빨라요");
-  await career.createExp(A, { title: "옛 프로젝트", startMonth: "2023-01", endMonth: "2023-06", tags: ["협업", "협업", "Python"] });
-  const now = await career.createExp(A, { title: "지금 하는 일", type: "work", startMonth: "2024-03", body: "## 상황\n..." });
+  // 경험: 흔히 쓰는 경험 정리 양식(기본·내용·STAR·자격·점수·비고), 날짜 글자 다듬기, 시작일 최근 순, 진행 중 먼저
+  assert.equal(await code(career.createExp(A, { title: " " })), "경험명을 입력해 주세요");
+  assert.equal(await code(career.createExp(A, { title: "x", startText: "어제" })), "날짜는 2024.06 또는 2024.06.01처럼 적어 주세요");
+  assert.equal(await code(career.createExp(A, { title: "x", startText: "2024.02.30" })), "날짜는 2024.06 또는 2024.06.01처럼 적어 주세요", "없는 날");
+  assert.equal(await code(career.createExp(A, { title: "x", startText: "2024.06", endText: "2024.05" })), "끝난 날이 시작한 날보다 빨라요");
+  const toeic = await career.createExp(A, { title: "TOEIC", categories: ["어학"], startText: "2024-10-13", score: "930", certNo: "1234", star: { situation: "  ", result: "목표 달성" } });
+  await career.createExp(A, { title: "인턴", categories: ["인턴"], organization: "방송사", role: "작가", startText: "2019.8", endText: "2019년 10월" });
+  await career.createExp(A, { title: "아카데미", categories: ["교육", "IT", "교육"], tags: ["SQL", "SQL", "협업"], startText: "2025.01.07", endText: "2025.12.18" });
+  const now = await career.createExp(A, { title: "지금 하는 일", startText: "2025.03", endText: "2025.04", ongoing: true });
+  await career.createExp(A, { title: "기간 없음" });
   const list = await career.expList(A);
-  assert.deepEqual(list.map((e) => e.title), ["지금 하는 일", "옛 프로젝트"], "진행 중 먼저");
-  assert.deepEqual(list[1].tags, ["협업", "Python"], "태그 중복 제거");
+  assert.deepEqual(list.map((e) => e.title), ["지금 하는 일", "아카데미", "TOEIC", "인턴", "기간 없음"], "진행 중 먼저, 시작일 최근 순, 기간 없으면 맨 뒤");
+  assert.deepEqual(list[1].categories, ["교육", "IT"], "분류 중복 제거");
+  assert.deepEqual(list[1].tags, ["SQL", "협업"], "키워드 중복 제거");
+  assert.equal(list[0].endText, null, "진행 중이면 끝난 날 없음");
+  assert.deepEqual([list[3].startText, list[3].endText], ["2019.08", "2019.10"], "날짜 글자 다듬기");
+  const te = await career.getExp(A, toeic.id);
+  assert.deepEqual([te.startText, te.score, te.certNo, te.star], ["2024.10.13", "930", "1234", { result: "목표 달성" }], "빈 STAR 칸은 버림");
+  assert.deepEqual([...(await career.expCategories(A))].sort(), ["IT", "교육", "어학", "인턴"].sort(), "쓴 분류 목록");
   assert.equal((await career.expList(B)).length, 0);
   assert.equal(await code(career.updateExp(B, now.id, now.version, { title: "남의 것" })), "찾을 수 없어요");
 
