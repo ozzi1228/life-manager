@@ -191,6 +191,7 @@ export function GoalList({ goals, categories, year, thisYear }: { goals: Goal[];
         </>
       ) : (
         <>
+          {active.length === 0 && <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">진행 중인 목표가 없어요. 새 목표를 적어 보세요</p>}
           {(["short", "mid", "long"] as const).map((h) => {
             const list = active.filter((g) => g.horizon === h);
             return (

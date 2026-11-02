@@ -194,7 +194,7 @@ export function TrackerGrid({ data }: { data: Data }) {
 
   const doneCount = (item: Item) => dates.filter((d) => d <= today && cells.get(k(item.id, d))?.done).length;
   // PC는 사이드바를 펼친 1280px 화면에서도 한 달이 한눈에 들어오게(칸이 좁으면 메모는 앞 글자만)
-  const cols = mobile ? `72px repeat(${shown.length}, minmax(40px, 1fr))` : `128px repeat(${shown.length}, minmax(24px, 1fr)) 48px`;
+  const cols = mobile ? `72px repeat(${shown.length}, minmax(36px, 1fr))` : `128px repeat(${shown.length}, minmax(24px, 1fr)) 48px`;
 
   return (
     <div className="space-y-4">

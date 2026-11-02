@@ -33,13 +33,14 @@ const WHERE: Record<MediaKind, string[]> = {
   drama: ["넷플릭스", "티빙", "디즈니+", "쿠팡플레이", "웨이브", "TV"],
 };
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
+const TINT: Record<MediaKind, string> = { book: "bg-chart-1/20", movie: "bg-chart-2/20", drama: "bg-chart-4/20" }; // 표지 없을 때 종류별 색
 
 /** 표지: 올린 사진, 없거나 깨지면 종류 아이콘 + 제목(04 §7.4) */
 export function Cover({ coverId, kind, title, className, faint }: { coverId: string | null; kind: MediaKind; title: string; className?: string; faint?: boolean }) {
   const [broken, setBroken] = useState(false);
   const Icon = KIND_ICON[kind];
   return (
-    <span className={cn("bg-secondary text-secondary-foreground relative block aspect-[2/3] shrink-0 overflow-hidden rounded-md", faint && "opacity-50", className)}>
+    <span className={cn("text-foreground/80 relative block aspect-[2/3] shrink-0 overflow-hidden rounded-md", TINT[kind], faint && "opacity-50", className)}>
       {coverId && !broken ? (
         // eslint-disable-next-line @next/next/no-img-element -- 로그인한 본인만 보는 사진(이 서버가 직접 보냄)
         <img src={`/api/v1/attachments/${coverId}?v=thumb`} alt="" className="size-full object-cover" onError={() => setBroken(true)} />

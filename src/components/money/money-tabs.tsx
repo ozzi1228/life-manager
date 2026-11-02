@@ -8,7 +8,7 @@ export const MoneyTabs = () => (
       { href: "/money", label: "한눈에" },
       { href: "/money/expenses", label: "지출", match: ["/money/expenses", "/money/fixed"] },
       { href: "/money/budget", label: "예산" },
-      { href: "/money/cards", label: "카드" },
+      { href: "/money/cards", label: "카드", match: "/money/cards" },
       { href: "/money/restraint", label: "참은 소비" },
     ]}
   />

@@ -86,24 +86,35 @@ function Row({ e, color, onOpen, day }: { e: Instance; color: string; onOpen: ()
   );
 }
 
-function DayList({ day, items, color, open, add, today }: { day: string; items: Instance[]; color: (e: Instance) => string; open: (e: Instance) => void; add: () => void; today: string }) {
+function DayList({ day, items, color, open, add, today, compact }: { day: string; items: Instance[]; color: (e: Instance) => string; open: (e: Instance) => void; add: () => void; today: string; compact?: boolean }) {
+  // compact(모바일 주 보기): 머리 줄에 + 버튼, 빈 날은 한 줄
   return (
-    <section className="space-y-2">
-      <h2 className="font-semibold">
-        {dayTitle(day)} {day === today && <span className="text-link text-sm">오늘</span>}
-      </h2>
-      {items.length ? (
+    <section className={compact ? "space-y-1" : "space-y-2"}>
+      <div className="flex items-center gap-2">
+        <h2 className="font-semibold">
+          {dayTitle(day)} {day === today && <span className="text-link text-sm">오늘</span>}
+        </h2>
+        {compact && !items.length && <span className="text-muted-foreground text-sm">일정 없음</span>}
+        {compact && (
+          <Button variant="ghost" size="icon" className="ml-auto size-9" aria-label={`${dayTitle(day)} 일정 추가`} onClick={add}>
+            <Plus />
+          </Button>
+        )}
+      </div>
+      {items.length > 0 ? (
         <ul>
           {items.map((e) => (
             <Row key={e.id + e.occurrenceDate} e={e} color={color(e)} onOpen={() => open(e)} day={day} />
           ))}
         </ul>
       ) : (
-        <p className="text-muted-foreground py-2 text-sm">일정이 없어요</p>
+        !compact && <p className="text-muted-foreground py-2 text-sm">일정이 없어요</p>
       )}
-      <Button variant="outline" size="sm" onClick={add}>
-        <Plus /> 이 날 일정 추가
-      </Button>
+      {!compact && (
+        <Button variant="outline" size="sm" onClick={add}>
+          <Plus /> 이 날 일정 추가
+        </Button>
+      )}
     </section>
   );
 }
@@ -620,7 +631,13 @@ function CalendarManager({ calendars, close, refresh }: { calendars: CalendarIte
 
 // ── 화면 ──
 
-export function CalendarView({ view, date, from, today, calendars, instances }: { view: View; date: string; from: string; today: string; calendars: CalendarItem[]; instances: Instance[] }) {
+/** 새 일정 초안: 고른 날, 다음 정시부터 한 시간 */
+function newDraft(calendarId: string, d: string, time?: string): Draft {
+  const start = time ?? toHm(Math.min(22, new Date().getHours() + 1) * 60);
+  return { calendarId, title: "", allDay: false, startDate: d, startTime: start, endDate: d, endTime: toHm(Math.min(minutes(start) + 60, 1439)), rrule: null, location: null, memo: null };
+}
+
+export function CalendarView({ view, date, from, today, calendars, instances, startNew }: { view: View; date: string; from: string; today: string; calendars: CalendarItem[]; instances: Instance[]; startNew?: boolean }) {
   const router = useRouter();
   const mobile = useIsMobile();
   const [selected, setSelected] = useState(date);
@@ -630,7 +647,11 @@ export function CalendarView({ view, date, from, today, calendars, instances }: 
     setSelected(date);
   }
   const [detail, setDetail] = useState<Instance | null>(null);
-  const [form, setForm] = useState<{ draft: Draft; edit?: Instance } | null>(null);
+  // 빠른 추가(+ → 일정 추가, ?new=1)면 처음부터 추가 창
+  const [form, setForm] = useState<{ draft: Draft; edit?: Instance } | null>(() => (startNew ? { draft: newDraft(calendars.find((c) => c.isVisible)?.id ?? calendars[0]?.id ?? "", date) } : null));
+  useEffect(() => {
+    if (startNew) router.replace(`/calendar?view=${view}&date=${date}`, { scroll: false });
+  }, [startNew, router, view, date]);
   const [scopeFor, setScopeFor] = useState<Instance | null>(null);
   const [manage, setManage] = useState(false);
   const [hidden, setHidden] = useState(() => new Set(calendars.filter((c) => !c.isVisible).map((c) => c.id)));
@@ -661,14 +682,7 @@ export function CalendarView({ view, date, from, today, calendars, instances }: 
   const visible = instances.filter((e) => !hidden.has(e.calendarId));
   const colorOf = (e: Instance) => calendars.find((c) => c.id === e.calendarId)?.colorHex ?? "#888888";
   const defaultCal = calendars.find((c) => !hidden.has(c.id))?.id ?? calendars[0]?.id ?? "";
-  const nextHour = () => {
-    const h = Math.min(22, new Date().getHours() + 1);
-    return toHm(h * 60);
-  };
-  const addAt = (d: string, time?: string) => {
-    const start = time ?? nextHour();
-    setForm({ draft: { calendarId: defaultCal, title: "", allDay: false, startDate: d, startTime: start, endDate: d, endTime: toHm(Math.min(minutes(start) + 60, 1439)), rrule: null, location: null, memo: null } });
-  };
+  const addAt = (d: string, time?: string) => setForm({ draft: newDraft(defaultCal, d, time) });
   const draftOf = (e: Instance): Draft => ({ calendarId: e.calendarId, title: e.title, allDay: e.allDay, startDate: e.startDate, startTime: e.startTime, endDate: e.endDate, endTime: e.endTime, rrule: e.rrule, location: e.location, memo: e.memo });
   const done = (d: string) => {
     setForm(null);
@@ -759,9 +773,11 @@ export function CalendarView({ view, date, from, today, calendars, instances }: 
           <DayList day={selected} items={dayItems(selected)} color={colorOf} open={setDetail} add={() => addAt(selected)} today={today} />
         </div>
       ) : view === "week" && mobile ? (
-        <div className="space-y-5">
+        <div className="divide-y">
           {Array.from({ length: 7 }, (_, i) => addDays(from, i)).map((d) => (
-            <DayList key={d} day={d} items={dayItems(d)} color={colorOf} open={setDetail} add={() => addAt(d)} today={today} />
+            <div key={d} className="py-2">
+              <DayList day={d} items={dayItems(d)} color={colorOf} open={setDetail} add={() => addAt(d)} today={today} compact />
+            </div>
           ))}
         </div>
       ) : (

@@ -19,7 +19,7 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
   const { calendars, instances } = await rangeView(ctx, from, to);
   return (
     <Page>
-      <CalendarView view={view} date={date} from={from} today={today} calendars={calendars} instances={instances} />
+      <CalendarView view={view} date={date} from={from} today={today} calendars={calendars} instances={instances} startNew={q.new === "1"} />
     </Page>
   );
 }

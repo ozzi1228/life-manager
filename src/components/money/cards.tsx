@@ -40,6 +40,9 @@ const daysSince = (d: string, today: string) => Math.round((fromYmd(today).getTi
 const PERF_TIP = "카드로 쓴 금액 중 혜택 조건 계산에 인정되는 금액이에요. 실적 제외로 정한 분류·업종과 환불은 빠져요. 기록된 지출로 계산한 예상값이에요.";
 
 /** 실적 막대: 조건(가장 낮은 전월 실적 구간)이 있으면 채움 정도, 없으면 금액만 */
+/** "2026-11-02" → "11월 2일" */
+const md = (d: string) => `${+d.slice(5, 7)}월 ${+d.slice(8)}일`;
+
 function PerfBar({ perf, target }: { perf: number; target: number | null }) {
   if (!target) return <p className="tabular-nums">{money(perf)}</p>;
   const met = perf >= target;
@@ -105,7 +108,7 @@ export function CardGrid({ cards, noPayment, categories, today }: { cards: ListC
                     </p>
                   )}
                   <p className="text-muted-foreground truncate text-sm">{targets.length ? targets.join(" · ") : "혜택을 넣으면 한도를 계산해 드려요"}</p>
-                  {stale && <p className="text-warning-text text-caption">혜택이 바뀌었는지 확인해 보세요 · 최종 확인 {c.card!.verifiedAt}</p>}
+                  {stale && <p className="text-warning-text text-caption">혜택이 바뀌었는지 확인해 보세요 · 최종 확인 {md(c.card!.verifiedAt!)}</p>}
                 </Link>
               </li>
             );
@@ -257,7 +260,7 @@ export function CardDetailView({ c, categories, today }: { c: DetailCard; catego
         )}
         {c.card?.verifiedAt && (
           <p className={cn("text-caption", daysSince(c.card.verifiedAt, today) > STALE_DAYS ? "text-warning-text" : "text-muted-foreground")}>
-            최종 확인 {c.card.verifiedAt}
+            최종 확인 {md(c.card.verifiedAt)}
             {daysSince(c.card.verifiedAt, today) > STALE_DAYS && " · 혜택이 바뀌었는지 확인해 보세요"}
           </p>
         )}
