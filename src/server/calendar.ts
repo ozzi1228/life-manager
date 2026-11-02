@@ -5,7 +5,7 @@ import { and, asc, eq, gte, inArray, isNotNull, lte, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
 import { uuidv7 } from "../db/id.ts";
-import { calendars, eventExceptions, events } from "../db/schema.ts";
+import { calendars, eventExceptions, events, periodNotes } from "../db/schema.ts";
 import { addDays, countBefore, dayOfWeek, daysBetween, expand, parseRule, ruleString, sortKey, type Exception } from "../lib/calendar.ts";
 import { GOAL_PALETTE } from "../lib/palette.ts";
 import { AppError } from "./errors.ts";
@@ -36,7 +36,7 @@ export async function createCalendar(ctx: Ctx, input: unknown) {
   const list = await calendarRepo.list(ctx);
   return calendarRepo.create(ctx, { ...v, sort: list.length });
 }
-export const updateCalendar = (ctx: Ctx, id: string, version: number, input: unknown) => calendarRepo.update(ctx, id, version, parse(calendarInput, input));
+export const updateCalendar = async (ctx: Ctx, id: string, version: number, input: unknown) => calendarRepo.update(ctx, id, version, parse(calendarInput, input));
 export const setCalendarVisible = (ctx: Ctx, id: string, version: number, visible: boolean) => calendarRepo.update(ctx, id, version, { isVisible: visible });
 
 /** 캘린더 지우기: 그 캘린더의 일정도 한 묶음으로 휴지통에(함께 복구). 마지막 하나는 못 지움 */
@@ -159,7 +159,7 @@ export async function deleteEvent(ctx: Ctx, id: string, scope: Scope = "all", oc
 
 /** 보기 범위 [from, to]의 일정 회차(시작 순) */
 export async function rangeView(ctx: Ctx, from: string, to: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to || daysBetween(from, to) > 62) throw new AppError("BAD_REQUEST", "잠시 후 다시 시도해 주세요");
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(from) || !/^\d{4}-\d{2}-\d{2}$/.test(to) || from > to || daysBetween(from, to) > 400) throw new AppError("BAD_REQUEST", "잠시 후 다시 시도해 주세요");
   const [cals, evs] = await Promise.all([
     calendarList(ctx),
     eventRepo.list(ctx, { where: and(lte(events.startDate, to), or(gte(events.endDate, from), isNotNull(events.rrule))), orderBy: [asc(events.startDate)], limit: 1000 }),
@@ -206,3 +206,35 @@ export async function rangeView(ctx: Ctx, from: string, to: string) {
 }
 export type Instance = Awaited<ReturnType<typeof rangeView>>["instances"][number];
 export type CalendarItem = Awaited<ReturnType<typeof rangeView>>["calendars"][number];
+
+// ── 기간 메모(연·월·주·일, 일정 화면 위) ──
+export const noteRepo = defineRepo(periodNotes, "period_note");
+export type NoteScope = "year" | "month" | "week" | "day";
+/** 그 날이 든 기간의 key: 연 "2026" · 월 "2026-11" · 주는 그 주 일요일 · 일 */
+export const periodKey = (scope: NoteScope, date: string) => (scope === "year" ? date.slice(0, 4) : scope === "month" ? date.slice(0, 7) : scope === "week" ? addDays(date, -dayOfWeek(date)) : date);
+const KEY = { year: /^\d{4}$/, month: /^\d{4}-\d{2}$/, week: /^\d{4}-\d{2}-\d{2}$/, day: /^\d{4}-\d{2}-\d{2}$/ };
+const checkKey = (scope: NoteScope, key: string) => {
+  if (!KEY[scope]?.test(key)) throw new AppError("BAD_REQUEST", "잠시 후 다시 시도해 주세요");
+};
+
+export async function getNote(ctx: Ctx, scope: NoteScope, key: string) {
+  checkKey(scope, key);
+  const [row] = await noteRepo.list(ctx, { where: and(eq(periodNotes.scope, scope), eq(periodNotes.periodKey, key)), limit: 1 });
+  return row ? { id: row.id, version: row.version, body: row.body } : null;
+}
+
+/** 저장(처음이면 만듦). version은 화면이 가진 값 — 다른 기기에서 먼저 고쳤으면 409 */
+export async function saveNote(ctx: Ctx, scope: NoteScope, key: string, body: unknown, version: number | null) {
+  checkKey(scope, key);
+  const text = parse(z.string().max(10_000, "메모는 1만 자까지 쓸 수 있어요"), body);
+  const cur = await getNote(ctx, scope, key);
+  if (!cur) {
+    if (version !== null) throw new AppError("VERSION_CONFLICT", "다른 기기에서 먼저 지웠어요");
+    const row = await noteRepo.create(ctx, { scope, periodKey: key, body: text }).catch(() => {
+      throw new AppError("VERSION_CONFLICT", "다른 기기에서 먼저 저장했어요");
+    });
+    return { id: row.id, version: row.version };
+  }
+  const row = await noteRepo.update(ctx, cur.id, version ?? -1, { body: text });
+  return { id: row.id, version: row.version };
+}

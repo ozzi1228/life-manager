@@ -1,0 +1,52 @@
+"use server";
+
+// 커리어: 경험 정리·문서 버전 (규칙은 src/server/career.ts)
+import { action } from "@/server/api";
+import { createDoc, createExp, expRepo, removeDoc, saveVersion, updateDoc, updateExp, versionRepo, type DocInput, type ExpInput, type VersionInput } from "@/server/career";
+import { once } from "@/server/idempotency";
+import { restore } from "@/server/repo";
+
+export async function addExperience(key: string, input: ExpInput) {
+  return action(async (ctx) => {
+    const { body } = await once(ctx.userId, `exp:${key}`, JSON.stringify(input), async () => ({ status: 201, body: { id: (await createExp(ctx, input)).id } }));
+    return body as { id: string };
+  });
+}
+export async function editExperience(id: string, version: number, input: ExpInput) {
+  return action(async (ctx) => ({ version: (await updateExp(ctx, id, version, input)).version }));
+}
+export async function deleteExperience(id: string) {
+  return action(async (ctx) => {
+    await expRepo.remove(ctx, id);
+  });
+}
+export async function restoreExperience(id: string) {
+  return action((ctx) => restore(ctx, "career_experience", id));
+}
+
+export async function addDoc(input: DocInput) {
+  return action(async (ctx) => ({ id: (await createDoc(ctx, input)).id }));
+}
+export async function editDoc(id: string, version: number, input: DocInput) {
+  return action(async (ctx) => {
+    await updateDoc(ctx, id, version, input);
+  });
+}
+export async function deleteDoc(id: string) {
+  return action((ctx) => removeDoc(ctx, id));
+}
+export async function restoreDoc(id: string) {
+  return action((ctx) => restore(ctx, "career_doc", id));
+}
+
+export async function saveDocVersion(docId: string, id: string | null, version: number | null, input: VersionInput) {
+  return action(async (ctx) => ({ id: (await saveVersion(ctx, docId, id, version, input)).id }));
+}
+export async function deleteDocVersion(id: string) {
+  return action(async (ctx) => {
+    await versionRepo.remove(ctx, id);
+  });
+}
+export async function restoreDocVersion(id: string) {
+  return action((ctx) => restore(ctx, "career_doc_version", id));
+}

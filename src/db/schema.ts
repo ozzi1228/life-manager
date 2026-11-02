@@ -229,7 +229,7 @@ export const attachments = pgTable(
   "attachments",
   {
     ...userData(),
-    purpose: text("purpose", { enum: ["journal_photo", "media_cover", "wish_image"] }).notNull(),
+    purpose: text("purpose", { enum: ["journal_photo", "media_cover", "wish_image", "career_file"] }).notNull(),
     ownerType: text("owner_type"),
     ownerId: uuid("owner_id"),
     storageKey: text("storage_key").notNull(), // <user>/<yyyy>/<id> — 변형은 -thumb.webp, -body.webp
@@ -238,6 +238,9 @@ export const attachments = pgTable(
     bytes: integer("bytes").notNull(),
     sha256: text("sha256").notNull(),
     sort: integer("sort").notNull().default(0),
+    // 사진이 아닌 파일(커리어 문서: PDF·Word·PPT·한글): 원래 이름과 형식. 사진은 비어 있음
+    fileName: text("file_name"),
+    mime: text("mime"),
   },
   (t) => [index("attachments_owner").on(t.ownerType, t.ownerId)],
 );
@@ -537,7 +540,7 @@ export const healthRecords = pgTable(
   "health_records",
   {
     ...userData(),
-    kind: text("kind", { enum: ["weight", "glucose"] }).notNull(),
+    kind: text("kind", { enum: ["weight", "glucose", "injection"] }).notNull(), // injection: 값 칸에 {약 이름, 용량, 부위}를 암호화한 JSON
     date: date("date").notNull(),
     time: text("time").notNull(), // HH:MM, 사용자 시간대
     context: text("context", { enum: ["fasting", "before_meal", "after_1h", "after_2h", "bedtime", "other"] }), // 혈당 측정 시점
@@ -577,4 +580,61 @@ export const pushSubscriptions = pgTable(
     createdAt: at("created_at").notNull().defaultNow(),
   },
   (t) => [uniqueIndex("push_subscriptions_endpoint").on(t.endpoint), index("push_subscriptions_user").on(t.userId)],
+);
+
+// 기간 메모(일정 화면): 연·월·주·일마다 하나. key: 연 "2026" · 월 "2026-11" · 주 그 주 일요일 "2026-11-01" · 일 "2026-11-02"
+export const periodNotes = pgTable(
+  "period_notes",
+  {
+    ...userData(),
+    scope: text("scope", { enum: ["year", "month", "week", "day"] }).notNull(),
+    periodKey: text("period_key").notNull(),
+    body: text("body").notNull().default(""),
+  },
+  (t) => [uniqueIndex("period_notes_key").on(t.userId, t.scope, t.periodKey).where(sql`${t.deletedAt} is null`)],
+);
+
+// ── 커리어 ──
+// 경험 정리: 앱 안에서 직접 쓰는 경험 카드(Notion 데이터베이스 대신). 본문은 마크다운 텍스트
+export const careerExperiences = pgTable(
+  "career_experiences",
+  {
+    ...userData(),
+    title: text("title").notNull(),
+    type: text("type", { enum: ["work", "project", "intern", "activity", "education", "award", "certificate", "other"] }).notNull().default("project"),
+    organization: text("organization"),
+    role: text("role"),
+    startMonth: text("start_month"), // YYYY-MM
+    endMonth: text("end_month"), // 비면 진행 중
+    tags: text("tags").array().notNull().default(sql`'{}'::text[]`),
+    summary: text("summary"),
+    body: text("body").notNull().default(""),
+    links: text("links").array().notNull().default(sql`'{}'::text[]`),
+  },
+  (t) => [index("career_experiences_user").on(t.userId, t.startMonth).where(sql`${t.deletedAt} is null`)],
+);
+
+// 문서(이력서·자소서·포트폴리오): 문서 1개 → 버전 n개 → 버전마다 형식 여러 개(링크·파일)
+export const careerDocs = pgTable(
+  "career_docs",
+  {
+    ...userData(),
+    kind: text("kind", { enum: ["resume", "cover_letter", "portfolio", "other"] }).notNull(),
+    title: text("title").notNull(),
+    memo: text("memo"),
+  },
+  (t) => [index("career_docs_user").on(t.userId, t.kind).where(sql`${t.deletedAt} is null`)],
+);
+
+// 형식(items): 링크(Notion·웹 등) 또는 올린 파일(attachments, owner_type=career_doc_version)
+export const careerDocVersions = pgTable(
+  "career_doc_versions",
+  {
+    ...userData(),
+    docId: uuid("doc_id").notNull(),
+    label: text("label").notNull(), // 예: v3 · 카카오 지원용
+    note: text("note"),
+    items: jsonb("items").$type<{ id: string; type: "link" | "file"; url: string | null; attachmentId: string | null; name: string | null }[]>().notNull().default([]),
+  },
+  (t) => [index("career_doc_versions_doc").on(t.docId).where(sql`${t.deletedAt} is null`)],
 );

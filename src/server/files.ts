@@ -10,6 +10,7 @@ import { and, eq, inArray, isNull, or } from "drizzle-orm";
 import { db, type Tx } from "../db/index.ts";
 import { uuidv7 } from "../db/id.ts";
 import { attachments } from "../db/schema.ts";
+import { extOf, FILE_TYPES } from "../lib/career.ts";
 import { AppError } from "./errors.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
 
@@ -25,9 +26,9 @@ function filesDir() {
   return d;
 }
 
-export const PURPOSES = ["journal_photo", "media_cover", "wish_image"] as const;
+export const PURPOSES = ["journal_photo", "media_cover", "wish_image", "career_file"] as const;
 
-export async function saveImage(ctx: Ctx, input: Buffer, purpose: (typeof PURPOSES)[number]) {
+export async function saveImage(ctx: Ctx, input: Buffer, purpose: Exclude<(typeof PURPOSES)[number], "career_file">) {
   if (input.length > MAX_BYTES) throw new AppError("BAD_REQUEST", "사진은 20MB까지 올릴 수 있어요");
   let meta: Metadata;
   try {
@@ -101,5 +102,44 @@ export async function removeImageFiles(storageKeys: string[]) {
     const parts = key.split("/");
     const id = parts.at(-1)!;
     for (const v of Object.keys(VARIANTS)) await rm(join(filesDir(), ...parts.slice(0, -1), `${id}-${v}.webp`), { force: true });
+    for (const ext of Object.keys(FILE_TYPES)) await rm(join(filesDir(), ...parts.slice(0, -1), `${id}.${ext}`), { force: true });
+  }
+}
+
+// ── 문서 파일(커리어: PDF·Word·PPT·한글) — 변환 없이 그대로 보관 ──
+const MAX_FILE = 30 * 1024 * 1024;
+const PDF = Buffer.from("%PDF");
+const ZIP = Buffer.from([0x50, 0x4b, 0x03, 0x04]); // docx·pptx·hwpx
+const OLE = Buffer.from([0xd0, 0xcf, 0x11, 0xe0]); // doc·ppt·hwp
+
+/** 확장자와 실제 파일 머리가 맞을 때만(이름만 바꾼 파일 막기) */
+export async function saveFile(ctx: Ctx, input: Buffer, fileName: string) {
+  if (input.length > MAX_FILE) throw new AppError("BAD_REQUEST", "파일은 30MB까지 올릴 수 있어요");
+  const ext = extOf(fileName);
+  const type = FILE_TYPES[ext];
+  const head = input.subarray(0, 4);
+  const ok = type && (ext === "pdf" ? head.equals(PDF) : ["docx", "pptx", "hwpx"].includes(ext) ? head.equals(ZIP) : head.equals(OLE));
+  if (!ok) throw new AppError("VALIDATION_FAILED", "PDF·Word·PPT·한글 파일만 올릴 수 있어요");
+  const id = uuidv7();
+  const year = String(new Date().getFullYear());
+  await mkdir(join(filesDir(), ctx.userId, year), { recursive: true });
+  await writeFile(join(filesDir(), ctx.userId, year, `${id}.${ext}`), input);
+  const name = fileName.replace(/[\\/\u0000-\u001f]/g, "").slice(-120);
+  const [row] = await db
+    .insert(attachments)
+    .values({ id, userId: ctx.userId, purpose: "career_file", storageKey: `${ctx.userId}/${year}/${id}`, width: 0, height: 0, bytes: input.length, sha256: createHash("sha256").update(input).digest("hex"), fileName: name, mime: type.mime })
+    .returning();
+  return { id: row.id, name: row.fileName!, bytes: row.bytes };
+}
+
+/** 내 문서 파일 읽기(지운 것·남의 것은 404) */
+export async function readDocFile(ctx: Ctx, id: string) {
+  const a = await attachmentRepo.get(ctx, id);
+  if (a.purpose !== "career_file" || !a.fileName) throw new AppError("NOT_FOUND", "찾을 수 없어요");
+  try {
+    const data = await readFile(join(filesDir(), ...a.storageKey.split("/").slice(0, -1), `${id}.${extOf(a.fileName)}`));
+    return { data, name: a.fileName, mime: a.mime ?? "application/octet-stream" };
+  } catch {
+    throw new AppError("NOT_FOUND", "찾을 수 없어요");
   }
 }

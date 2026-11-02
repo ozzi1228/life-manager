@@ -99,6 +99,13 @@
       "when": 1793587921912,
       "tag": "0013_ops",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1793589207742,
+      "tag": "0014_notes_career",
+      "breakpoints": true
     }
   ]
 }

@@ -7,7 +7,7 @@ import { ChevronLeft, ChevronRight, Clock, MapPin, Plus, Repeat, Settings2, Stic
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { addCalendar, addEvent, editCalendar, editEvent, removeCalendar, removeEvent, restoreCalendar, showCalendar, undoRemoveEvent } from "@/app/actions/calendar";
+import { addCalendar, addEvent, editCalendar, editEvent, removeCalendar, removeEvent, restoreCalendar, saveCalendarNote, showCalendar, undoRemoveEvent } from "@/app/actions/calendar";
 import { ColorPalettePicker } from "@/components/app/color-picker";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
 import { toastUndo } from "@/components/app/states";
@@ -27,9 +27,9 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { addDays, dayOfWeek, daysBetween, parseRule, ruleLabel, ruleString, type Freq, type Rule } from "@/lib/calendar";
 import { fromYmd, ymd } from "@/lib/format";
 import { cn } from "@/lib/utils";
-import type { CalendarItem, EventInput, Instance, Scope } from "@/server/calendar";
+import type { CalendarItem, EventInput, Instance, NoteScope, Scope } from "@/server/calendar";
 
-type View = "month" | "week" | "day";
+type View = "year" | "month" | "week" | "day";
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 const HOUR = 48; // 시간축 한 시간 높이(px)
 
@@ -629,6 +629,107 @@ function CalendarManager({ calendars, close, refresh }: { calendars: CalendarIte
   );
 }
 
+// ── 기간 메모(연·월·주·일) ──
+
+export type Note = { scope: NoteScope; key: string; id: string | null; version: number | null; body: string };
+const NOTE_HINT: Record<NoteScope, string> = { year: "올해 이루고 싶은 것, 큰 계획", month: "이번 달 안에 해야 할 일", week: "이번 주에 할 일", day: "오늘 메모" };
+
+/** 쓰는 동안 잠깐 멈추면 저장(0.8초). 다른 기기에서 먼저 고쳤으면 알려 줌 */
+function NotePanel({ note, title }: { note: Note; title: string }) {
+  const [text, setText] = useState(note.body);
+  const [state, setState] = useState<"idle" | "saving" | "saved" | "conflict">("idle");
+  const version = useRef(note.version);
+  const saved = useRef(note.body);
+  const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  async function save(body: string) {
+    if (body === saved.current) return;
+    setState("saving");
+    const r = await saveCalendarNote(note.scope, note.key, body, version.current);
+    if (!r.ok) return setState(r.error.code === "VERSION_CONFLICT" ? "conflict" : "idle");
+    version.current = r.data.version;
+    saved.current = body;
+    setState("saved");
+  }
+  const change = (v: string) => {
+    setText(v);
+    clearTimeout(timer.current);
+    timer.current = setTimeout(() => save(v), 800);
+  };
+  useEffect(() => () => clearTimeout(timer.current), []);
+
+  return (
+    <section className="bg-card space-y-1.5 rounded-lg border p-3">
+      <div className="flex items-center gap-2">
+        <h2 className="text-sm font-semibold">{title}</h2>
+        <span className="text-muted-foreground ml-auto text-caption" aria-live="polite">
+          {state === "saving" ? "저장 중" : state === "saved" ? "저장됨" : state === "conflict" ? "다른 기기에서 먼저 고쳤어요. 새로 고침해 주세요" : ""}
+        </span>
+      </div>
+      <Textarea
+        aria-label={title}
+        placeholder={NOTE_HINT[note.scope]}
+        maxLength={10_000}
+        className="field-sizing-content min-h-16 resize-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
+        value={text}
+        onChange={(e) => change(e.target.value)}
+        onBlur={() => (clearTimeout(timer.current), save(text))}
+      />
+    </section>
+  );
+}
+
+// ── 연 보기 ──
+
+function YearGrid({ year, today, items, open }: { year: string; today: string; items: Instance[]; open: (v: View, d: string) => void }) {
+  // 일정 있는 날(여러 날 일정은 그 사이 모든 날)
+  const busy = new Set<string>();
+  for (const e of items) for (let d = e.startDate; d <= e.endDate && d <= `${year}-12-31`; d = addDays(d, 1)) busy.add(d);
+  return (
+    <div className="grid grid-cols-2 gap-x-4 gap-y-5 sm:grid-cols-3 xl:grid-cols-4">
+      {Array.from({ length: 12 }, (_, i) => {
+        const first = `${year}-${String(i + 1).padStart(2, "0")}-01`;
+        const days = new Date(Date.UTC(+year, i + 1, 0)).getUTCDate();
+        return (
+          <section key={first} className="space-y-1">
+            <button type="button" onClick={() => open("month", first)} className="hover:text-link font-semibold">
+              {i + 1}월
+            </button>
+            <div className="grid grid-cols-7 text-center text-micro">
+              {WEEK.map((w, k) => (
+                <span key={w} className={k === 0 ? "text-destructive-text" : "text-muted-foreground"}>
+                  {w}
+                </span>
+              ))}
+              {Array.from({ length: dayOfWeek(first) }, (_, k) => (
+                <span key={`e${k}`} />
+              ))}
+              {Array.from({ length: days }, (_, k) => {
+                const d = addDays(first, k);
+                return (
+                  <button
+                    key={d}
+                    type="button"
+                    aria-label={`${dayTitle(d)}${busy.has(d) ? ", 일정 있음" : ""}`}
+                    onClick={() => open("month", d)}
+                    className={cn(
+                      "hover:bg-accent relative mx-auto flex size-6 items-center justify-center rounded-full tabular-nums",
+                      d === today ? "bg-primary text-primary-foreground font-semibold" : dayOfWeek(d) === 0 && "text-destructive-text",
+                    )}
+                  >
+                    {k + 1}
+                    {busy.has(d) && d !== today && <span className="bg-primary absolute bottom-0 size-1 rounded-full" />}
+                  </button>
+                );
+              })}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── 화면 ──
 
 /** 새 일정 초안: 고른 날, 다음 정시부터 한 시간 */
@@ -637,7 +738,7 @@ function newDraft(calendarId: string, d: string, time?: string): Draft {
   return { calendarId, title: "", allDay: false, startDate: d, startTime: start, endDate: d, endTime: toHm(Math.min(minutes(start) + 60, 1439)), rrule: null, location: null, memo: null };
 }
 
-export function CalendarView({ view, date, from, today, calendars, instances, startNew }: { view: View; date: string; from: string; today: string; calendars: CalendarItem[]; instances: Instance[]; startNew?: boolean }) {
+export function CalendarView({ view, date, from, today, calendars, instances, note, startNew }: { view: View; date: string; from: string; today: string; calendars: CalendarItem[]; instances: Instance[]; note: Note; startNew?: boolean }) {
   const router = useRouter();
   const mobile = useIsMobile();
   const [selected, setSelected] = useState(date);
@@ -658,6 +759,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, st
 
   const go = (v: View, d: string) => router.push(`/calendar?view=${v}&date=${d}`, { scroll: false });
   const step = (n: number) => {
+    if (view === "year") return go(view, `${+date.slice(0, 4) + n}-01-01`);
     if (view === "month") {
       const [y, m] = date.split("-").map(Number);
       const t = new Date(Date.UTC(y, m - 1 + n, 1));
@@ -666,14 +768,14 @@ export function CalendarView({ view, date, from, today, calendars, instances, st
     go(view, addDays(date, n * (view === "week" ? 7 : 1)));
   };
 
-  // 키보드: T 오늘, M/W/D 보기 전환(입력 중이면 무시)
+  // 키보드: T 오늘, Y/M/W/D 보기 전환(입력 중이면 무시)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
       if (e.metaKey || e.ctrlKey || e.altKey || t.closest("input, textarea, [contenteditable], [role=dialog]")) return;
       const k = e.key.toLowerCase();
       if (k === "t") go(view, today);
-      else if (k === "m" || k === "w" || k === "d") go(({ m: "month", w: "week", d: "day" } as const)[k], selected);
+      else if (k === "y" || k === "m" || k === "w" || k === "d") go(({ y: "year", m: "month", w: "week", d: "day" } as const)[k], selected);
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
@@ -716,12 +818,15 @@ export function CalendarView({ view, date, from, today, calendars, instances, st
   }
 
   const label =
-    view === "month"
+    view === "year"
+      ? `${date.slice(0, 4)}년`
+      : view === "month"
       ? `${date.slice(0, 4)}년 ${+date.slice(5, 7)}월`
       : view === "week"
         ? `${md(from)} ~ ${addDays(from, 6).slice(5, 7) === from.slice(5, 7) ? `${+addDays(from, 6).slice(8)}일` : md(addDays(from, 6))}`
         : dayTitle(date);
   const dayItems = (d: string) => visible.filter((e) => onDay(e, d));
+  const noteTitle = view === "year" ? `${date.slice(0, 4)}년 메모` : view === "month" ? `${+date.slice(5, 7)}월 메모` : view === "week" ? `${md(from)} 주 메모` : `${md(date)} 메모`;
 
   return (
     <div className="space-y-4">
@@ -739,6 +844,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, st
           오늘
         </Button>
         <ToggleGroup type="single" variant="outline" size="sm" value={view} onValueChange={(v) => v && go(v as View, selected)} aria-label="보기" className="ml-auto">
+          <ToggleGroupItem value="year">연</ToggleGroupItem>
           <ToggleGroupItem value="month">월</ToggleGroupItem>
           <ToggleGroupItem value="week">주</ToggleGroupItem>
           <ToggleGroupItem value="day">일</ToggleGroupItem>
@@ -767,10 +873,16 @@ export function CalendarView({ view, date, from, today, calendars, instances, st
         </Button>
       </div>
 
-      {view === "month" ? (
+      {view !== "month" && <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />}
+      {view === "year" ? (
+        <YearGrid year={date.slice(0, 4)} today={today} items={visible} open={go} />
+      ) : view === "month" ? (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <MonthGrid from={from} month={date.slice(0, 7)} selected={selected} today={today} items={visible} color={colorOf} select={setSelected} open={setDetail} add={addAt} mobile={mobile} />
-          <DayList day={selected} items={dayItems(selected)} color={colorOf} open={setDetail} add={() => addAt(selected)} today={today} />
+          <div className="space-y-4">
+            <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
+            <DayList day={selected} items={dayItems(selected)} color={colorOf} open={setDetail} add={() => addAt(selected)} today={today} />
+          </div>
         </div>
       ) : view === "week" && mobile ? (
         <div className="divide-y">

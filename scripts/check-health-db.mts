@@ -37,6 +37,13 @@ try {
   assert.equal(await code(updateHealth(A, r.id, r.version, { ...w, value: 50 })), "VERSION_CONFLICT");
   assert.equal(await code(updateHealth(B, r.id, 2, { ...w, value: 50 })), "NOT_FOUND", "남의 기록 못 고침");
   assert.equal((await healthList(B, "weight", "2026-01-01")).length, 0);
+  // 주사: 약 이름 필수, 약 이름·용량·부위도 암호화
+  assert.equal(await code(createHealth(A, { kind: "injection", date: "2026-11-02", time: "08:00", injection: { name: " " } })), "약 이름을 입력해 주세요");
+  const inj = await createHealth(A, { kind: "injection", date: "2026-11-02", time: "08:00", injection: { name: "인슐린", dose: "10단위", site: "배 왼쪽" } });
+  const [rawInj] = await db.select().from(healthRecords).where(eq(healthRecords.id, inj.id));
+  assert.ok(rawInj.valueEnc.startsWith("v1.") && !rawInj.valueEnc.includes("인슐린"), "주사 내용도 암호화");
+  const injList = await healthList(A, "injection", "2026-01-01");
+  assert.deepEqual(injList[0].injection, { name: "인슐린", dose: "10단위", site: "배 왼쪽" });
   console.log("건강 기록 규칙 확인 통과");
 } catch (e) {
   // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄

@@ -14,6 +14,7 @@ import { registeredTables, restore, type Ctx } from "./repo.ts";
 // 서비스마다 자기 테이블을 등록하므로 모두 불러와 둠(묶음이 여러 영역에 걸쳐도 함께 복구·삭제)
 import "./budget.ts";
 import "./calendar.ts";
+import "./career.ts";
 import "./cards.ts";
 import "./finance.ts";
 import "./goals.ts";
@@ -50,6 +51,9 @@ const SHOWN: Record<string, { area: string; name: (r: AnyRow, batch: { entity: s
   wish_item: { area: "위시", name: (r) => String(r.name) },
   health_record: { area: "건강", name: (r) => `${r.kind === "weight" ? "체중" : "혈당"} 기록 · ${r.date}` }, // 값은 풀지 않음
   pet: { area: "펫", name: (r) => String(r.name) },
+  career_doc: { area: "커리어", name: (r) => String(r.title) },
+  career_doc_version: { area: "커리어", name: (r) => `버전 ${r.label}` },
+  career_experience: { area: "커리어", name: (r) => String(r.title) },
 };
 
 async function deletedRows(ctx: Ctx, batchIds?: string[]) {

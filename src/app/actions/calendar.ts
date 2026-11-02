@@ -8,11 +8,13 @@ import {
   deleteCalendar,
   deleteEvent,
   exceptionRepo,
+  saveNote,
   setCalendarVisible,
   updateCalendar,
   updateEvent,
   type CalendarInput,
   type EventInput,
+  type NoteScope,
   type Scope,
 } from "@/server/calendar";
 import { once } from "@/server/idempotency";
@@ -58,4 +60,9 @@ export async function removeCalendar(id: string) {
 }
 export async function restoreCalendar(id: string) {
   return action((ctx) => restore(ctx, "calendar", id));
+}
+
+/** 기간 메모 저장(연·월·주·일) */
+export async function saveCalendarNote(scope: NoteScope, key: string, body: string, version: number | null) {
+  return action((ctx) => saveNote(ctx, scope, key, body, version));
 }

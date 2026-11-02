@@ -1,6 +1,8 @@
 // 건강 기록 계산 (docs/planning/10 §4·5). 기록 도구일 뿐 — 정상·위험 같은 판정은 하지 않음(10 §2)
-// 생리 주기는 만들지 않음(D-063)
-export type HealthKind = "weight" | "glucose";
+// 생리 주기는 만들지 않음(D-063). 주사 기록: 약 이름·용량·부위(부위를 돌려 가며 맞도록 최근 부위를 보여 줌)
+export type HealthKind = "weight" | "glucose" | "injection";
+export type Injection = { name: string; dose: string | null; site: string | null };
+export const SITES = ["배 왼쪽", "배 오른쪽", "허벅지 왼쪽", "허벅지 오른쪽", "팔 왼쪽", "팔 오른쪽", "엉덩이"];
 export type GlucoseContext = "fasting" | "before_meal" | "after_1h" | "after_2h" | "bedtime" | "other";
 export type HealthPoint = { date: string; time: string; value: number; context: GlucoseContext | null };
 

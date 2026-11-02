@@ -18,11 +18,12 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { dateLabel, dayLabel, fromYmd, ymd } from "@/lib/format";
-import { CONTEXTS, contextLabel, dailyLast, glucoseOn, weekChange, type GlucoseContext, type HealthKind } from "@/lib/health";
+import { CONTEXTS, contextLabel, dailyLast, glucoseOn, SITES, weekChange, type GlucoseContext, type HealthKind } from "@/lib/health";
 import type { HealthRecord } from "@/server/health";
 
-const UNIT: Record<HealthKind, string> = { weight: "kg", glucose: "mg/dL" };
-const NAME: Record<HealthKind, string> = { weight: "체중", glucose: "혈당" };
+const UNIT: Record<HealthKind, string> = { weight: "kg", glucose: "mg/dL", injection: "" };
+const NAME: Record<HealthKind, string> = { weight: "체중", glucose: "혈당", injection: "주사" };
+const injLabel = (r: HealthRecord) => [r.injection?.name, r.injection?.dose].filter(Boolean).join(" ");
 const PERIODS = [
   { v: "7", label: "1주" },
   { v: "30", label: "1달" },
@@ -44,17 +45,21 @@ function Sparkline({ values, label }: { values: number[]; label: string }) {
   );
 }
 
-type Draft = { kind: HealthKind; date: string; time: string; context: GlucoseContext | null; value: string; memo: string };
+type Draft = { kind: HealthKind; date: string; time: string; context: GlucoseContext | null; value: string; memo: string; name: string; dose: string; site: string };
 
-function HealthForm({ edit, kind, today, close, done }: { edit?: HealthRecord; kind: HealthKind; today: string; close: () => void; done: () => void }) {
+/** last: 마지막 주사(새 주사 기록에 약 이름·용량을 미리 채움), names: 지난 약 이름(고르기) */
+function HealthForm({ edit, kind, today, last, names, close, done }: { edit?: HealthRecord; kind: HealthKind; today: string; last?: HealthRecord; names: string[]; close: () => void; done: () => void }) {
   const now = () => `${String(new Date().getHours()).padStart(2, "0")}:${String(new Date().getMinutes()).padStart(2, "0")}`;
   const [v, setV] = useState<Draft>(() => ({
     kind: edit?.kind ?? kind,
     date: edit?.date ?? today,
     time: edit?.time ?? now(),
     context: edit?.context ?? (kind === "glucose" ? "fasting" : null),
-    value: edit ? String(edit.value) : "",
+    value: edit && edit.kind !== "injection" ? String(edit.value) : "",
     memo: edit?.memo ?? "",
+    name: edit?.injection?.name ?? last?.injection?.name ?? "",
+    dose: edit?.injection?.dose ?? last?.injection?.dose ?? "",
+    site: edit?.injection?.site ?? "",
   }));
   const [dateOpen, setDateOpen] = useState(false);
   const [busy, setBusy] = useState(false);
@@ -62,15 +67,25 @@ function HealthForm({ edit, kind, today, close, done }: { edit?: HealthRecord; k
   const key = useRef(crypto.randomUUID());
   const set = <K extends keyof Draft>(k: K, val: Draft[K]) => setV((s) => ({ ...s, [k]: val }));
   const num = Number(v.value.replace(",", "."));
+  const inj = v.kind === "injection";
+  const ready = inj ? !!v.name.trim() : !!v.value.trim() && !Number.isNaN(num);
 
   async function save() {
     setBusy(true);
     setError("");
-    const input = { kind: v.kind, date: v.date, time: v.time, context: v.kind === "glucose" ? v.context : null, value: num, memo: v.memo.trim() || null };
+    const input = {
+      kind: v.kind,
+      date: v.date,
+      time: v.time,
+      context: v.kind === "glucose" ? v.context : null,
+      value: inj ? null : num,
+      injection: inj ? { name: v.name.trim(), dose: v.dose.trim() || null, site: v.site.trim() || null } : null,
+      memo: v.memo.trim() || null,
+    };
     const r = edit ? await editHealth(edit.id, edit.version, input) : await addHealth(key.current, input);
     setBusy(false);
     if (!r.ok) return setError(r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 수정했어요. 닫고 다시 열어 주세요" : (r.error.fields?.[0]?.message ?? r.error.message));
-    toast(edit ? "고쳤어요" : `${NAME[v.kind]}을 기록했어요`);
+    toast(edit ? "고쳤어요" : `${NAME[v.kind]}${inj ? "를" : "을"} 기록했어요`);
     done();
   }
   async function remove() {
@@ -97,7 +112,7 @@ function HealthForm({ edit, kind, today, close, done }: { edit?: HealthRecord; k
               삭제
             </Button>
           )}
-          <Button className="ml-auto max-md:flex-1" disabled={!v.value.trim() || Number.isNaN(num) || busy} onClick={save}>
+          <Button className="ml-auto max-md:flex-1" disabled={!ready || busy} onClick={save}>
             {busy && <Spinner />} 저장
           </Button>
         </div>
@@ -112,8 +127,42 @@ function HealthForm({ edit, kind, today, close, done }: { edit?: HealthRecord; k
             <ToggleGroupItem value="glucose" className="flex-1">
               혈당
             </ToggleGroupItem>
+            <ToggleGroupItem value="injection" className="flex-1">
+              주사
+            </ToggleGroupItem>
           </ToggleGroup>
         )}
+        {inj && (
+          <>
+            <div className="grid grid-cols-[1fr_7rem] gap-2">
+              <Field>
+                <FieldLabel htmlFor="hl-name">약 이름</FieldLabel>
+                <Input id="hl-name" autoFocus={!v.name} list="hl-names" maxLength={40} placeholder="예: 인슐린" className="h-11 text-base md:h-9 md:text-sm" value={v.name} onChange={(e) => set("name", e.target.value)} />
+                <datalist id="hl-names">
+                  {names.map((n) => (
+                    <option key={n} value={n} />
+                  ))}
+                </datalist>
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="hl-dose">용량</FieldLabel>
+                <Input id="hl-dose" maxLength={20} placeholder="예: 10단위" className="h-11 text-base md:h-9 md:text-sm" value={v.dose} onChange={(e) => set("dose", e.target.value)} />
+              </Field>
+            </div>
+            <Field>
+              <FieldLabel>부위</FieldLabel>
+              <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="부위">
+                {SITES.map((s) => (
+                  <Button key={s} type="button" role="radio" aria-checked={v.site === s} size="sm" variant={v.site === s ? "default" : "outline"} className="rounded-full" onClick={() => set("site", v.site === s ? "" : s)}>
+                    {s}
+                  </Button>
+                ))}
+              </div>
+              {last?.injection?.site && !edit && <p className="text-muted-foreground text-caption">지난번: {last.injection.site}</p>}
+            </Field>
+          </>
+        )}
+        {!inj && (
         <Field>
           <FieldLabel htmlFor="hl-value">{v.kind === "weight" ? "체중" : "혈당"}</FieldLabel>
           <div className="flex items-center gap-2">
@@ -130,6 +179,7 @@ function HealthForm({ edit, kind, today, close, done }: { edit?: HealthRecord; k
             <span className="text-muted-foreground w-14 shrink-0">{UNIT[v.kind]}</span>
           </div>
         </Field>
+        )}
         {v.kind === "glucose" && (
           <Field>
             <FieldLabel>측정 시점</FieldLabel>
@@ -162,7 +212,7 @@ function HealthForm({ edit, kind, today, close, done }: { edit?: HealthRecord; k
   );
 }
 
-export function HealthView({ weight, glucose, today }: { weight: HealthRecord[]; glucose: HealthRecord[]; today: string }) {
+export function HealthView({ weight, glucose, injection, today }: { weight: HealthRecord[]; glucose: HealthRecord[]; injection: HealthRecord[]; today: string }) {
   const router = useRouter();
   const [form, setForm] = useState<{ kind: HealthKind; edit?: HealthRecord } | null>(null);
   const [kind, setKind] = useState<HealthKind>("weight");
@@ -173,8 +223,12 @@ export function HealthView({ weight, glucose, today }: { weight: HealthRecord[];
   const change = weekChange(wDaily);
   const gToday = glucoseOn(glucose, today);
   const gLast = glucose[0];
-  const list = (kind === "weight" ? weight : glucose).filter((r) => r.date >= daysAgo(today, Number(period)));
-  const fmt = (r: HealthRecord) => (r.kind === "weight" ? r.value.toFixed(1) : String(r.value));
+  const iLast = injection[0];
+  const iDays = iLast ? Math.round((fromYmd(today).getTime() - fromYmd(iLast.date).getTime()) / 86_400_000) : 0;
+  const recentSites = injection.flatMap((r) => (r.injection?.site ? [r.injection.site] : [])).slice(0, 4);
+  const names = [...new Set(injection.map((r) => r.injection?.name).filter((n): n is string => !!n))];
+  const list = { weight, glucose, injection }[kind].filter((r) => r.date >= daysAgo(today, Number(period)));
+  const fmt = (r: HealthRecord) => (r.kind === "injection" ? injLabel(r) : r.kind === "weight" ? r.value.toFixed(1) : String(r.value));
 
   const card = "bg-card space-y-2 rounded-xl border p-4";
   return (
@@ -186,7 +240,7 @@ export function HealthView({ weight, glucose, today }: { weight: HealthRecord[];
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <section className={card}>
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">체중</h2>
@@ -241,6 +295,28 @@ export function HealthView({ weight, glucose, today }: { weight: HealthRecord[];
             label="최근 14일 혈당 추세"
           />
         </section>
+        <section className={card}>
+          <div className="flex items-center justify-between">
+            <h2 className="font-semibold">주사</h2>
+            <Button variant="outline" size="sm" onClick={() => setForm({ kind: "injection" })}>
+              <Plus /> 주사
+            </Button>
+          </div>
+          {iLast ? (
+            <>
+              <p>
+                <span className="font-semibold">{injLabel(iLast)}</span>
+                <span className="text-muted-foreground ml-2 text-sm">
+                  {dayLabel(iLast.date, fromYmd(today))} {iLast.time}
+                  {iDays > 0 && ` · ${iDays}일 전`}
+                </span>
+              </p>
+              {recentSites.length > 0 && <p className="text-muted-foreground text-sm">최근 부위: {recentSites.join(" → ")}</p>}
+            </>
+          ) : (
+            <p className="text-muted-foreground text-sm">아직 기록이 없어요</p>
+          )}
+        </section>
       </div>
 
       <section className="space-y-3">
@@ -248,6 +324,7 @@ export function HealthView({ weight, glucose, today }: { weight: HealthRecord[];
           <ToggleGroup type="single" variant="outline" size="sm" value={kind} onValueChange={(k) => k && setKind(k as HealthKind)} aria-label="기록 종류">
             <ToggleGroupItem value="weight">체중</ToggleGroupItem>
             <ToggleGroupItem value="glucose">혈당</ToggleGroupItem>
+            <ToggleGroupItem value="injection">주사</ToggleGroupItem>
           </ToggleGroup>
           <ToggleGroup type="single" variant="outline" size="sm" value={period} onValueChange={(p) => p && setPeriod(p)} aria-label="기간" className="ml-auto">
             {PERIODS.map((p) => (
@@ -267,6 +344,7 @@ export function HealthView({ weight, glucose, today }: { weight: HealthRecord[];
                   </span>
                   <span className="min-w-0 flex-1">
                     {r.context && <span className="text-muted-foreground mr-2 text-sm">{contextLabel(r.context)}</span>}
+                    {r.injection?.site && <span className="text-muted-foreground mr-2 text-sm">{r.injection.site}</span>}
                     {r.memo && <span className="text-muted-foreground truncate text-caption">{r.memo}</span>}
                   </span>
                   <span className="shrink-0 font-semibold tabular-nums">
@@ -277,8 +355,8 @@ export function HealthView({ weight, glucose, today }: { weight: HealthRecord[];
               </li>
             ))}
           </ul>
-        ) : weight.length + glucose.length === 0 ? (
-          <EmptyState pet="komong" title="체중이나 혈당을 기록해 보세요" description="숫자 하나면 돼요. 날짜별로 모아 추세를 보여 드려요." action={<Button onClick={() => setForm({ kind })}>기록하기</Button>} />
+        ) : weight.length + glucose.length + injection.length === 0 ? (
+          <EmptyState pet="komong" title="체중·혈당·주사를 기록해 보세요" description="숫자 하나면 돼요. 날짜별로 모아 추세를 보여 드려요." action={<Button onClick={() => setForm({ kind })}>기록하기</Button>} />
         ) : (
           <p className="text-muted-foreground py-6 text-center text-sm">이 기간의 {NAME[kind]} 기록이 없어요</p>
         )}
@@ -290,6 +368,8 @@ export function HealthView({ weight, glucose, today }: { weight: HealthRecord[];
           edit={form.edit}
           kind={form.kind}
           today={today}
+          last={iLast}
+          names={names}
           close={() => setForm(null)}
           done={() => {
             setForm(null);
