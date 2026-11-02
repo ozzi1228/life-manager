@@ -1,6 +1,6 @@
-// 고정 지출 (SCR-FIN-06·07): 월 환산 합계, 다음 결제일 순 목록, 해지됨은 접어 둠
+// 고정 지출 (SCR-FIN-06·07): 자산 > 지출 탭 안. 월 환산 합계, 다음 결제일 순 목록, 해지됨은 접어 둠
 import { Page } from "@/components/app/page-shell";
-import { MoneyTabs } from "@/components/money/money-tabs";
+import { ExpenseTabs, MoneyTabs } from "@/components/money/money-tabs";
 import { RecurringList } from "@/components/money/recurring-list";
 import { formData, todayIn } from "@/server/finance";
 import { recurringList } from "@/server/recurring";
@@ -12,6 +12,7 @@ export default async function FixedPage() {
   return (
     <Page>
       <MoneyTabs />
+      <ExpenseTabs />
       <RecurringList
         items={items}
         categories={f.categories.filter((c) => c.kind === "expense").map(({ id, name }) => ({ id, name }))}

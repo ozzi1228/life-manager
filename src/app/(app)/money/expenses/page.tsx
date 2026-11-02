@@ -2,7 +2,7 @@
 import { Page } from "@/components/app/page-shell";
 import { EmptyState } from "@/components/app/states";
 import { AddExpenseButton, MonthNav, TypeFilter } from "@/components/money/controls";
-import { MoneyTabs } from "@/components/money/money-tabs";
+import { ExpenseTabs, MoneyTabs } from "@/components/money/money-tabs";
 import { TxList } from "@/components/money/tx-list";
 import { money } from "@/lib/format";
 import { monthTransactions, nameMaps, todayIn, totals, toRow } from "@/server/finance";
@@ -20,6 +20,7 @@ export default async function ExpensesPage({ searchParams }: PageProps<"/money/e
   return (
     <Page>
       <MoneyTabs />
+      <ExpenseTabs />
       <div className="flex flex-wrap items-center justify-between gap-3">
         <MonthNav month={month} />
         <div className="flex items-center gap-2">

@@ -98,6 +98,19 @@ export async function removeFromMonth(ctx: Ctx, itemId: string, month: string) {
   await db.delete(trackerMonthItems).where(and(eq(trackerMonthItems.userId, ctx.userId), eq(trackerMonthItems.itemId, itemId), eq(trackerMonthItems.month, month)));
 }
 
+/** 이 달 항목 순서 바꾸기(드래그). 목록에 없는 항목은 건드리지 않음 */
+export async function reorderMonth(ctx: Ctx, month: string, itemIds: unknown) {
+  checkMonth(month);
+  const ids = parse(z.array(z.uuid()).max(200), itemIds);
+  await db.transaction(async (tx) => {
+    for (const [i, id] of ids.entries())
+      await tx
+        .update(trackerMonthItems)
+        .set({ sort: i + 1 })
+        .where(and(eq(trackerMonthItems.userId, ctx.userId), eq(trackerMonthItems.month, month), eq(trackerMonthItems.itemId, id)));
+  });
+}
+
 /** 지난달 항목 중 고른 것으로 이번 달 시작 */
 export async function startMonthWith(ctx: Ctx, month: string, itemIds: string[]) {
   checkMonth(month);

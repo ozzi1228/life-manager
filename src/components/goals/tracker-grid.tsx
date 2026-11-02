@@ -2,7 +2,7 @@
 
 // 월간 트래커 (SCR-GOAL-02, 04 §5.1): 항목 × 날짜 색 칸. 누르면 색이 채워지고, 메모는 칸 안 글자로
 // PC: 한 달 전체 · 모바일: 7일 창. 칸 메모는 PC 두 번 클릭(또는 Enter), 모바일 길게 누르기
-import { Check, Plus } from "lucide-react";
+import { Check, GripVertical, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -12,6 +12,7 @@ import {
   editTrackerItem,
   hideTrackerItem,
   nextColor,
+  reorderTrackerItems,
   restoreTrackerItem,
   saveCell,
   startTrackerMonth,
@@ -26,6 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { useDragSort } from "@/hooks/use-drag-sort";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { fromYmd } from "@/lib/format";
 import { textOn } from "@/lib/palette";
@@ -37,7 +39,7 @@ type Data = { month: string; days: number; today: string; items: Item[]; cells: 
 
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 const k = (itemId: string, date: string) => `${itemId}|${date}`;
-const HOW = ["칸을 누르면 색이 채워져요", "PC는 두 번 클릭, 휴대폰은 길게 눌러 메모를 남겨요", "항목 이름을 누르면 이름·색을 바꿀 수 있어요"];
+const HOW = ["칸을 누르면 색이 채워져요", "PC는 두 번 클릭, 휴대폰은 길게 눌러 메모를 남겨요", "항목 이름을 누르면 이름·색을 바꾸고, 왼쪽 손잡이를 끌면 순서를 바꿔요"];
 
 export function TrackerGrid({ data }: { data: Data }) {
   const router = useRouter();
@@ -61,6 +63,17 @@ export function TrackerGrid({ data }: { data: Data }) {
   const weeks = Array.from({ length: Math.ceil(days / 7) }, (_, i) => [i * 7 + 1, Math.min(days, i * 7 + 7)] as const);
   const [week, setWeek] = useState(thisMonth ? Math.floor((Number(today.slice(8)) - 1) / 7) : 0);
   const shown = mobile ? dates.slice(weeks[week][0] - 1, weeks[week][1]) : dates;
+
+  // 항목 순서: 손잡이로 끌면 화면에서 먼저 바꾸고 저장
+  const sort = useDragSort(
+    items.map((i) => i.id),
+    async (ids) => {
+      const r = await reorderTrackerItems(month, ids);
+      if (!r.ok) toast("순서를 저장하지 못했어요");
+      router.refresh();
+    },
+  );
+  const rowsInOrder = sort.order.flatMap((id) => items.filter((i) => i.id === id));
 
   const [editCell, setEditCell] = useState<{ item: Item; date: string } | null>(null);
   const [editItem, setEditItem] = useState<Item | "new" | null>(null);
@@ -218,18 +231,19 @@ export function TrackerGrid({ data }: { data: Data }) {
             {!mobile && <div role="columnheader" className="text-muted-foreground border-b py-1 text-center text-caption">완료</div>}
           </div>
 
-          {items.map((item) => (
+          {rowsInOrder.map((item) => (
             <div key={item.id} role="row" className="contents">
-              <button
-                type="button"
-                role="rowheader"
-                onClick={() => setEditItem(item)}
-                title={item.name}
-                className="bg-card hover:bg-accent/50 sticky left-0 z-[1] flex min-h-11 items-center gap-1.5 border-b px-2 text-left"
-              >
-                <span className="size-2.5 shrink-0 rounded-full" style={{ background: item.colorHex }} />
-                <span className="truncate">{item.name}</span>
-              </button>
+              <div role="rowheader" ref={sort.rowRef(item.id)} className={cn("bg-card sticky left-0 z-[1] flex min-h-11 items-stretch border-b", sort.dragging === item.id && "bg-accent")}>
+                {items.length > 1 && (
+                  <button type="button" {...sort.handle(item.id)} className="text-muted-foreground hover:text-foreground flex w-5 shrink-0 cursor-grab items-center justify-center active:cursor-grabbing">
+                    <GripVertical className="size-3.5" />
+                  </button>
+                )}
+                <button type="button" onClick={() => setEditItem(item)} title={item.name} className={cn("hover:bg-accent/50 flex min-w-0 flex-1 items-center gap-1.5 pr-2 text-left", items.length > 1 ? "pl-0.5" : "pl-2")}>
+                  <span className="size-2.5 shrink-0 rounded-full" style={{ background: item.colorHex }} />
+                  <span className="truncate">{item.name}</span>
+                </button>
+              </div>
               {shown.map((d) => {
                 const c = cells.get(k(item.id, d));
                 const future = d > today;
@@ -382,9 +396,13 @@ function ItemEditor({ month, item, preset, used, close, done }: { month: string;
           {color ? <ColorPalettePicker value={color} onChange={setColor} used={used.filter((u) => u !== item?.colorHex)} /> : <Spinner />}
         </Field>
         {item && (
-          <Button variant="outline" onClick={hide}>
-            이번 달에서 빼기
-          </Button>
+          <div className="space-y-1">
+            <Button variant="outline" onClick={hide}>
+              이번 달에서 빼기
+            </Button>
+            <p className="text-muted-foreground text-caption">이번 달 트래커에서만 빠져요. 지난 달 기록은 그대로 남아요.</p>
+            <p className="text-muted-foreground text-caption">아래 삭제는 모든 달에서 지우고 휴지통으로 옮겨요.</p>
+          </div>
         )}
       </div>
     </ResponsiveModal>

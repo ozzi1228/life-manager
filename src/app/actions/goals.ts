@@ -8,6 +8,7 @@ import {
   goalRepo,
   itemRepo,
   removeFromMonth,
+  reorderMonth,
   setCell,
   setGoalStatus,
   startMonthWith,
@@ -36,6 +37,10 @@ export async function editTrackerItem(id: string, version: number, input: { name
   return action(async (ctx) => {
     await updateItem(ctx, id, version, input);
   });
+}
+
+export async function reorderTrackerItems(month: string, itemIds: string[]) {
+  return action((ctx) => reorderMonth(ctx, month, itemIds));
 }
 
 export async function hideTrackerItem(id: string, month: string) {
