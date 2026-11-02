@@ -111,16 +111,21 @@ export async function expList(ctx: Ctx) {
 export type Experience = Awaited<ReturnType<typeof expList>>[number];
 export const getExp = async (ctx: Ctx, id: string) => toExp(await expRepo.get(ctx, id));
 
-/** 분류 목록(순서대로): 분류 편집에서 고친 목록(없으면 기본 목록) + 경험에 붙어 있는데 목록에 없는 것 */
-export async function expCategories(ctx: Ctx): Promise<ExpCategory[]> {
+/** 분류 목록(순서대로): 분류 편집에서 고친 목록(없으면 기본 목록) + 경험에 붙어 있는데 목록에 없는 것. count = 그 분류가 붙은 경험 수 */
+export async function expCategories(ctx: Ctx): Promise<(ExpCategory & { count: number })[]> {
   const [row] = await db.select({ list: userSettings.expCategories }).from(userSettings).where(eq(userSettings.userId, ctx.userId));
   const cat = (x: string | Partial<ExpCategory>): ExpCategory => {
     const o = typeof x === "string" ? { name: x } : x;
     return { name: o.name!, color: o.color ?? null, sections: o.sections ?? defaultSections(o.name!) };
   };
   const list = (row?.list ?? DEFAULT_CATEGORIES).map(cat);
-  for (const e of await expList(ctx)) for (const c of e.categories) if (!list.some((x) => x.name === c)) list.push(cat(c));
-  return list;
+  const count = new Map<string, number>();
+  for (const e of await expList(ctx))
+    for (const c of e.categories) {
+      if (!list.some((x) => x.name === c)) list.push(cat(c));
+      count.set(c, (count.get(c) ?? 0) + 1);
+    }
+  return list.map((x) => ({ ...x, count: count.get(x.name) ?? 0 }));
 }
 
 const catName = z.string().trim().min(1, "이름을 입력해 주세요").max(20, "분류는 20자까지 쓸 수 있어요");
@@ -128,7 +133,8 @@ const catPatch = z.object({
   color: z.string().regex(/^#[0-9A-F]{6}$/i, "색을 다시 골라 주세요").nullable().optional(),
   sections: z.array(z.enum(EXP_SECTIONS.map((x) => x.value) as ["content", "star", "cert"])).optional(),
 });
-async function saveCategories(ctx: Ctx, list: ExpCategory[]) {
+async function saveCategories(ctx: Ctx, all: ExpCategory[]) {
+  const list = all.map(({ name, color, sections }) => ({ name, color, sections })); // 경험 수(count)는 저장 안 함
   await db.insert(userSettings).values({ userId: ctx.userId, expCategories: list }).onConflictDoUpdate({ target: userSettings.userId, set: { expCategories: list, updatedAt: new Date() } });
 }
 // 경험에 붙은 분류를 한꺼번에 바꿈(버전을 올려 다른 기기의 오래된 수정은 충돌로 막힘). ponytail: 변경 기록(revision)은 안 남김

@@ -56,20 +56,40 @@ import { cn } from "@/lib/utils";
 import type { Experience } from "@/server/career";
 
 const NONE = "분류 없음";
+type Cat = ExpCategory & { count?: number };
 // 분류 편집(목록·편집 화면 공용): 이름을 바꾸거나 지우면 경험에 붙은 분류도 같이 바뀜
 const catEditor = (
-  categories: ExpCategory[],
+  categories: Cat[],
   onRenamed?: (from: string, to: string) => void,
   onRemoved?: (name: string) => void,
 ) => ({
   title: "경험 분류 편집",
-  items: categories.map((c) => ({ key: c.name, name: c.name, color: c.color })),
+  description:
+    "바꾸면 바로 저장돼요. 이 순서대로 화면에 보이고, 체크한 칸만 경험 양식에 보여요",
+  items: categories.map((c) => ({
+    key: c.name,
+    name: c.name,
+    color: c.color,
+    count: c.count,
+  })),
   onReorder: reorderExpCats,
   onColor: (it: { key: string }, color: string | null) =>
     setExpCat(it.key, { color }),
-  extra: (it: { key: string }) => (
-    <SectionToggles cat={categories.find((c) => c.name === it.key)!} />
-  ),
+  columns: EXP_SECTIONS.map((x) => ({
+    key: x.value,
+    label: x.value === "cert" ? "자격" : x.label,
+  })),
+  isOn: (it: { key: string }, col: string) =>
+    !!categories
+      .find((c) => c.name === it.key)
+      ?.sections.includes(col as ExpSection),
+  onToggle: (it: { key: string }, col: string, on: boolean) => {
+    const cur = categories.find((c) => c.name === it.key)!.sections;
+    return setExpCat(it.key, {
+      sections: on ? [...cur, col] : cur.filter((x) => x !== col),
+    });
+  },
+  countLabel: "개",
   removeNote: "이 분류가 붙은 경험에서도 빠져요",
   onAdd: addExpCat,
   onRename: async (it: { key: string }, name: string) => {
@@ -83,39 +103,6 @@ const catEditor = (
     return r;
   },
 });
-// 분류마다 보일 칸(분류 편집 창의 줄 아래): 이 분류의 경험을 쓸 때 보일 칸을 고름
-function SectionToggles({ cat }: { cat: ExpCategory }) {
-  const router = useRouter();
-  const flip = async (s: ExpSection) => {
-    const sections = cat.sections.includes(s)
-      ? cat.sections.filter((x) => x !== s)
-      : [...cat.sections, s];
-    const r = await setExpCat(cat.name, { sections });
-    if (!r.ok) return void toast.error(r.error.message);
-    router.refresh();
-  };
-  return (
-    <div className="text-muted-foreground flex flex-wrap items-center gap-1 text-caption">
-      보일 칸
-      {EXP_SECTIONS.map((x) => (
-        <button
-          key={x.value}
-          type="button"
-          aria-pressed={cat.sections.includes(x.value)}
-          onClick={() => flip(x.value)}
-          className={cn(
-            "rounded-full border px-2 py-0.5",
-            cat.sections.includes(x.value)
-              ? "border-primary bg-primary/10 text-foreground"
-              : "hover:bg-accent",
-          )}
-        >
-          {x.label}
-        </button>
-      ))}
-    </div>
-  );
-}
 /** 분류 색으로 칠한 카드 배경·테두리(첫 번째로 색이 있는 분류) */
 const tint = (hex: string | null | undefined) =>
   hex
@@ -200,7 +187,7 @@ export function ExperienceList({
   categories,
 }: {
   items: Experience[];
-  categories: ExpCategory[];
+  categories: Cat[];
 }) {
   const [cat, setCat] = useState<string | null>(null);
   const colors = new Map(categories.map((c) => [c.name, c.color]));
@@ -353,7 +340,7 @@ export function ExperienceEditor({
   categories,
 }: {
   exp?: Experience;
-  categories: ExpCategory[];
+  categories: Cat[];
 }) {
   const router = useRouter();
   const [v, setV] = useState({

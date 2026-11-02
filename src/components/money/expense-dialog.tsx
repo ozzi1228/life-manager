@@ -1,7 +1,7 @@
 "use client";
 
 // 지출 입력·수정 (SCR-FIN-03, 04 §6.3): 결제 직후 15초 안에. 어느 화면에서든 열 수 있게 앱 셸에 하나만 둠
-import { ChevronDown, Minus, Plus } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -240,10 +240,28 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
           {wish.notice && <p className="bg-warning/15 rounded-md p-2 text-sm">{wish.notice}</p>}
         </div>
       )}
-      <ToggleGroup type="single" variant="outline" value={type} onValueChange={(v) => v && (setType(v as typeof type), setCategoryId(null))} className={cn("w-full", wish && "hidden")}>
+      {/* 지출 · 환불 · 수입: 환불은 저장할 땐 "지출 + 환불 표시"(지출 합계에서 빠짐). 지출↔환불은 분류를 그대로 둠 */}
+      <ToggleGroup
+        type="single"
+        variant="outline"
+        value={type === "income" ? "income" : refund ? "refund" : "expense"}
+        onValueChange={(v) => {
+          if (!v) return;
+          const next = v === "income" ? "income" : "expense";
+          if (next !== type) setCategoryId(null);
+          setType(next);
+          setRefund(v === "refund");
+        }}
+        className={cn("w-full", wish && "hidden")}
+      >
         <ToggleGroupItem value="expense" className="flex-1">
           지출
         </ToggleGroupItem>
+        {(!edit || edit.type === "expense") && (
+          <ToggleGroupItem value="refund" className="flex-1">
+            환불
+          </ToggleGroupItem>
+        )}
         <ToggleGroupItem value="income" className="flex-1">
           수입
         </ToggleGroupItem>
@@ -251,22 +269,17 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
 
       <Field data-invalid={error?.field === "amount" || undefined}>
         <div className="flex items-center gap-2">
-          {type === "expense" && !wish && (
-            <Button
-              type="button"
-              variant={refund ? "secondary" : "ghost"}
-              size="sm"
-              aria-pressed={refund}
-              onClick={() => setRefund(!refund)}
-              title="환불·취소는 지출에서 빼요"
-            >
-              {refund ? <Plus /> : <Minus />} {refund ? "환불" : "환불이면"}
-            </Button>
+          {/* 돌려받는 돈은 금액 앞에 + */}
+          {type === "expense" && refund && (
+            <span className="text-success-text text-title font-semibold" aria-hidden>
+              +
+            </span>
           )}
           <div className="flex-1">
             <AmountInput value={amount} onChange={setAmount} autoFocus={!edit} invalid={error?.field === "amount"} />
           </div>
         </div>
+        {type === "expense" && refund && <p className="text-muted-foreground text-caption">돌려받은 금액이에요. 이 달 지출 합계에서 빠져요</p>}
         {error?.field === "amount" && <FieldError>{error.message}</FieldError>}
       </Field>
 
