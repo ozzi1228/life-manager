@@ -112,7 +112,9 @@ function Frame({ name, seenHints, children }: Props) {
             <Link href="/" className="flex h-10 items-center gap-2 px-2 font-bold">
               {/* eslint-disable-next-line @next/next/no-img-element -- 작은 로고(정적 파일) */}
               <img src="/icon.png" alt="" width={24} height={24} className="rounded" />
-              <span className="group-data-[collapsible=icon]:hidden">우나</span>
+              <span className="group-data-[collapsible=icon]:hidden">
+                우나 <span className="text-muted-foreground font-medium">oona</span>
+              </span>
             </Link>
           </SidebarHeader>
           <SidebarContent>
