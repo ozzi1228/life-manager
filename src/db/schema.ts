@@ -227,7 +227,7 @@ export const attachments = pgTable(
   "attachments",
   {
     ...userData(),
-    purpose: text("purpose", { enum: ["journal_photo"] }).notNull(),
+    purpose: text("purpose", { enum: ["journal_photo", "media_cover", "wish_image"] }).notNull(),
     ownerType: text("owner_type"),
     ownerId: uuid("owner_id"),
     storageKey: text("storage_key").notNull(), // <user>/<yyyy>/<id> — 변형은 -thumb.webp, -body.webp
@@ -381,4 +381,64 @@ export const cardBenefits = pgTable(
     memo: text("memo"),
   },
   (t) => [index("card_benefits_card").on(t.cardId).where(sql`${t.deletedAt} is null`), check("card_benefit_value_positive", sql`${t.value} > 0`)],
+);
+
+// ── 작품 기록 (08 §3, 14 §4.6) ──
+// 작품 정보 1개 + 감상 기록 n개(다시 읽기·보기). 표지는 올린 사진(attachments) — 검색(C-09)이 붙으면 외부 주소·저자 jsonb 추가
+export const mediaWorks = pgTable("media_works", {
+  ...userData(),
+  kind: text("kind", { enum: ["book", "movie", "drama"] }).notNull(),
+  title: text("title").notNull(),
+  creator: text("creator"), // 저자 / 감독·출연
+  coverAttachmentId: uuid("cover_attachment_id"),
+});
+
+// 상태는 종류와 상관없이 3가지(화면 이름은 종류별: 읽는 중·보는 중 / 완독·봤어요·다 봄 / 중도 포기). 영화는 done만
+// ponytail: 14의 watched_dates 배열 대신 영화는 기록 하나 = 본 날 하나(end_date). 다시 보면 기록을 하나 더
+export const mediaLogs = pgTable(
+  "media_logs",
+  {
+    ...userData(),
+    workId: uuid("work_id").notNull(),
+    status: text("status", { enum: ["ongoing", "done", "dropped"] }).notNull(),
+    startDate: date("start_date"),
+    endDate: date("end_date"),
+    rating: doublePrecision("rating"), // 0.5~5, 0.5 단위
+    oneLiner: text("one_liner"),
+    review: text("review"),
+    whereText: text("where_text"),
+    fromWishId: uuid("from_wish_id"),
+  },
+  (t) => [
+    index("media_logs_user_end").on(t.userId, t.endDate).where(sql`${t.deletedAt} is null`),
+    index("media_logs_work").on(t.workId),
+    check("media_logs_rating", sql`${t.rating} is null or (${t.rating} >= 0.5 and ${t.rating} <= 5)`),
+    check("media_logs_dates", sql`${t.startDate} is null or ${t.endDate} is null or ${t.startDate} <= ${t.endDate}`),
+  ],
+);
+
+// ── 위시 (09, 14 §4.7) ──
+// 이미지는 attachments(owner_type=wish_item). 쇼핑은 가격 필수(09 §4)
+// ponytail: 14의 wish_links 테이블 대신 링크는 배열 — 링크 미리보기(P1)가 붙으면 링크별 제목·이미지를 위해 나눔
+export const wishItems = pgTable(
+  "wish_items",
+  {
+    ...userData(),
+    kind: text("kind", { enum: ["shopping", "media"] }).notNull(),
+    mediaKind: text("media_kind", { enum: ["book", "movie", "drama"] }),
+    name: text("name").notNull(),
+    level: text("level", { enum: ["need", "want", "like"] }),
+    price: bigint("price", { mode: "number" }),
+    seenWhere: text("seen_where"), // 쇼핑: 어디서 봤는지 / 작품: 메모(누가 추천했는지 등)
+    links: text("links").array().notNull().default(sql`'{}'::text[]`),
+    status: text("status", { enum: ["saved", "bought", "dropped", "started", "finished"] }).notNull().default("saved"),
+    doneAt: date("done_at"), // 구매한 날·그만둔 날·작품 기록으로 옮긴 날
+    droppedReason: text("dropped_reason"),
+    transactionId: uuid("transaction_id"),
+    mediaLogId: uuid("media_log_id"),
+  },
+  (t) => [
+    index("wish_items_user_kind").on(t.userId, t.kind, t.status).where(sql`${t.deletedAt} is null`),
+    check("wish_items_shopping_price", sql`${t.kind} <> 'shopping' or ${t.price} > 0`),
+  ],
 );

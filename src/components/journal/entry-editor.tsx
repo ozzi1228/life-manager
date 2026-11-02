@@ -3,11 +3,11 @@
 // 일기 쓰기·고치기 (SCR-JRN-03, 08 §2): 날짜·주제·제목·본문·사진 10장. 전체 화면
 // 쓰는 중 5초마다 이 기기에 임시 저장(08 §2.5) → 다시 열면 이어 쓰기
 // ponytail: 본문은 마크다운 글자 그대로(Textarea). 서식 도구가 필요해지면 에디터 라이브러리(Q-070)
-import { ImagePlus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { addEntry, editEntry, removeEntry, restoreEntry } from "@/app/actions/journal";
+import { PhotoPicker, type Photo } from "@/components/app/photo-picker";
 import { toastUndo } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -17,7 +17,6 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { dateLabel, fromYmd, ymd } from "@/lib/format";
 
-type Photo = { id: string; width: number; height: number };
 export type Entry = { id: string; version: number; date: string; topicId: string | null; title: string | null; bodyMd: string; photos: Photo[] };
 type Topic = { id: string; name: string; colorHex: string };
 type Draft = { date: string; topicId: string | null; title: string; body: string; photos: Photo[]; at: number };
@@ -38,13 +37,12 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
   const [title, setTitle] = useState(entry?.title ?? "");
   const [body, setBody] = useState(entry?.bodyMd ?? "");
   const [photos, setPhotos] = useState<Photo[]>(entry?.photos ?? []);
-  const [uploading, setUploading] = useState(0);
+  const [uploading, setUploading] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [dateOpen, setDateOpen] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
   const key = useRef(crypto.randomUUID());
-  const file = useRef<HTMLInputElement>(null);
 
   // 다시 열었을 때 이 기기에 남은 임시 저장이 있으면 이어 쓰기 제안
   useEffect(() => {
@@ -70,25 +68,6 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
     }, 5000);
     return () => clearInterval(t);
   }, [entry?.id]);
-
-  async function upload(files: FileList | null) {
-    const list = [...(files ?? [])].slice(0, 10 - photos.length);
-    if (files && files.length > list.length) toast("사진은 10장까지 넣을 수 있어요");
-    setUploading((n) => n + list.length);
-    for (const f of list) {
-      const form = new FormData();
-      form.set("file", f);
-      try {
-        const r = await fetch("/api/v1/uploads", { method: "POST", body: form, headers: { "idempotency-key": crypto.randomUUID() } });
-        const j = await r.json();
-        if (!r.ok) toast(j.error?.message ?? "사진을 올리지 못했어요");
-        else setPhotos((p) => [...p, j.data]);
-      } catch {
-        toast("사진을 올리지 못했어요. 연결을 확인해 주세요");
-      }
-      setUploading((n) => n - 1);
-    }
-  }
 
   async function save() {
     setBusy(true);
@@ -179,33 +158,7 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
         onChange={(e) => setBody(e.target.value)}
       />
 
-      <div className="flex flex-wrap gap-2">
-        {photos.map((p) => (
-          <div key={p.id} className="relative">
-            {/* eslint-disable-next-line @next/next/no-img-element -- 로그인한 본인만 보는 사진(이 서버가 직접 보냄) */}
-            <img src={`/api/v1/attachments/${p.id}?v=thumb`} alt="" className="size-24 rounded-lg object-cover" />
-            <button
-              type="button"
-              aria-label="사진 빼기"
-              className="bg-foreground/70 text-background absolute top-1 right-1 flex size-6 items-center justify-center rounded-full"
-              onClick={() => setPhotos((list) => list.filter((x) => x.id !== p.id))}
-            >
-              <X className="size-4" />
-            </button>
-          </div>
-        ))}
-        {Array.from({ length: uploading }, (_, i) => (
-          <div key={i} className="bg-muted flex size-24 items-center justify-center rounded-lg">
-            <Spinner />
-          </div>
-        ))}
-        {photos.length + uploading < 10 && (
-          <button type="button" onClick={() => file.current?.click()} className="text-muted-foreground hover:bg-accent flex size-24 flex-col items-center justify-center gap-1 rounded-lg border border-dashed text-caption">
-            <ImagePlus className="size-6" /> 사진 {photos.length}/10
-          </button>
-        )}
-        <input ref={file} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden onChange={(e) => (upload(e.target.files), (e.target.value = ""))} />
-      </div>
+      <PhotoPicker value={photos} onChange={setPhotos} onBusy={setUploading} purpose="journal_photo" />
 
       {error && <p className="text-destructive-text text-sm">{error}</p>}
 
@@ -218,7 +171,7 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
         <Button variant="outline" className="ml-auto" onClick={() => router.back()}>
           취소
         </Button>
-        <Button disabled={empty || busy || uploading > 0} onClick={save}>
+        <Button disabled={empty || busy || uploading} onClick={save}>
           {busy && <Spinner />} 저장
         </Button>
       </div>

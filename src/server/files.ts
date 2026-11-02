@@ -25,7 +25,9 @@ function filesDir() {
   return d;
 }
 
-export async function saveImage(ctx: Ctx, input: Buffer, purpose: "journal_photo") {
+export const PURPOSES = ["journal_photo", "media_cover", "wish_image"] as const;
+
+export async function saveImage(ctx: Ctx, input: Buffer, purpose: (typeof PURPOSES)[number]) {
   if (input.length > MAX_BYTES) throw new AppError("BAD_REQUEST", "사진은 20MB까지 올릴 수 있어요");
   let meta: Metadata;
   try {

@@ -1,7 +1,7 @@
 // 돈 서비스 (docs/planning/06 §3, 15 §6). 화면(Server Action)과 이후 /api/v1이 함께 씀
 import { and, asc, desc, eq, gte, isNull, lt, max, sql } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "../db/index.ts";
+import { db, type Tx } from "../db/index.ts";
 import { finCategories, paymentMethods, plannedExpenses, transactions } from "../db/schema.ts";
 import { parse } from "./validate.ts";
 import { AppError } from "./errors.ts";
@@ -86,10 +86,10 @@ async function checkRefs(ctx: Ctx, v: { type: string; categoryId: string; paymen
 
 const clean = (v: z.infer<typeof txInput>) => ({ ...v, title: v.title || null, memo: v.memo || null, isRefund: v.type === "expense" && v.isRefund, plannedExpenseId: v.type === "expense" ? v.plannedExpenseId : null });
 
-export async function createTransaction(ctx: Ctx, input: unknown) {
+export async function createTransaction(ctx: Ctx, input: unknown, tx?: Tx) {
   const v = clean(parse(txInput, input));
   const cat = await checkRefs(ctx, v);
-  const row = await txRepo.create(ctx, v);
+  const row = await txRepo.create(ctx, v, { tx });
   return { row, restraint: v.type === "expense" && !v.isRefund && cat.countsTowardRestraint };
 }
 

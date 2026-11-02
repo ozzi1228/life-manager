@@ -14,6 +14,7 @@ import {
   removeTransaction,
   restoreTransaction,
 } from "@/app/actions/money";
+import { buyWish, undoBuyWish } from "@/app/actions/wish";
 import { AmountInput } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
 import { toastUndo } from "@/components/app/states";
@@ -45,24 +46,26 @@ export type TxEdit = {
   memo: string | null;
   plannedExpenseId?: string | null;
 };
+/** 위시 구매(09 §6, 04 §7.8): 가격·이름·쇼핑 분류로 채워 열고, 저장하면 지출 + 위시 구매함을 한 번에 */
+export type WishBuy = { id: string; version: number; name: string; price: number | null; notice?: string; done?: () => void };
 type FormData = Extract<Awaited<ReturnType<typeof expenseFormData>>, { ok: true }>["data"];
 
-const Ctx = createContext<(edit?: TxEdit) => void>(() => {});
-/** 화면 어디서든: const openExpense = useExpenseDialog(); openExpense() / openExpense(행) */
+const Ctx = createContext<(edit?: TxEdit, wish?: WishBuy) => void>(() => {});
+/** 화면 어디서든: const openExpense = useExpenseDialog(); openExpense() / openExpense(행) / openExpense(undefined, 위시) */
 export const useExpenseDialog = () => useContext(Ctx);
 
 export function ExpenseDialogProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<{ open: boolean; edit?: TxEdit; n: number }>({ open: false, n: 0 });
+  const [state, setState] = useState<{ open: boolean; edit?: TxEdit; wish?: WishBuy; n: number }>({ open: false, n: 0 });
   return (
-    <Ctx.Provider value={(edit) => setState((s) => ({ open: true, edit, n: s.n + 1 }))}>
+    <Ctx.Provider value={(edit, wish) => setState((s) => ({ open: true, edit, wish, n: s.n + 1 }))}>
       {children}
       <ResponsiveModal
         open={state.open}
         onOpenChange={(open) => setState((s) => ({ ...s, open }))}
-        title={state.edit ? "지출 수정" : "지출 추가"}
+        title={state.edit ? "지출 수정" : state.wish ? "구매 기록" : "지출 추가"}
         size="md"
       >
-        {state.open && <ExpenseForm key={state.n} edit={state.edit} close={() => setState((s) => ({ ...s, open: false }))} />}
+        {state.open && <ExpenseForm key={state.n} edit={state.edit} wish={state.wish} close={() => setState((s) => ({ ...s, open: false }))} />}
       </ResponsiveModal>
     </Ctx.Provider>
   );
@@ -70,17 +73,17 @@ export function ExpenseDialogProvider({ children }: { children: ReactNode }) {
 
 const newKey = () => crypto.randomUUID();
 
-function ExpenseForm({ edit, close }: { edit?: TxEdit; close: () => void }) {
+function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; close: () => void }) {
   const router = useRouter();
   const [data, setData] = useState<FormData | null>(null);
   const [loadError, setLoadError] = useState("");
   const [type, setType] = useState<"expense" | "income">(edit?.type ?? "expense");
   const [refund, setRefund] = useState(edit?.isRefund ?? false);
-  const [amount, setAmount] = useState<number | null>(edit?.amount ?? null);
+  const [amount, setAmount] = useState<number | null>(edit?.amount ?? wish?.price ?? null);
   const [categoryId, setCategoryId] = useState<string | null>(edit?.categoryId ?? null); // 직전 선택 기억 안 함(오기록 방지, 04 §6.3)
   const [paymentId, setPaymentId] = useState<string | null>(edit?.paymentMethodId ?? null);
   const [date, setDate] = useState(edit?.date ?? ymd(new Date()));
-  const [title, setTitle] = useState(edit?.title ?? "");
+  const [title, setTitle] = useState(edit?.title ?? wish?.name.slice(0, 60) ?? "");
   const [memo, setMemo] = useState(edit?.memo ?? "");
   const [plannedId, setPlannedId] = useState<string | null>(edit?.plannedExpenseId ?? null);
   const [allCats, setAllCats] = useState(false);
@@ -98,8 +101,9 @@ function ExpenseForm({ edit, close }: { edit?: TxEdit; close: () => void }) {
       if (!r.ok) return setLoadError(r.error.message);
       setData(r.data);
       if (!edit) setPaymentId(r.data.lastPaymentMethodId);
+      if (wish) setCategoryId(r.data.categories.find((c) => c.kind === "expense" && c.name === "쇼핑")?.id ?? null);
     });
-  }, [edit]);
+  }, [edit, wish]);
 
   const cats = data?.categories.filter((c) => c.kind === type) ?? [];
   const shownCats = allCats ? cats : cats.slice(0, 6);
@@ -116,7 +120,7 @@ function ExpenseForm({ edit, close }: { edit?: TxEdit; close: () => void }) {
     setBusy(true);
     setError(null);
     const input = { type, amount, isRefund: type === "expense" && refund, date, categoryId, paymentMethodId: paymentId, title: title.trim() || null, memo: memo.trim() || null, plannedExpenseId: linked };
-    const r = edit ? await editTransaction(edit.id, edit.version, input) : await addTransaction(key, input);
+    const r = edit ? await editTransaction(edit.id, edit.version, input) : wish ? await buyWish(key, wish.id, wish.version, input) : await addTransaction(key, input);
     setBusy(false);
     if (!r.ok) {
       if (r.error.code === "VERSION_CONFLICT") return setError({ message: "다른 기기에서 먼저 수정했어요. 닫고 다시 열어 주세요" });
@@ -128,7 +132,8 @@ function ExpenseForm({ edit, close }: { edit?: TxEdit; close: () => void }) {
       toast("고쳤어요");
       return close();
     }
-    const id = r.data.id;
+    if (wish) return bought(r.data as { budget: { category: string; over: number } | null });
+    const id = r.data.id!;
     const undo = async () => {
       await removeTransaction(id);
       router.refresh();
@@ -145,6 +150,29 @@ function ExpenseForm({ edit, close }: { edit?: TxEdit; close: () => void }) {
       setCategoryId(null);
       setKey(newKey());
     } else close();
+  }
+
+  /** 위시 구매함 처리 뒤: 토스트 되돌리기 = 지출도 휴지통 + 담아둠으로 */
+  function bought(d: { budget: { category: string; over: number } | null }) {
+    if (!wish) return;
+    const undo = async () => {
+      await undoBuyWish(wish.id);
+      router.refresh();
+    };
+    if (d.budget) toast.warning(`구매함으로 옮겼어요 · ${d.budget.category} 예산을 ${money(d.budget.over)} 넘었어요`, { duration: 5000, action: { label: "되돌리기", onClick: undo } });
+    else toastUndo("구매함으로 옮겼어요", undo);
+    wish.done?.();
+    close();
+  }
+
+  async function buyWithoutExpense() {
+    if (!wish) return;
+    setBusy(true);
+    const r = await buyWish(key, wish.id, wish.version, null);
+    setBusy(false);
+    if (!r.ok) return setError({ message: r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 바꿨어요. 닫고 다시 열어 주세요" : r.error.message });
+    router.refresh();
+    bought({ budget: null });
   }
 
   async function remove() {
@@ -198,7 +226,15 @@ function ExpenseForm({ edit, close }: { edit?: TxEdit; close: () => void }) {
         save();
       }}
     >
-      <ToggleGroup type="single" variant="outline" value={type} onValueChange={(v) => v && (setType(v as typeof type), setCategoryId(null))} className="w-full">
+      {wish && (
+        <div className="space-y-2">
+          <Badge variant="secondary" className="max-w-full truncate">
+            위시: {wish.name}
+          </Badge>
+          {wish.notice && <p className="bg-warning/15 rounded-md p-2 text-sm">{wish.notice}</p>}
+        </div>
+      )}
+      <ToggleGroup type="single" variant="outline" value={type} onValueChange={(v) => v && (setType(v as typeof type), setCategoryId(null))} className={cn("w-full", wish && "hidden")}>
         <ToggleGroupItem value="expense" className="flex-1">
           지출
         </ToggleGroupItem>
@@ -209,7 +245,7 @@ function ExpenseForm({ edit, close }: { edit?: TxEdit; close: () => void }) {
 
       <Field data-invalid={error?.field === "amount" || undefined}>
         <div className="flex items-center gap-2">
-          {type === "expense" && (
+          {type === "expense" && !wish && (
             <Button
               type="button"
               variant={refund ? "secondary" : "ghost"}
@@ -373,7 +409,7 @@ function ExpenseForm({ edit, close }: { edit?: TxEdit; close: () => void }) {
       {error && !error.field && <p className="text-destructive-text text-sm">{error.message}</p>}
 
       <div className="bg-popover sticky bottom-0 -mx-1 space-y-2 px-1 pt-2">
-        {!edit && (
+        {!edit && !wish && (
           <label className="flex items-center gap-2 text-sm">
             <Checkbox checked={repeat} onCheckedChange={(v) => setRepeat(v === true)} /> 연속 입력
           </label>
@@ -388,6 +424,11 @@ function ExpenseForm({ edit, close }: { edit?: TxEdit; close: () => void }) {
             {busy && <Spinner />} {edit ? "저장" : type === "income" ? "수입 추가" : refund ? "환불 기록" : "지출 추가"}
           </Button>
         </div>
+        {wish && (
+          <Button type="button" variant="link" className="w-full" disabled={busy} onClick={buyWithoutExpense}>
+            지출 없이 구매함으로
+          </Button>
+        )}
       </div>
     </form>
   );
