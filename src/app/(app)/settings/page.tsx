@@ -1,7 +1,7 @@
 "use client";
 
-// 설정 홈 (SCR-SET-01): 계정, 화면 모드, 펫, AI 연결, 휴지통·보안 기록, 로그아웃
-// ponytail: 알림(M-21)·외부 캘린더(C-08)·건강 잠금(C-15)·내보내기·탈퇴(C-14)는 그 작업에서
+// 설정 홈 (SCR-SET-01): 계정, 알림, 화면 모드, 펫, AI 연결, 휴지통·보안 기록, 운영(주인만), 로그아웃
+// ponytail: 외부 캘린더(C-08)·건강 잠금(C-15)·내보내기·탈퇴(C-14)는 그 작업에서
 import { ChevronRight, Lock, LogOut, ShieldCheck, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -10,6 +10,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { Page } from "@/components/app/page-shell";
 import { PRESET_PETS, petSrc } from "@/components/pet/pet-layer";
 import { AccountSection } from "@/components/settings/account";
+import { NotifySection, OpsSection } from "@/components/settings/notify";
 import { usePetPrefs } from "@/components/pet/use-pet-prefs";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -51,6 +52,11 @@ export default function SettingsPage() {
       <section className="space-y-3">
         <h2 className="text-subtitle font-semibold">계정</h2>
         <AccountSection />
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-subtitle font-semibold">알림</h2>
+        <NotifySection />
       </section>
 
       <section className="space-y-3">
@@ -124,6 +130,8 @@ export default function SettingsPage() {
         ))}
         <p className="text-muted-foreground text-caption">건강 기록은 암호화해 저장하고 홈·검색·AI에는 보이지 않아요.</p>
       </section>
+
+      <OpsSection />
 
       <Button
         variant="outline"

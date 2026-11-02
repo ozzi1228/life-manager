@@ -86,7 +86,7 @@ async function settle(ctx: Ctx, month: string, carriedIn: number, row?: typeof r
 }
 
 /** 밀린 정산 따라잡기: 마지막 정산 다음 달(처음이면 지난달)부터 지난달까지 */
-async function catchUp(ctx: Ctx) {
+export async function catchUp(ctx: Ctx) {
   const cur = todayIn().slice(0, 7);
   const [last] = await restraintMonthRepo.list(ctx, { orderBy: [desc(restraintMonths.month)], limit: 1 });
   let m = last ? nextMonth(last.month) : prevMonth(cur);

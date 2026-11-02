@@ -9,7 +9,7 @@
     "lint": "eslint",
     "typecheck": "next typegen && tsc --noEmit",
     "check": "next typegen && tsc --noEmit && eslint",
-    "check:db": "node --env-file=.env scripts/check-data.mts && node --env-file=.env scripts/check-finance.mts && node --env-file=.env scripts/check-goals.mts && node --env-file=.env scripts/check-journal.mts && node --env-file=.env scripts/check-media.mts && node --env-file=.env scripts/check-calendar-db.mts && node --env-file=.env scripts/check-health-db.mts && node --env-file=.env scripts/check-trash.mts && node --env-file=.env scripts/check-ai.mts && node scripts/check-format.mts && node scripts/check-recurring.mts && node scripts/check-budget.mts && node scripts/check-cards.mts && node scripts/check-restraint.mts && node scripts/check-calendar.mts && node scripts/check-health.mts",
+    "check:db": "node --env-file=.env scripts/check-data.mts && node --env-file=.env scripts/check-finance.mts && node --env-file=.env scripts/check-goals.mts && node --env-file=.env scripts/check-journal.mts && node --env-file=.env scripts/check-media.mts && node --env-file=.env scripts/check-calendar-db.mts && node --env-file=.env scripts/check-health-db.mts && node --env-file=.env scripts/check-trash.mts && node --env-file=.env scripts/check-jobs.mts && node --env-file=.env scripts/check-ai.mts && node scripts/check-format.mts && node scripts/check-recurring.mts && node scripts/check-budget.mts && node scripts/check-cards.mts && node scripts/check-restraint.mts && node scripts/check-calendar.mts && node scripts/check-health.mts",
     "db:generate": "node --env-file=.env node_modules/drizzle-kit/bin.cjs generate",
     "db:migrate": "node --env-file=.env scripts/migrate.mts"
   },

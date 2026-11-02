@@ -82,6 +82,8 @@ export const userSettings = pgTable("user_settings", {
   // 온보딩에서 고른 관리 영역(홈 위젯 켜기, 04 §2.4): goals·money·calendar·records·health
   areas: jsonb("areas").$type<string[]>().notNull().default([]),
   onboardedAt: at("onboarded_at"),
+  // 알림 끄기(04 §8.4): false인 종류만 저장. 없으면 켜짐 — payment(결제 하루 전)·budget(예산 80%·초과)·restraint(월 정산 결과)
+  notify: jsonb("notify").$type<Partial<Record<"payment" | "budget" | "restraint", boolean>>>().notNull().default({}),
   updatedAt: at("updated_at").notNull().defaultNow(),
 });
 
@@ -543,4 +545,36 @@ export const healthRecords = pgTable(
     memoEnc: text("memo_enc"),
   },
   (t) => [index("health_records_user_kind_date").on(t.userId, t.kind, t.date).where(sql`${t.deletedAt} is null`)],
+);
+
+// ── 운영 (16 §5.5·§6·§12) ──
+// 예약 작업 실행 기록 = 중복 방지 장부. key는 "작업:대상:날짜"처럼 한 번만 해야 하는 단위(같은 key는 다시 안 함)
+// 알림도 여기로 한 번만 보냄(예: notify:payment:<user>:<고정 지출>:<결제일>). 90일 지나면 정리
+export const jobRuns = pgTable(
+  "job_runs",
+  {
+    id: uuid("id").primaryKey().$defaultFn(uuidv7),
+    key: text("key").notNull(),
+    job: text("job").notNull(),
+    status: text("status", { enum: ["running", "ok", "failed"] }).notNull(),
+    detail: jsonb("detail"),
+    error: text("error"),
+    startedAt: at("started_at").notNull().defaultNow(),
+    finishedAt: at("finished_at"),
+  },
+  (t) => [uniqueIndex("job_runs_key").on(t.key), index("job_runs_job_started").on(t.job, t.startedAt.desc())],
+);
+
+// 웹 푸시 구독(기기마다 하나). 보내다 410/404가 오면 지움
+export const pushSubscriptions = pgTable(
+  "push_subscriptions",
+  {
+    id: uuid("id").primaryKey().$defaultFn(uuidv7),
+    userId: text("user_id").notNull(),
+    endpoint: text("endpoint").notNull(),
+    keys: jsonb("keys").$type<{ p256dh: string; auth: string }>().notNull(),
+    device: text("device"),
+    createdAt: at("created_at").notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("push_subscriptions_endpoint").on(t.endpoint), index("push_subscriptions_user").on(t.userId)],
 );

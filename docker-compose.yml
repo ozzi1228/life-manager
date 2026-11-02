@@ -47,6 +47,8 @@ services:
       OONA_OWNER_USERNAME: ${OONA_OWNER_USERNAME:-}
       OONA_AI_LOGIN_DIR: /data/ai-login
       OONA_FILES_DIR: /data/files
+      # 예약 작업(src/server/jobs.ts): 꺼짐 감시 핑 주소(비면 안 보냄, docs/operations.md)
+      HEARTBEAT_URL: ${HEARTBEAT_URL:-}
     # 이 PC에서 scripts/ai-login.mts로 로그인한 구독 폴더(Claude·ChatGPT). 토큰 갱신 때 앱이 다시 씀
     volumes:
       - ${OONA_AI_LOGIN_DIR:?.env에 OONA_AI_LOGIN_DIR이 필요해요}:/data/ai-login
