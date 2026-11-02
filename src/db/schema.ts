@@ -442,3 +442,44 @@ export const wishItems = pgTable(
     check("wish_items_shopping_price", sql`${t.kind} <> 'shopping' or ${t.price} > 0`),
   ],
 );
+
+// ── 참은 소비 (20, 14 §4.4) ──
+// 기록 하나 = 참은 물건 하나. 이름·금액은 기록 시점 복사본(위시가 바뀌거나 지워져도 그대로)
+// 한 위시는 한 번만 센다(D-039): 빼기(excluded)한 것만 다시 대상
+// ponytail: 이미지·링크 칸은 아직 없음 — 위시에서 고르면 위시 쪽에 남아 있음
+export const restraintEntries = pgTable(
+  "restraint_entries",
+  {
+    ...userData(),
+    month: text("month").notNull(), // YYYY-MM, 이 달의 참은 금액에 더해짐
+    date: date("date").notNull(),
+    origin: text("origin", { enum: ["manual", "wish_auto", "wish_dropped", "wish_picked"] }).notNull(),
+    wishItemId: uuid("wish_item_id"),
+    name: text("name").notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(),
+    reason: text("reason"),
+    status: text("status", { enum: ["counted", "excluded", "later_bought"] }).notNull().default("counted"),
+    boughtMonth: text("bought_month"), // 나중에 산 달 — 그 달 참아야 할 금액에 더해짐(D-041)
+  },
+  (t) => [
+    index("restraint_entries_user_month").on(t.userId, t.month).where(sql`${t.deletedAt} is null`),
+    uniqueIndex("restraint_entries_wish").on(t.userId, t.wishItemId).where(sql`${t.wishItemId} is not null and ${t.status} <> 'excluded' and ${t.deletedAt} is null`),
+    check("restraint_entries_amount_positive", sql`${t.amount} > 0`),
+  ],
+);
+
+// 월 정산 결과(20 §6). 지난 달은 정산 때 고정, 부족분은 다음 달로 넘김(D-040)
+// ponytail: 부족분 넘기기 설정(끄기)은 아직 — 늘 넘김
+export const restraintMonths = pgTable(
+  "restraint_months",
+  {
+    ...userData(),
+    month: text("month").notNull(),
+    target: bigint("target", { mode: "number" }).notNull(),
+    filled: bigint("filled", { mode: "number" }).notNull(),
+    carriedIn: bigint("carried_in", { mode: "number" }).notNull(),
+    carryOut: bigint("carry_out", { mode: "number" }).notNull(),
+    detail: jsonb("detail").$type<{ luxury: number; overage: { categoryId: string; over: number }[]; laterBought: number }>().notNull(),
+  },
+  (t) => [uniqueIndex("restraint_months_month").on(t.userId, t.month).where(sql`${t.deletedAt} is null`)],
+);

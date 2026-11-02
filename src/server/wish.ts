@@ -1,13 +1,16 @@
 // 위시 서비스 (docs/planning/09, 15 §9). 작품 위시 → 작품 기록은 media.ts createMedia(fromWish)
 // 상태: 담아둠 → 구매함(지출 연결 또는 없이) / 그만둠 → 다시 담기. 작품은 담아둠 → 시작함 / 다 봄
-// ponytail: 그만둘 때 "참은 소비로 기록"은 참은 소비(M-22)에서. 링크 미리보기·같은 링크 경고는 P1
+// 참은 소비 연결(20): 그만둘 때 기록, 참은 위시를 사면 "나중에 샀어요", 카드에 "○월에 참음"·월말 후보 표시
+// ponytail: 링크 미리보기·같은 링크 경고는 P1
 import { and, desc, eq, inArray, isNull } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
 import { transactions, wishItems } from "../db/schema.ts";
 import { AppError } from "./errors.ts";
 import { imagesOf, linkImages } from "./files.ts";
+import { autoEligible } from "../lib/restraint.ts";
 import { createTransaction, txRepo } from "./finance.ts";
+import { markLaterBought, recordDropped, restrainedOf } from "./restraint.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
 import { todayIn } from "./time.ts";
 import { parse } from "./validate.ts";
@@ -72,6 +75,11 @@ export async function wishList(ctx: Ctx) {
     OWNER,
     rows.map((r) => r.id),
   );
+  const restrained = await restrainedOf(
+    ctx,
+    rows.map((r) => r.id),
+  );
+  const month = todayIn().slice(0, 7);
   const txIds = rows.flatMap((r) => (r.transactionId ? [r.transactionId] : []));
   const alive = txIds.length
     ? new Set((await db.select({ id: transactions.id }).from(transactions).where(and(eq(transactions.userId, ctx.userId), inArray(transactions.id, txIds), isNull(transactions.deletedAt)))).map((t) => t.id))
@@ -93,6 +101,8 @@ export async function wishList(ctx: Ctx) {
     hasTx: !!r.transactionId,
     createdAt: r.createdAt.toISOString(),
     photos: photos.get(r.id) ?? [],
+    restrained: restrained.get(r.id) ?? null, // { month, status: counted | later_bought }
+    candidate: autoEligible({ ...r, createdDate: r.createdAt.toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }), counted: restrained.has(r.id) }, month),
   }));
 }
 export type WishItem = Awaited<ReturnType<typeof wishList>>[number];
@@ -109,7 +119,9 @@ export async function purchaseWish(ctx: Ctx, id: string, version: number, tx: un
   if (w.status === "bought") throw new AppError("VERSION_CONFLICT", "이미 구매함으로 옮겼어요");
   return db.transaction(async (t) => {
     const made = tx ? await createTransaction(ctx, tx, t) : null;
-    const row = await wishRepo.update(ctx, id, version, { status: "bought", doneAt: made?.row.date ?? todayIn(), transactionId: made?.row.id ?? null, droppedReason: null }, { tx: t });
+    const boughtAt = made?.row.date ?? todayIn();
+    const row = await wishRepo.update(ctx, id, version, { status: "bought", doneAt: boughtAt, transactionId: made?.row.id ?? null, droppedReason: null }, { tx: t });
+    await markLaterBought(ctx, t, id, boughtAt.slice(0, 7));
     return { wish: row, transaction: made };
   });
 }
@@ -119,12 +131,18 @@ export async function reopenWish(ctx: Ctx, id: string, version: number, removeTx
   const w = await wishRepo.get(ctx, id);
   return db.transaction(async (t) => {
     if (removeTx && w.transactionId) await txRepo.remove(ctx, w.transactionId, { tx: t }).catch(() => null);
+    if (w.status === "bought") await markLaterBought(ctx, t, id, null);
     return wishRepo.update(ctx, id, version, { status: "saved", doneAt: null, droppedReason: null, transactionId: null, mediaLogId: null }, { tx: t });
   });
 }
 
-export async function dropWish(ctx: Ctx, id: string, version: number, reason: string | null) {
-  await shopping(ctx, id);
+/** 그만둠. record면 가격만큼 이번 달 참은 소비로(20 §4.1, 기본 켬) */
+export async function dropWish(ctx: Ctx, id: string, version: number, reason: string | null, record = false) {
+  const w = await shopping(ctx, id);
   const r = parse(z.string().trim().max(100, "이유는 100자까지 쓸 수 있어요").nullable(), reason);
-  return wishRepo.update(ctx, id, version, { status: "dropped", doneAt: todayIn(), droppedReason: r || null });
+  return db.transaction(async (t) => {
+    const row = await wishRepo.update(ctx, id, version, { status: "dropped", doneAt: todayIn(), droppedReason: r || null }, { tx: t });
+    if (record) await recordDropped(ctx, t, w);
+    return row;
+  });
 }

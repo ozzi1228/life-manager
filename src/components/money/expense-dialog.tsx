@@ -139,8 +139,8 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
       router.refresh();
     };
     const label = type === "income" ? "수입을 기록했어요" : refund ? "환불을 기록했어요" : "지출을 기록했어요";
-    if ("budget" in r.data && r.data.budget) toast.warning(`${r.data.budget.category} 예산을 ${money(r.data.budget.over)} 넘었어요`, { duration: 5000, action: { label: "되돌리기", onClick: undo } });
-    else if ("restraint" in r.data && r.data.restraint) toast(`사치 지출을 기록했어요 · 이번 달 참아야 할 금액에 더해져요`, { duration: 6000, action: { label: "되돌리기", onClick: undo } });
+    if ("budget" in r.data && r.data.budget) toast.warning(`${r.data.budget.category} 예산을 ${money(r.data.budget.over)} 넘었어요 · 그만큼 참아야 할 금액에 더해져요`, { duration: 5000, action: { label: "되돌리기", onClick: undo } });
+    else if ("restraint" in r.data && r.data.restraint) toast(`사치 지출을 기록했어요 · 이번 달 참아야 할 금액 +${money(amount)}`, { duration: 6000, action: { label: "되돌리기", onClick: undo } });
     else toastUndo(label, undo);
     if (repeat) {
       // 연속 입력: 비우고 다시 금액부터

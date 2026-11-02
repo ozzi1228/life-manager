@@ -1,7 +1,8 @@
 "use client";
 
 // 위시: 쇼핑(필요·갖고 싶음·관심, 가격 필수, 목록에서 구매 체크) · 작품(완료 → 작품 기록·감상) (SCR-WISH-01~04, 04 §7.6~7.8, 09)
-// ponytail: 링크 미리보기·같은 링크 경고·구분 변경 이력 표시(P1), 그만둘 때 참은 소비 기록(M-22)은 아직
+// 참은 소비 연결(20): 그만둘 때 기록(기본 켬), "○월에 참음"·월말 후보 표시, 참은 물건을 살 때 안내
+// ponytail: 링크 미리보기·같은 링크 경고·구분 변경 이력 표시(P1)
 import { Check, ChevronDown, CircleAlert, ExternalLink, Eye, Heart, Link2, MoreHorizontal, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
@@ -16,6 +17,7 @@ import { Cover, MediaForm } from "@/components/media/media";
 import { useExpenseDialog } from "@/components/money/expense-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -24,7 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { dateLabel, fromYmd, money, ymd } from "@/lib/format";
+import { dateLabel, fromYmd, money, monthLabel, ymd } from "@/lib/format";
 import { FINISH_LABEL, KIND_LABEL, START_LABEL, type MediaKind } from "@/lib/media";
 import { cn } from "@/lib/utils";
 import type { WishInput, WishItem } from "@/server/wish";
@@ -55,6 +57,23 @@ const domain = (u: string) => {
   }
 };
 const daysSince = (iso: string, today: string) => Math.max(0, Math.round((fromYmd(today).getTime() - fromYmd(ymd(new Date(iso))).getTime()) / 86_400_000));
+
+/** 위시 → 구매 기록 열기. 참았던 물건이면 안내(20 §5.3) */
+const buyOf = (w: WishItem, today: string, done: () => void) => ({
+  id: w.id,
+  version: w.version,
+  name: w.name,
+  price: w.price,
+  done,
+  notice: w.restrained?.status === "counted" && w.price ? `${monthLabel(w.restrained.month, fromYmd(today))}에 참은 물건이에요. 사면 이번 달 참아야 할 금액에 ${money(w.price)}이 더해져요.` : undefined,
+});
+
+/** 카드·상세 작은 글: "10월에 참음" / 월말 후보 */
+function RestraintNote({ w, today }: { w: WishItem; today: string }) {
+  if (w.restrained) return <span className="text-success-text block text-caption">{monthLabel(w.restrained.month, fromYmd(today))}에 참음{w.restrained.status === "later_bought" && " · 나중에 샀어요"}</span>;
+  if (w.candidate) return <span className="text-muted-foreground block text-caption">이번 달에 안 사면 참은 소비로 들어가요</span>;
+  return null;
+}
 
 function LevelBadge({ level }: { level: string | null }) {
   const l = levelOf(level);
@@ -194,6 +213,7 @@ function ShopDetail({ w, today, close, edit, refresh }: { w: WishItem; today: st
   const openExpense = useExpenseDialog();
   const [dropping, setDropping] = useState(false);
   const [reason, setReason] = useState("");
+  const [record, setRecord] = useState(!w.restrained);
   const [askTx, setAskTx] = useState(false);
   const [busy, setBusy] = useState(false);
 
@@ -223,11 +243,20 @@ function ShopDetail({ w, today, close, edit, refresh }: { w: WishItem; today: st
       dropping ? (
         <div className="w-full space-y-2">
           <Input autoFocus aria-label="그만두는 이유" placeholder="이유 한 줄 (선택)" maxLength={100} value={reason} onChange={(e) => setReason(e.target.value)} />
+          {!w.restrained && w.price && (
+            <label className="flex items-start gap-2 text-sm">
+              <Checkbox className="mt-0.5" checked={record} onCheckedChange={(c) => setRecord(c === true)} />
+              <span>
+                참은 소비로 기록하기
+                <span className="text-muted-foreground block text-caption">{money(w.price)}이 이번 달 참은 금액에 더해져요</span>
+              </span>
+            </label>
+          )}
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => setDropping(false)}>
               취소
             </Button>
-            <Button className="ml-auto" disabled={busy} onClick={() => run(dropWishAction(w.id, w.version, reason.trim() || null), "그만둠으로 옮겼어요")}>
+            <Button className="ml-auto" disabled={busy} onClick={() => run(dropWishAction(w.id, w.version, reason.trim() || null, record && !w.restrained), record && !w.restrained ? "그만두고 참은 소비로 기록했어요" : "그만둠으로 옮겼어요")}>
               그만두기
             </Button>
           </div>
@@ -248,7 +277,7 @@ function ShopDetail({ w, today, close, edit, refresh }: { w: WishItem; today: st
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
-          <Button className="ml-auto" onClick={() => (close(), openExpense(undefined, { id: w.id, version: w.version, name: w.name, price: w.price, done: refresh }))}>
+          <Button className="ml-auto" onClick={() => (close(), openExpense(undefined, buyOf(w, today, refresh)))}>
             <Check /> 구매함
           </Button>
         </div>
@@ -297,10 +326,11 @@ function ShopDetail({ w, today, close, edit, refresh }: { w: WishItem; today: st
         </div>
         <p className="text-muted-foreground text-sm">
           {dateLabel(ymd(new Date(w.createdAt)), fromYmd(today))}에 담음
-          {w.status === "saved" && ` · ${daysSince(w.createdAt, today)}일째`}
+          {w.status === "saved" && daysSince(w.createdAt, today) > 0 && ` · ${daysSince(w.createdAt, today)}일째`}
           {w.status === "bought" && w.doneAt && ` · ${dateLabel(w.doneAt, fromYmd(today))}에 구매함`}
           {w.status === "dropped" && w.doneAt && ` · ${dateLabel(w.doneAt, fromYmd(today))}에 그만둠`}
         </p>
+        <RestraintNote w={w} today={today} />
         {w.txGone && <p className="bg-warning/15 rounded-md p-2 text-sm">연결된 지출이 삭제됐어요</p>}
         {w.droppedReason && <p className="text-sm">그만둔 이유: {w.droppedReason}</p>}
         {w.seenWhere && (
@@ -352,13 +382,14 @@ function ShopCard({ w, today, open }: { w: WishItem; today: string; open: () => 
           <span className="text-muted-foreground flex items-center gap-1 text-caption">
             {daysSince(w.createdAt, today) ? `${daysSince(w.createdAt, today)}일째` : "오늘 담음"} {w.links.length > 0 && <Link2 className="size-3.5" aria-label="링크 있음" />}
           </span>
+          <RestraintNote w={w} today={today} />
         </span>
       </button>
       <button
         type="button"
         aria-label="구매했어요"
         title="구매했어요"
-        onClick={() => openExpense(undefined, { id: w.id, version: w.version, name: w.name, price: w.price, done: () => router.refresh() })}
+        onClick={() => openExpense(undefined, buyOf(w, today, () => router.refresh()))}
         className="bg-background/90 hover:bg-primary hover:text-primary-foreground absolute top-1.5 right-1.5 flex size-11 items-center justify-center rounded-full border shadow-sm"
       >
         <Check className="size-5" />
@@ -377,6 +408,7 @@ function DoneRow({ w, today, open }: { w: WishItem; today: string; open: () => v
             {w.doneAt ? dateLabel(w.doneAt, fromYmd(today)) : ""}
             {w.droppedReason && ` · ${w.droppedReason}`}
             {w.txGone && " · 연결된 지출이 삭제됐어요"}
+            {w.restrained && ` · ${monthLabel(w.restrained.month, fromYmd(today))}에 참음`}
           </span>
         </span>
         <span className="text-muted-foreground shrink-0 tabular-nums">{w.price ? money(w.price) : ""}</span>

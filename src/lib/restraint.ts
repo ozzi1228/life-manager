@@ -1,0 +1,27 @@
+// 참은 소비 계산 (docs/planning/20 §3·4). 서버·화면·확인 스크립트 공용
+// 참아야 할 금액 = 사치 분류 지출(환불 차감) + 분류별 예산 초과액(예산 정한 분류만, 사치 분류 제외 — 이중 계산 방지)
+//                + 지난달에서 넘어온 금액 + 참았다가 이번 달에 산 물건
+// 오늘 이후 날짜(예정) 지출은 넣지 않음. 큰 지출 계획 초과도 넣지 않음(D-042)
+export type RTx = { amount: number; isRefund: boolean; date: string; categoryId: string };
+export type CategoryUse = { categoryId: string; budget: number; used: number };
+
+export function restraintTarget(o: { txs: RTx[]; luxuryIds: string[]; categories: CategoryUse[]; carriedIn: number; laterBought: number; today: string }) {
+  const luxury = Math.max(
+    0,
+    o.txs.filter((t) => t.date <= o.today && o.luxuryIds.includes(t.categoryId)).reduce((a, t) => a + (t.isRefund ? -t.amount : t.amount), 0),
+  );
+  const overage = o.categories.filter((c) => !o.luxuryIds.includes(c.categoryId) && c.used > c.budget).map((c) => ({ categoryId: c.categoryId, over: c.used - c.budget }));
+  const overageTotal = overage.reduce((a, c) => a + c.over, 0);
+  return { luxury, overage, carriedIn: o.carriedIn, laterBought: o.laterBought, target: luxury + overageTotal + o.carriedIn + o.laterBought };
+}
+export type TargetDetail = ReturnType<typeof restraintTarget>;
+
+/** 참을 것 없음 / 진행 중 / 달성 (20 §4.4). 넘친 금액은 다음 달로 넘기지 않음 */
+export const fillState = (target: number, filled: number) => (target <= 0 ? "none" : filled >= target ? "done" : "progress");
+
+/**
+ * 월말에 자동으로 들어갈 위시인지(20 §4.2): 쇼핑·담아둠·갖고 싶음/관심·가격 있음·그 달 1일 전에 담음·아직 참은 소비로 센 적 없음
+ * createdDate: 담은 날(사용자 시간대 "YYYY-MM-DD")
+ */
+export const autoEligible = (w: { kind: string; status: string; level: string | null; price: number | null; createdDate: string; counted: boolean }, month: string) =>
+  w.kind === "shopping" && w.status === "saved" && (w.level === "want" || w.level === "like") && !!w.price && w.createdDate < `${month}-01` && !w.counted;

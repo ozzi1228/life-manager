@@ -38,8 +38,8 @@ export async function undoBuyWish(id: string) {
 export async function reopenWishAction(id: string, version: number, removeTx: boolean) {
   return action(async (ctx) => ({ version: (await reopenWish(ctx, id, version, removeTx)).version }));
 }
-export async function dropWishAction(id: string, version: number, reason: string | null) {
-  return action(async (ctx) => ({ version: (await dropWish(ctx, id, version, reason)).version }));
+export async function dropWishAction(id: string, version: number, reason: string | null, recordRestraint: boolean) {
+  return action(async (ctx) => ({ version: (await dropWish(ctx, id, version, reason, recordRestraint)).version }));
 }
 export async function deleteWish(id: string) {
   return action(async (ctx) => {

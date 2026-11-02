@@ -25,11 +25,11 @@ export const prevMonth = (m: string) => {
   const [y, mo] = m.split("-").map(Number);
   return mo === 1 ? `${y - 1}-12` : `${y}-${String(mo - 1).padStart(2, "0")}`;
 };
-const nextMonth = (m: string) => {
+export const nextMonth = (m: string) => {
   const [y, mo] = m.split("-").map(Number);
   return mo === 12 ? `${y + 1}-01` : `${y}-${String(mo + 1).padStart(2, "0")}`;
 };
-const monthEnd = (m: string) => addDays(`${nextMonth(m)}-01`, -1);
+export const monthEnd = (m: string) => addDays(`${nextMonth(m)}-01`, -1);
 
 const amount = z.number().int().min(1, "1원 이상 입력해 주세요").max(10_000_000_000, "100억 원까지 입력할 수 있어요");
 export const budgetInput = z.object({

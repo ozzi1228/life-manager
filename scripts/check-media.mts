@@ -1,13 +1,16 @@
-// 작품 기록·위시 규칙(src/server/media.ts·wish.ts, src/lib/media.ts) 확인: node --env-file=.env scripts/check-media.mts (개발 DB)
+// 작품 기록·위시·참은 소비 규칙(src/server/media.ts·wish.ts·restraint.ts, src/lib/media.ts) 확인: node --env-file=.env scripts/check-media.mts (개발 DB)
 import assert from "node:assert/strict";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 
 if (!process.env.DATABASE_URL?.endsWith("/oona_dev")) throw new Error("개발 DB(oona_dev)에서만 실행해요");
 
 const { db } = await import("../src/db/index.ts");
-const { finCategories, mediaLogs, mediaWorks, paymentMethods, revisions, transactions, wishItems } = await import("../src/db/schema.ts");
+const { budgets, finCategories, mediaLogs, mediaWorks, paymentMethods, plannedExpenses, restraintEntries, restraintMonths, revisions, transactions, wishItems } = await import("../src/db/schema.ts");
 const { AppError } = await import("../src/server/errors.ts");
-const { formData } = await import("../src/server/finance.ts");
+const { createTransaction, formData } = await import("../src/server/finance.ts");
+const { prevMonth, saveBudget } = await import("../src/server/budget.ts");
+const { createRestraint, resettle, restraintView, setExcluded } = await import("../src/server/restraint.ts");
+const { todayIn } = await import("../src/server/time.ts");
 const { createMedia, mediaList, removeMedia, updateMedia } = await import("../src/server/media.ts");
 const { createWish, dropWish, purchaseWish, reopenWish, wishList, wishRepo } = await import("../src/server/wish.ts");
 const { calendarDay, monthSummary } = await import("../src/lib/media.ts");
@@ -81,11 +84,74 @@ try {
   assert.deepEqual([mwNow.status, mwNow.mediaLogId], ["finished", log.id]);
   assert.equal(await code(createWish(B, { kind: "media", name: "x" })), "종류를 골라 주세요");
   console.log("작품 기록·위시 규칙 확인 통과");
+
+  // ── 참은 소비(20): 사치 + 예산 초과, 지난달 정산·위시 자동 포함, 직접 기록·위시에서 고르기, 그만둘 때 기록, 나중에 산 물건, 넘기기 ──
+  const R: Ctx = { userId: "check-med-r", actor: "user" };
+  users.push(R.userId);
+  const cur = todayIn().slice(0, 7);
+  const prev = prevMonth(cur);
+  const today = todayIn();
+  const cats = (await formData(R)).categories;
+  const [lux, food, shopCat] = ["사치", "식비", "쇼핑"].map((n) => cats.find((c) => c.name === n)!);
+  const back = (id: string, day: string) => db.update(wishItems).set({ createdAt: new Date(`${day}T12:00:00+09:00`) }).where(eq(wishItems.id, id));
+  const w1 = await createWish(R, { kind: "shopping", name: "무선 이어폰", level: "want", price: 89000 });
+  await back(w1.id, `${prevMonth(prev)}-15`); // 지난달 1일 전부터 담아 둠 → 지난달 정산에 자동 포함
+  const w2 = await createWish(R, { kind: "shopping", name: "가죽 가방", level: "like", price: 30000 });
+  await back(w2.id, `${prev}-10`); // 지난달 중간에 담음 → 이번 달 후보
+  const wNeed = await createWish(R, { kind: "shopping", name: "청소기", level: "need", price: 200000 });
+  await back(wNeed.id, `${prevMonth(prev)}-01`);
+  await saveBudget(R, cur, null, { lines: { [food.id]: 10000 } });
+  await createTransaction(R, { type: "expense", amount: 50000, date: today, categoryId: lux.id });
+  await createTransaction(R, { type: "expense", amount: 15000, date: today, categoryId: food.id });
+
+  let rv = await restraintView(R, cur);
+  assert.deepEqual([rv.detail.luxury, rv.detail.overage.map((o) => [o.name, o.over]), rv.detail.carriedIn, rv.target], [50000, [["식비", 5000]], 0, 55000]);
+  let pv = await restraintView(R, prev);
+  assert.deepEqual([pv.closed, pv.entries.map((e) => [e.origin, e.name, e.amount])], [true, [["wish_auto", "무선 이어폰", 89000]]], "지난달 정산: 한 달 내내 안 산 갖고 싶음만 자동 포함(필요 제외)");
+  assert.deepEqual(rv.candidates.map((c) => c.name), ["가죽 가방"], "이미 센 위시는 후보에서 빠짐");
+
+  // 직접 기록 + 위시에서 고르기(한 번만)
+  await createRestraint(R, { name: "한정판 운동화", amount: 20000, date: today, reason: "비슷한 게 있음" });
+  await createRestraint(R, { name: "가죽 가방", amount: 30000, date: today, wishItemId: w2.id });
+  assert.equal(await code(createRestraint(R, { name: "x", amount: 1, date: today, wishItemId: w2.id })), "DUPLICATE");
+  rv = await restraintView(R, cur);
+  assert.deepEqual([rv.filled, rv.candidates.length], [50000, 0]);
+
+  // 그만둘 때 기록 → 달성
+  const w3 = await createWish(R, { kind: "shopping", name: "향수", level: "want", price: 40000 });
+  await dropWish(R, w3.id, w3.version, null, true);
+  rv = await restraintView(R, cur);
+  assert.equal(rv.filled, 90000);
+  assert.equal((await wishList(R)).find((w) => w.id === w3.id)?.restrained?.month, cur, "위시에 ○월에 참음");
+
+  // 참았던 위시를 삼 → 산 달 참아야 할 금액에 더함, 되돌리면 빠짐(D-041)
+  const w1now = await wishRepo.get(R, w1.id);
+  await purchaseWish(R, w1.id, w1now.version, { type: "expense", amount: 89000, date: today, categoryId: shopCat.id });
+  rv = await restraintView(R, cur);
+  assert.deepEqual([rv.target, rv.detail.laterBought], [55000 + 89000, 89000]);
+  await reopenWish(R, w1.id, (await wishRepo.get(R, w1.id)).version, true);
+  rv = await restraintView(R, cur);
+  assert.equal(rv.target, 55000);
+
+  // 지난달: 자동 항목 빼기 → 다시 정산 필요, 사치 지출 추가 → 부족분이 이번 달로 넘어옴
+  pv = await restraintView(R, prev);
+  await setExcluded(R, pv.entries[0].id, pv.entries[0].version, true);
+  await createTransaction(R, { type: "expense", amount: 100000, date: `${prev}-20`, categoryId: lux.id });
+  pv = await restraintView(R, prev);
+  assert.equal(pv.stale, true, "정산 뒤 바뀜");
+  await resettle(R, prev);
+  pv = await restraintView(R, prev);
+  assert.deepEqual([pv.stale, pv.target, pv.filled, pv.carryOut], [false, 100000, 0, 100000]);
+  rv = await restraintView(R, cur);
+  assert.deepEqual([rv.detail.carriedIn, rv.target], [100000, 155000]);
+  assert.deepEqual(rv.candidates.map((c) => c.name), ["무선 이어폰"], "뺀 위시는 다시 대상");
+  assert.equal((await restraintView(B, cur)).entries.length, 0, "남의 기록은 안 보임");
+  console.log("참은 소비 규칙 확인 통과");
 } catch (e) {
   // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄
   console.error(e);
   process.exitCode = 1;
 } finally {
-  for (const t of [mediaLogs, mediaWorks, wishItems, transactions, finCategories, paymentMethods, revisions]) await db.delete(t).where(inArray(t.userId, users));
+  for (const t of [mediaLogs, mediaWorks, wishItems, transactions, finCategories, paymentMethods, budgets, plannedExpenses, restraintEntries, restraintMonths, revisions]) await db.delete(t).where(inArray(t.userId, users));
   process.exit(process.exitCode ?? 0);
 }

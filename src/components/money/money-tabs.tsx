@@ -1,4 +1,4 @@
-// 자산 영역 탭(02 §6): 지금 만든 것만. 참은 소비는 3묶음에서 추가
+// 자산 영역 탭(02 §6)
 import { AreaTabs } from "@/components/app/area-tabs";
 
 export const MoneyTabs = () => (
@@ -10,6 +10,7 @@ export const MoneyTabs = () => (
       { href: "/money/budget", label: "예산" },
       { href: "/money/fixed", label: "고정 지출" },
       { href: "/money/cards", label: "카드" },
+      { href: "/money/restraint", label: "참은 소비" },
     ]}
   />
 );
