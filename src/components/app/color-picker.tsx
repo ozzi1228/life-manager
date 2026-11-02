@@ -12,7 +12,7 @@ export function ColorPalettePicker({ value, onChange, used = [] }: { value: stri
   const custom = !GOAL_PALETTE.some((c) => c.hex === v);
   return (
     <div className="space-y-3">
-      <div className="grid grid-cols-6 gap-2" role="radiogroup" aria-label="색">
+      <div className="grid w-fit grid-cols-6 gap-2" role="radiogroup" aria-label="색">
         {GOAL_PALETTE.map((c) => (
           <Tooltip key={c.hex}>
             <TooltipTrigger asChild>
@@ -33,6 +33,7 @@ export function ColorPalettePicker({ value, onChange, used = [] }: { value: stri
           </Tooltip>
         ))}
       </div>
+      {GOAL_PALETTE.some((c) => usedSet.has(c.hex) && c.hex !== v) && <p className="text-muted-foreground text-caption">점이 있는 색은 이번 달에 쓰고 있어요</p>}
       <div className="flex items-center gap-3 text-sm">
         <label className="text-link inline-flex cursor-pointer items-center gap-2">
           <input type="color" value={v} onChange={(e) => onChange(e.target.value.toUpperCase())} className="size-8 cursor-pointer rounded border-0 bg-transparent p-0" aria-label="직접 고르기" />

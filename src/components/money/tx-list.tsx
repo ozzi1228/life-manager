@@ -24,7 +24,7 @@ export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; c
           <section key={date} aria-label={dayLabel(date, fromYmd(today))}>
             <h3 className="bg-background/95 text-muted-foreground sticky top-14 z-[1] flex justify-between py-1.5 text-sm backdrop-blur">
               <span>{dayLabel(date, fromYmd(today))}</span>
-              <span className="tabular-nums">{sum > 0 ? `+${money(sum)}` : money(sum)}</span>
+              <span className="tabular-nums">{sum > 0 ? `+${money(sum)}` : money(Math.abs(sum))}</span>
             </h3>
             <ul className="divide-y rounded-lg border">
               {list.map((r) => (

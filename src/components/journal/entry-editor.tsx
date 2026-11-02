@@ -3,6 +3,8 @@
 // 일기 쓰기·고치기 (SCR-JRN-03, 08 §2): 날짜·주제·제목·본문·사진 10장. 전체 화면
 // 쓰는 중 5초마다 이 기기에 임시 저장(08 §2.5) → 다시 열면 이어 쓰기
 // ponytail: 본문은 마크다운 글자 그대로(Textarea). 서식 도구가 필요해지면 에디터 라이브러리(Q-070)
+import { ChevronLeft } from "lucide-react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -95,9 +97,14 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
   }
 
   const empty = !title.trim() && !body.trim() && !photos.length;
+  const listHref = `/records?month=${(entry?.date ?? today).slice(0, 7)}`;
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 px-4 py-4 md:px-8 md:py-6">
+      <Link href={listHref} className="text-muted-foreground hover:text-foreground -ml-2 inline-flex h-10 items-center gap-1 px-2 text-sm">
+        <ChevronLeft className="size-4" />
+        일기
+      </Link>
       {draft && (
         <div role="status" className="bg-accent flex flex-wrap items-center gap-2 rounded-lg p-3 text-sm">
           이 기기에 쓰다 만 글이 있어요.
@@ -137,8 +144,8 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
               role="radio"
               aria-checked={topicId === t.id}
               size="sm"
-              variant={topicId === t.id ? "secondary" : "ghost"}
-              className={topicId === t.id ? "ring-primary rounded-full ring-2" : "rounded-full"}
+              variant={topicId === t.id ? "outline" : "ghost"}
+              className={topicId === t.id ? "border-primary bg-primary/10 rounded-full max-md:min-h-10" : "rounded-full max-md:min-h-10"}
               onClick={() => setTopicId(topicId === t.id ? null : t.id)}
             >
               <span className="size-2 rounded-full" style={{ background: t.colorHex }} />
@@ -148,12 +155,12 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
         </div>
       </div>
 
-      <Input aria-label="제목" placeholder="제목 (선택)" maxLength={100} className="h-12 border-0 px-0 text-title font-semibold shadow-none focus-visible:ring-0" value={title} onChange={(e) => setTitle(e.target.value)} />
+      <Input aria-label="제목" placeholder="제목 (선택)" maxLength={100} className="focus-visible:border-primary h-12 rounded-none border-0 border-b px-0 text-title font-semibold shadow-none placeholder:font-normal focus-visible:ring-0" value={title} onChange={(e) => setTitle(e.target.value)} />
       <Textarea
         aria-label="본문"
         placeholder="오늘 있었던 일을 적어 보세요"
         maxLength={50_000}
-        className="min-h-[40vh] resize-none border-0 px-0 text-base leading-7 shadow-none focus-visible:ring-0 md:text-body"
+        className="min-h-[28vh] resize-none md:min-h-[40vh] border-0 px-0 text-base leading-7 shadow-none focus-visible:ring-0 md:text-body"
         value={body}
         onChange={(e) => setBody(e.target.value)}
       />
@@ -162,14 +169,14 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
 
       {error && <p className="text-destructive-text text-sm">{error}</p>}
 
-      <div className="bg-background/95 sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] flex gap-2 border-t py-3 backdrop-blur md:bottom-0">
+      <div data-pet-avoid className="bg-background/95 sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] flex gap-2 border-t py-3 backdrop-blur md:bottom-0">
         {entry && (
           <Button variant="ghost" className="text-destructive-text" onClick={remove}>
             삭제
           </Button>
         )}
-        <Button variant="outline" className="ml-auto" onClick={() => router.back()}>
-          취소
+        <Button variant="outline" className="ml-auto" asChild>
+          <Link href={listHref}>취소</Link>
         </Button>
         <Button disabled={empty || busy || uploading} onClick={save}>
           {busy && <Spinner />} 저장

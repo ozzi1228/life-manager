@@ -134,6 +134,20 @@
       "when": 1793593883428,
       "tag": "0018_career_exp_template",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1793595282152,
+      "tag": "0019_nav_order",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1793597848374,
+      "tag": "0020_exp_categories",
+      "breakpoints": true
     }
   ]
 }

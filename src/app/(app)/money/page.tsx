@@ -43,14 +43,14 @@ export default async function MoneyHome() {
             <>
               <div className="flex items-center gap-1">
                 <p className="text-muted-foreground text-sm">{m}월 {s.left >= 0 ? "남은 예산" : "예산 초과"}</p>
-                <InfoTip label="예산 계산 방식">예산 = 분류별 예산 + 이번 달 큰 지출 + 고정 지출. 남은 예산 = 예산 − 쓴 돈</InfoTip>
+                <InfoTip label="예산 계산 방식">예산 = 분류별 예산 + 이번 달 큰 지출 + 고정 지출. 남은 예산 = 예산 − 쓴 돈(오늘까지, 환불 뺀 금액)</InfoTip>
               </div>
               <p className={s.left < 0 ? "text-display text-destructive-text flex items-center gap-2 font-bold tabular-nums" : "text-display font-bold tabular-nums"}>
                 {s.left < 0 && <CircleAlert className="size-7" aria-hidden />}
                 {money(Math.abs(s.left))}
               </p>
               <p className="text-muted-foreground text-sm tabular-nums">
-                {money(s.spent)} / {money(s.total)} 썼어요
+                {money(s.total)} 중 {money(s.spent)} 썼어요
               </p>
               <BudgetBar used={s.spent} planned={s.scheduled} budget={s.total} label={`${m}월 예산 사용`} compact />
               <Button asChild variant="link" size="sm" className="-ml-3">
@@ -104,7 +104,7 @@ export default async function MoneyHome() {
           </div>
         ) : (
           <>
-            <section className={card}>
+            <section className={`${card} lg:self-start`}>
               <h2 className="text-subtitle font-semibold">분류별</h2>
               <ul className="space-y-2.5">
                 {top.map(([id, v]) => {

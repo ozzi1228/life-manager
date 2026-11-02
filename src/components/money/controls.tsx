@@ -28,10 +28,16 @@ export function MonthNav({ month }: { month: string }) {
 export function TypeFilter({ value }: { value: "all" | "expense" | "income" }) {
   const set = useQuery();
   return (
-    <ToggleGroup type="single" variant="outline" size="sm" value={value} onValueChange={(v) => v && set("type", v === "all" ? null : v)} aria-label="종류">
-      <ToggleGroupItem value="all">모두</ToggleGroupItem>
-      <ToggleGroupItem value="expense">지출</ToggleGroupItem>
-      <ToggleGroupItem value="income">수입</ToggleGroupItem>
+    <ToggleGroup type="single" variant="outline" value={value} onValueChange={(v) => v && set("type", v === "all" ? null : v)} aria-label="종류">
+      <ToggleGroupItem value="all" className="max-md:h-11">
+        모두
+      </ToggleGroupItem>
+      <ToggleGroupItem value="expense" className="max-md:h-11">
+        지출
+      </ToggleGroupItem>
+      <ToggleGroupItem value="income" className="max-md:h-11">
+        수입
+      </ToggleGroupItem>
     </ToggleGroup>
   );
 }

@@ -22,7 +22,7 @@ export function MonthSwitcher({ value, onChange }: { value: string; onChange: (y
   };
   return (
     <ButtonGroup>
-      <Button variant="outline" size="icon" aria-label="이전 달" onClick={() => onChange(addMonths(value, -1))}>
+      <Button variant="outline" size="icon" className="max-md:size-11" aria-label="이전 달" onClick={() => onChange(addMonths(value, -1))}>
         <ChevronLeft />
       </Button>
       <Popover
@@ -36,11 +36,11 @@ export function MonthSwitcher({ value, onChange }: { value: string; onChange: (y
         }}
       >
         <PopoverTrigger asChild>
-          <Button variant="outline" className="min-w-24 tabular-nums">
+          <Button variant="outline" className="min-w-24 tabular-nums max-md:h-11">
             {Number(value.slice(0, 4))}년 {Number(value.slice(5, 7))}월
           </Button>
         </PopoverTrigger>
-        <PopoverContent className="w-64">
+        <PopoverContent align="start" className="w-64">
           <div className="mb-2 flex items-center justify-between">
             <Button variant="ghost" size="icon-sm" aria-label="이전 해" onClick={() => setYear(year - 1)}>
               <ChevronLeft />
@@ -58,7 +58,7 @@ export function MonthSwitcher({ value, onChange }: { value: string; onChange: (y
                   key={ym}
                   size="sm"
                   variant={ym === value ? "default" : "ghost"}
-                  className={cn(ym === thisMonth && ym !== value && "ring-primary ring-1")}
+                  className={cn("max-md:h-11", ym === thisMonth && ym !== value && "ring-primary ring-1")}
                   aria-current={ym === thisMonth ? "date" : undefined}
                   onClick={() => pick(ym)}
                 >
@@ -74,7 +74,7 @@ export function MonthSwitcher({ value, onChange }: { value: string; onChange: (y
           )}
         </PopoverContent>
       </Popover>
-      <Button variant="outline" size="icon" aria-label="다음 달" onClick={() => onChange(addMonths(value, 1))}>
+      <Button variant="outline" size="icon" className="max-md:size-11" aria-label="다음 달" onClick={() => onChange(addMonths(value, 1))}>
         <ChevronRight />
       </Button>
     </ButtonGroup>

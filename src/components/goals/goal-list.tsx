@@ -12,6 +12,7 @@ import { ResponsiveModal } from "@/components/app/responsive";
 import { EmptyState, toastUndo } from "@/components/app/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { ButtonGroup, ButtonGroupText } from "@/components/ui/button-group";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Field, FieldError, FieldLabel } from "@/components/ui/field";
@@ -20,6 +21,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useIsMobile } from "@/hooks/use-mobile";
 
 export type Goal = {
   id: string;
@@ -41,6 +43,7 @@ const period = (g: Goal) => (g.startYear === null ? "언젠가" : g.startYear ==
 
 export function GoalList({ goals, categories, year, thisYear }: { goals: Goal[]; categories: Category[]; year?: number; thisYear: number }) {
   const router = useRouter();
+  const mobile = useIsMobile();
   const [horizon, setHorizon] = useState<"all" | Goal["horizon"]>("all");
   const [category, setCategory] = useState("all");
   const [editing, setEditing] = useState<Goal | "new" | null>(null);
@@ -86,13 +89,14 @@ export function GoalList({ goals, categories, year, thisYear }: { goals: Goal[];
       <button type="button" onClick={() => setEditing(g)} className="min-w-0 flex-1 text-left">
         <span className={g.status === "done" ? "text-muted-foreground line-through" : undefined}>{g.title}</span>
         <span className="text-muted-foreground block text-caption">
-          {[catName(g.categoryId), period(g), year !== undefined ? HORIZON[g.horizon] : null].filter(Boolean).join(" · ")}
+          {/* 연도별 화면에서 그 해 한 해짜리면 연도는 이미 보이니 뺌 */}
+          {[catName(g.categoryId), year !== undefined && g.startYear === g.endYear ? null : period(g), year !== undefined ? HORIZON[g.horizon] : null].filter(Boolean).join(" · ")}
         </span>
       </button>
       {(g.status === "paused" || g.status === "dropped") && <Badge variant="secondary">{STATUS[g.status]}</Badge>}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" aria-label={`${g.title} 더 보기`}>
+          <Button variant="ghost" size="icon" className="max-md:size-11" aria-label={`${g.title} 더 보기`}>
             <Ellipsis />
           </Button>
         </DropdownMenuTrigger>
@@ -114,7 +118,7 @@ export function GoalList({ goals, categories, year, thisYear }: { goals: Goal[];
     list.length > 0 && (
       <Collapsible>
         <CollapsibleTrigger asChild>
-          <Button variant="ghost" size="sm" className="-ml-2">
+          <Button variant="ghost" size="sm" className="-ml-2 [&>svg]:transition-transform [&[data-state=closed]>svg]:-rotate-90">
             <ChevronDown /> {title} {list.length}
           </Button>
         </CollapsibleTrigger>
@@ -128,26 +132,26 @@ export function GoalList({ goals, categories, year, thisYear }: { goals: Goal[];
     <div className="space-y-5">
       <div className="flex flex-wrap items-center gap-2">
         {year !== undefined ? (
-          <div className="flex items-center gap-1">
+          <ButtonGroup>
             <Button asChild variant="outline" size="icon" aria-label="이전 해">
               <Link href={`/goals/year?y=${year - 1}`}>
                 <ChevronLeft />
               </Link>
             </Button>
-            <span className="min-w-20 text-center font-semibold tabular-nums">{year}년</span>
+            <ButtonGroupText className="bg-background dark:border-input dark:bg-input/30 min-w-20 justify-center font-semibold tabular-nums">{year}년</ButtonGroupText>
             <Button asChild variant="outline" size="icon" aria-label="다음 해">
               <Link href={`/goals/year?y=${year + 1}`}>
                 <ChevronRight />
               </Link>
             </Button>
-          </div>
+          </ButtonGroup>
         ) : (
           <>
             <ToggleGroup type="single" variant="outline" size="sm" value={horizon} onValueChange={(v) => v && setHorizon(v as typeof horizon)} aria-label="기간 구분">
-              <ToggleGroupItem value="all">전체</ToggleGroupItem>
-              <ToggleGroupItem value="short">단기</ToggleGroupItem>
-              <ToggleGroupItem value="mid">중기</ToggleGroupItem>
-              <ToggleGroupItem value="long">장기</ToggleGroupItem>
+              <ToggleGroupItem value="all" className="max-md:h-10 max-md:px-3.5">전체</ToggleGroupItem>
+              <ToggleGroupItem value="short" className="max-md:h-10 max-md:px-3.5">단기</ToggleGroupItem>
+              <ToggleGroupItem value="mid" className="max-md:h-10 max-md:px-3.5">중기</ToggleGroupItem>
+              <ToggleGroupItem value="long" className="max-md:h-10 max-md:px-3.5">장기</ToggleGroupItem>
             </ToggleGroup>
             <InfoTip label="단기·중기·장기">기준은 직접 정해요. 예: 단기 1년 이내, 중기 1~3년, 장기 3년 이상</InfoTip>
             <Select value={category} onValueChange={setCategory}>
@@ -165,7 +169,8 @@ export function GoalList({ goals, categories, year, thisYear }: { goals: Goal[];
             </Select>
           </>
         )}
-        <Button className="ml-auto" onClick={() => setEditing("new")}>
+        {/* 모바일은 빠른 추가(+)가 이미 채움 버튼이라 여기는 테두리만(primary 한 화면 1개, 03 §4.4) */}
+        <Button className="ml-auto" variant={mobile ? "outline" : "default"} onClick={() => setEditing("new")}>
           <Plus /> 목표 추가
         </Button>
       </div>
@@ -272,9 +277,14 @@ function GoalDialog({ goal, preset, defaultYear, categories, close, done }: { go
       onOpenChange={(o) => !o && close()}
       title={goal ? "목표 수정" : "목표 추가"}
       footer={
-        <Button disabled={!title.trim() || busy} onClick={save}>
-          {busy && <Spinner />} {goal ? "저장" : "목표 추가"}
-        </Button>
+        <>
+          <Button variant="outline" onClick={close}>
+            취소
+          </Button>
+          <Button disabled={!title.trim() || busy} onClick={save}>
+            {busy && <Spinner />} {goal ? "저장" : "목표 추가"}
+          </Button>
+        </>
       }
     >
       <div className="space-y-5">
@@ -285,15 +295,15 @@ function GoalDialog({ goal, preset, defaultYear, categories, close, done }: { go
         </Field>
         <Field>
           <FieldLabel>기간 구분</FieldLabel>
-          <ToggleGroup type="single" variant="outline" value={horizon} onValueChange={(v) => v && setHorizon(v as Goal["horizon"])}>
+          <ToggleGroup type="single" variant="outline" aria-label="기간 구분" value={horizon} onValueChange={(v) => v && setHorizon(v as Goal["horizon"])}>
             <ToggleGroupItem value="short">단기</ToggleGroupItem>
             <ToggleGroupItem value="mid">중기</ToggleGroupItem>
             <ToggleGroupItem value="long">장기</ToggleGroupItem>
           </ToggleGroup>
         </Field>
         <Field>
-          <FieldLabel>기간</FieldLabel>
-          <ToggleGroup type="single" variant="outline" value={kind} onValueChange={(v) => v && setKind(v as typeof kind)}>
+          <FieldLabel>연도</FieldLabel>
+          <ToggleGroup type="single" variant="outline" aria-label="연도" value={kind} onValueChange={(v) => v && setKind(v as typeof kind)}>
             <ToggleGroupItem value="one">한 해</ToggleGroupItem>
             <ToggleGroupItem value="range">여러 해</ToggleGroupItem>
             <ToggleGroupItem value="none">정하지 않음</ToggleGroupItem>
@@ -310,9 +320,9 @@ function GoalDialog({ goal, preset, defaultYear, categories, close, done }: { go
           )}
         </Field>
         <Field>
-          <FieldLabel>카테고리</FieldLabel>
+          <FieldLabel htmlFor="goal-category">카테고리</FieldLabel>
           <Select value={categoryId} onValueChange={setCategoryId}>
-            <SelectTrigger className="w-40">
+            <SelectTrigger id="goal-category" className="w-40">
               <SelectValue />
             </SelectTrigger>
             <SelectContent>

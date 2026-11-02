@@ -76,12 +76,13 @@ export function ResponsiveModal({ open, onOpenChange, title, description, footer
     );
   return (
     <Dialog open={open} onOpenChange={change}>
-      <DialogContent className={cn(WIDTH[size], "max-h-[85vh] overflow-y-auto")}>
+      {/* 본문만 스크롤, 저장 버튼(footer)은 늘 보이게 */}
+      <DialogContent className={cn(WIDTH[size], "flex max-h-[85vh] flex-col")}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
         </DialogHeader>
-        {children}
+        <div className="-mx-4 -my-1 min-h-0 flex-1 overflow-y-auto px-4 py-1">{children}</div>
         {footer && <DialogFooter>{footer}</DialogFooter>}
       </DialogContent>
     </Dialog>

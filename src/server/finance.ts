@@ -142,6 +142,21 @@ export async function createCategory(ctx: Ctx, input: unknown) {
   return categoryRepo.create(ctx, { ...v, sort: await nextSort(finCategories, ctx) }).catch((e) => dup(e, "분류"));
 }
 
+/** 분류 편집: 이름 바꾸기(지난 지출도 새 이름으로 보임) */
+export async function renameCategory(ctx: Ctx, id: string, name: string) {
+  const cur = await categoryRepo.get(ctx, id);
+  const v = parse(categoryInput, { kind: cur.kind, name });
+  return categoryRepo.update(ctx, id, cur.version, { name: v.name }).catch((e) => dup(e, "분류"));
+}
+
+/** 분류 편집: 지우기(휴지통으로, 지난 지출은 이름 그대로). 같은 종류의 마지막 분류는 못 지움 */
+export async function removeCategory(ctx: Ctx, id: string) {
+  const cur = await categoryRepo.get(ctx, id);
+  const left = await categoryRepo.list(ctx, { where: eq(finCategories.kind, cur.kind) });
+  if (left.length <= 1) throw new AppError("VALIDATION_FAILED", "분류가 하나는 있어야 해요");
+  await categoryRepo.remove(ctx, id);
+}
+
 export async function createPaymentMethod(ctx: Ctx, input: unknown) {
   const v = parse(paymentInput, input);
   return paymentRepo.create(ctx, { ...v, sort: await nextSort(paymentMethods, ctx) }).catch((e) => dup(e, "결제수단"));

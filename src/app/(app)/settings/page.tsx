@@ -87,7 +87,7 @@ export default function SettingsPage() {
             <ToggleGroupItem value="off">멈추기</ToggleGroupItem>
           </ToggleGroup>
         </div>
-        <div className="grid grid-cols-5 gap-2" role="radiogroup" aria-label="오늘의 펫">
+        <div className="grid grid-cols-4 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="오늘의 펫">
           {PRESET_PETS.map(petButton)}
         </div>
         {mine.length > 0 && (
@@ -95,7 +95,7 @@ export default function SettingsPage() {
             <h3 className="text-muted-foreground flex items-center gap-1 text-sm font-medium">
               내 펫 <Lock className="size-3.5" aria-label="내 계정에서만 보여요" />
             </h3>
-            <div className="grid grid-cols-5 gap-2" role="radiogroup" aria-label="내 펫">
+            <div className="grid grid-cols-4 gap-2 sm:grid-cols-5" role="radiogroup" aria-label="내 펫">
               {mine.map(petButton)}
             </div>
           </>

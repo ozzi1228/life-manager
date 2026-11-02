@@ -26,6 +26,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { dateLabel, fromYmd, money, monthLabel, ymd } from "@/lib/format";
 import { FINISH_LABEL, KIND_LABEL, START_LABEL, type MediaKind } from "@/lib/media";
 import { cn } from "@/lib/utils";
@@ -434,10 +435,9 @@ function Folded({ label, children, count }: { label: string; count: number; chil
 }
 
 type Sort = "new" | "old" | "price" | "level";
-function Shopping({ items, today, add, edit }: { items: WishItem[]; today: string; add: React.ReactNode; edit: (w: WishItem) => void }) {
+function Shopping({ items, today, add, edit, sort }: { items: WishItem[]; today: string; add: React.ReactNode; edit: (w: WishItem) => void; sort: Sort }) {
   const router = useRouter();
   const [level, setLevel] = useState<"all" | Level>("all");
-  const [sort, setSort] = useState<Sort>("new");
   const [detail, setDetail] = useState<WishItem | null>(null);
   const order = (l: string | null) => LEVELS.findIndex((x) => x.value === l);
   const saved = items
@@ -462,17 +462,6 @@ function Shopping({ items, today, add, edit }: { items: WishItem[]; today: strin
           </ToggleGroup>
           <LevelTip />
         </div>
-        <Select value={sort} onValueChange={(x) => setSort(x as Sort)}>
-          <SelectTrigger size="sm" aria-label="정렬" className="ml-auto">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent align="end">
-            <SelectItem value="new">담은 날</SelectItem>
-            <SelectItem value="old">오래 담아둔 순</SelectItem>
-            <SelectItem value="price">가격 높은 순</SelectItem>
-            <SelectItem value="level">구분 순</SelectItem>
-          </SelectContent>
-        </Select>
       </div>
       {saved.length > 0 ? (
         <>
@@ -485,8 +474,11 @@ function Shopping({ items, today, add, edit }: { items: WishItem[]; today: strin
             ))}
           </ul>
         </>
+      ) : level === "all" ? (
+        // 담기 버튼은 위 줄에 있어 빈 상태엔 안 둠
+        <EmptyState pet="pomong" title="지금 담아 둔 위시가 없어요" description="산 것·그만둔 것은 아래에 모여 있어요." />
       ) : (
-        <p className="text-muted-foreground py-8 text-center text-sm">{level === "all" ? "담아 둔 위시가 없어요" : `${levelOf(level).label}으로 담은 위시가 없어요`}</p>
+        <p className="text-muted-foreground py-8 text-center text-sm">{levelOf(level).label}으로 담은 위시가 없어요</p>
       )}
       <Folded label="구매함" count={bought.length}>
         {bought.map((w) => (
@@ -533,7 +525,7 @@ function MediaWishes({ items, today, add, edit }: { items: WishItem[]; today: st
     return (
       <li key={w.id} className="flex items-center gap-3 px-3 py-2">
         <button type="button" onClick={() => (w.status === "saved" ? edit(w) : router.push("/records/media"))} className="flex min-w-0 flex-1 items-center gap-3 text-left">
-          <Cover coverId={w.photos[0]?.id ?? null} kind={k} title={w.name} className="w-10" />
+          <Cover coverId={w.photos[0]?.id ?? null} kind={k} className="w-10" />
           <span className="min-w-0 flex-1">
             <span className={cn("block truncate", w.status !== "saved" && "text-muted-foreground")}>{w.name}</span>
             <span className="text-muted-foreground block truncate text-caption">{[KIND_LABEL[k], w.seenWhere].filter(Boolean).join(" · ")}</span>
@@ -606,34 +598,57 @@ function MediaWishes({ items, today, add, edit }: { items: WishItem[]; today: st
 
 export function WishView({ items, today, initialTab }: { items: WishItem[]; today: string; initialTab: "shopping" | "media" }) {
   const router = useRouter();
+  const mobile = useIsMobile();
   const [tab, setTab] = useState(initialTab);
   const [form, setForm] = useState<{ edit?: WishItem } | null>(null);
+  const [sort, setSort] = useState<Sort>("new");
   const mine = items.filter((w) => w.kind === tab);
   const add = (
-    <Button onClick={() => setForm({})}>
+    <Button variant={mobile ? "outline" : "default"} onClick={() => setForm({})}>
       <Plus /> 담기
     </Button>
   );
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-2">
-        <ToggleGroup
-          type="single"
-          variant="outline"
-          value={tab}
-          onValueChange={(x) => {
-            if (!x) return;
-            setTab(x as typeof tab);
-            router.replace(x === "media" ? "/records/wish?tab=media" : "/records/wish", { scroll: false });
-          }}
-          aria-label="위시 종류"
-        >
-          <ToggleGroupItem value="shopping">쇼핑</ToggleGroupItem>
-          <ToggleGroupItem value="media">작품</ToggleGroupItem>
-        </ToggleGroup>
-        {mine.length > 0 && <span className="ml-auto">{add}</span>}
+        {/* 쇼핑/작품 전환은 아래 필터와 구분되게 알약 모양(SubTabs와 같은 모양) */}
+        <div role="group" aria-label="위시 종류" className="flex gap-1.5">
+          {(
+            [
+              ["shopping", "쇼핑"],
+              ["media", "작품"],
+            ] as const
+          ).map(([x, label]) => (
+            <button
+              key={x}
+              type="button"
+              aria-pressed={tab === x}
+              onClick={() => {
+                setTab(x);
+                router.replace(x === "media" ? "/records/wish?tab=media" : "/records/wish", { scroll: false });
+              }}
+              className={cn("rounded-full border px-3 py-1 text-sm max-md:min-h-10", tab === x ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+        {tab === "shopping" && mine.length > 0 && (
+          <Select value={sort} onValueChange={(x) => setSort(x as Sort)}>
+            <SelectTrigger size="sm" aria-label="정렬" className="ml-auto max-md:min-h-10">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent align="end">
+              <SelectItem value="new">담은 날</SelectItem>
+              <SelectItem value="old">오래 담아둔 순</SelectItem>
+              <SelectItem value="price">가격 높은 순</SelectItem>
+              <SelectItem value="level">구분 순</SelectItem>
+            </SelectContent>
+          </Select>
+        )}
+        {mine.length > 0 && <span className={cn(tab !== "shopping" && "ml-auto")}>{add}</span>}
       </div>
-      {tab === "shopping" ? <Shopping items={mine} today={today} add={add} edit={(w) => setForm({ edit: w })} /> : <MediaWishes items={mine} today={today} add={add} edit={(w) => setForm({ edit: w })} />}
+      {tab === "shopping" ? <Shopping items={mine} today={today} add={add} edit={(w) => setForm({ edit: w })} sort={sort} /> : <MediaWishes items={mine} today={today} add={add} edit={(w) => setForm({ edit: w })} />}
       {form && (
         <WishForm
           key={form.edit?.id ?? tab}

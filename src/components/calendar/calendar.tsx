@@ -212,7 +212,7 @@ function TimeGrid({ days, today, items, color, open, add }: { days: string[]; to
   // 처음엔 아침 7시쯤이 보이게
   const scroller = (el: HTMLDivElement | null) => {
     if (el && !el.dataset.scrolled) {
-      el.scrollTop = 7 * HOUR;
+      el.scrollTop = 7 * HOUR - 12;
       el.dataset.scrolled = "1";
     }
   };
@@ -382,7 +382,7 @@ function DateButton({ value, onChange, label }: { value: string; onChange: (d: s
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
-        <Button type="button" variant="outline" aria-label={label} className="flex-1 justify-start">
+        <Button type="button" variant="outline" aria-label={label} className="flex-1 justify-start font-normal">
           {dayTitle(value)}
         </Button>
       </PopoverTrigger>
@@ -453,12 +453,14 @@ function EventForm({ draft, edit, calendars, close, done }: { draft: Draft; edit
         </label>
         <div className="space-y-2">
           <div className="flex gap-2">
+            <span className="text-muted-foreground w-7 shrink-0 self-center text-sm">시작</span>
             <DateButton label="시작 날짜" value={v.startDate} onChange={(d) => setStart(d)} />
-            {!v.allDay && <Input type="time" step={900} aria-label="시작 시간" className="w-32" value={v.startTime ?? ""} onChange={(e) => e.target.value && setStart(v.startDate, e.target.value)} />}
+            {!v.allDay && <Input type="time" step={900} aria-label="시작 시간" className="w-36 shrink-0 md:w-32" value={v.startTime ?? ""} onChange={(e) => e.target.value && setStart(v.startDate, e.target.value)} />}
           </div>
           <div className="flex gap-2">
+            <span className="text-muted-foreground w-7 shrink-0 self-center text-sm">끝</span>
             <DateButton label="끝 날짜" value={v.endDate} onChange={(d) => set("endDate", d)} />
-            {!v.allDay && <Input type="time" step={900} aria-label="끝 시간" className="w-32" value={v.endTime ?? ""} onChange={(e) => e.target.value && set("endTime", e.target.value)} />}
+            {!v.allDay && <Input type="time" step={900} aria-label="끝 시간" className="w-36 shrink-0 md:w-32" value={v.endTime ?? ""} onChange={(e) => e.target.value && set("endTime", e.target.value)} />}
           </div>
         </div>
         <Field>
@@ -545,8 +547,8 @@ function EventForm({ draft, edit, calendars, close, done }: { draft: Draft; edit
         </Field>
         <Collapsible defaultOpen={!!(draft.location || draft.memo)}>
           <CollapsibleTrigger asChild>
-            <Button type="button" variant="ghost" size="sm" className="-ml-2">
-              장소·메모
+            <Button type="button" variant="ghost" size="sm" className="text-muted-foreground -ml-2">
+              <Plus /> 장소·메모 추가
             </Button>
           </CollapsibleTrigger>
           <CollapsibleContent className="space-y-2 pt-2">
@@ -826,32 +828,34 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
         ? `${md(from)} ~ ${addDays(from, 6).slice(5, 7) === from.slice(5, 7) ? `${+addDays(from, 6).slice(8)}일` : md(addDays(from, 6))}`
         : dayTitle(date);
   const dayItems = (d: string) => visible.filter((e) => onDay(e, d));
-  const noteTitle = view === "year" ? `${date.slice(0, 4)}년 메모` : view === "month" ? `${+date.slice(5, 7)}월 메모` : view === "week" ? `${md(from)} 주 메모` : `${md(date)} 메모`;
+  const noteTitle = view === "year" ? `${date.slice(0, 4)}년 메모` : view === "month" ? `${+date.slice(5, 7)}월 메모` : view === "week" ? `${label} 메모` : `${md(date)} 메모`;
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center">
-          <Button variant="outline" size="icon" aria-label="이전" onClick={() => step(-1)}>
+          <Button variant="outline" size="icon" className="max-md:size-11" aria-label="이전" onClick={() => step(-1)}>
             <ChevronLeft />
           </Button>
           <span className="min-w-28 px-2 text-center font-semibold tabular-nums">{label}</span>
-          <Button variant="outline" size="icon" aria-label="다음" onClick={() => step(1)}>
+          <Button variant="outline" size="icon" className="max-md:size-11" aria-label="다음" onClick={() => step(1)}>
             <ChevronRight />
           </Button>
         </div>
-        <Button variant="outline" size="sm" onClick={() => go(view, today)}>
+        <Button variant="outline" size="sm" className="max-md:h-11" onClick={() => go(view, today)}>
           오늘
         </Button>
-        <ToggleGroup type="single" variant="outline" size="sm" value={view} onValueChange={(v) => v && go(v as View, selected)} aria-label="보기" className="ml-auto">
-          <ToggleGroupItem value="year">연</ToggleGroupItem>
-          <ToggleGroupItem value="month">월</ToggleGroupItem>
-          <ToggleGroupItem value="week">주</ToggleGroupItem>
-          <ToggleGroupItem value="day">일</ToggleGroupItem>
+        {/* 모바일: 보기 전환은 둘째 줄에 꽉 차게 */}
+        <ToggleGroup type="single" variant="outline" size="sm" value={view} onValueChange={(v) => v && go(v as View, selected)} aria-label="보기" className="max-md:order-last max-md:w-full md:ml-auto">
+          {[["year", "연"], ["month", "월"], ["week", "주"], ["day", "일"]].map(([k, t]) => (
+            <ToggleGroupItem key={k} value={k} className="max-md:h-10 max-md:flex-1">
+              {t}
+            </ToggleGroupItem>
+          ))}
         </ToggleGroup>
         <Popover>
           <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" aria-label="캘린더 보기 설정">
+            <Button variant="ghost" size="icon" className="max-md:ml-auto max-md:size-11" aria-label="캘린더 보기 설정">
               <Settings2 />
             </Button>
           </PopoverTrigger>
@@ -879,8 +883,11 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
       ) : view === "month" ? (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
           <MonthGrid from={from} month={date.slice(0, 7)} selected={selected} today={today} items={visible} color={colorOf} select={setSelected} open={setDetail} add={addAt} mobile={mobile} />
-          <div className="space-y-4">
-            <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
+          {/* 모바일은 고른 날 일정 → 메모 순 */}
+          <div className="flex flex-col gap-4">
+            <div className="max-lg:order-last">
+              <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
+            </div>
             <DayList day={selected} items={dayItems(selected)} color={colorOf} open={setDetail} add={() => addAt(selected)} today={today} />
           </div>
         </div>

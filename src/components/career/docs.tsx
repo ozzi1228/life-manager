@@ -17,6 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { DOC_KINDS, formatOf, type DocKind } from "@/lib/career";
 import type { CareerDoc, VersionInput } from "@/server/career";
 
@@ -234,7 +235,7 @@ function DocCard({ d, onVersion, onEdit }: { d: CareerDoc; onVersion: (v?: Versi
         <span className="text-muted-foreground text-caption tabular-nums">{when(v.createdAt)}</span>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="ml-auto size-8" aria-label={`${v.label} 더 보기`}>
+            <Button variant="ghost" size="icon" className="ml-auto size-8 max-md:size-10" aria-label={`${v.label} 더 보기`}>
               <MoreHorizontal />
             </Button>
           </DropdownMenuTrigger>
@@ -289,6 +290,7 @@ function DocCard({ d, onVersion, onEdit }: { d: CareerDoc; onVersion: (v?: Versi
 
 export function DocList({ docs }: { docs: CareerDoc[] }) {
   const router = useRouter();
+  const mobile = useIsMobile();
   const [docForm, setDocForm] = useState<{ edit?: CareerDoc; kind: DocKind } | null>(null);
   const [verForm, setVerForm] = useState<{ doc: CareerDoc; edit?: Version } | null>(null);
   const refresh = () => router.refresh();
@@ -297,7 +299,7 @@ export function DocList({ docs }: { docs: CareerDoc[] }) {
     <div className="space-y-6">
       <div className="flex items-center">
         <p className="text-muted-foreground text-sm">버전마다 Notion 링크와 PDF·Word·PPT 파일을 함께 둘 수 있어요</p>
-        <Button className="ml-auto shrink-0" onClick={() => setDocForm({ kind: "resume" })}>
+        <Button className="ml-auto shrink-0" variant={mobile ? "outline" : "default"} onClick={() => setDocForm({ kind: "resume" })}>
           <Plus /> 새 문서
         </Button>
       </div>

@@ -3,17 +3,21 @@
 // 커리어 · 경험 정리 (D-064): 취업 준비에서 흔히 쓰는 경험 정리 양식
 // 기본(경험명·분류·기관·역할·기간) · 내용(주요 활동·성과·배운 점·역량 키워드) · STAR(자소서용) · 자격·점수 · 비고·링크
 // 목록은 분류별 묶음(여러 분류면 묶음마다 보임), 분류를 고르면 그 분류만. 쓰기·고치기는 전체 화면
-import { ChevronDown, ExternalLink, Plus, Search, X } from "lucide-react";
+import { ChevronDown, ChevronLeft, ExternalLink, Plus, Search, X } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
+  addExpCat,
   addExperience,
   deleteExperience,
   editExperience,
+  removeExpCat,
+  renameExpCat,
   restoreExperience,
 } from "@/app/actions/career";
+import { CategoryEditor } from "@/components/app/category-editor";
 import { EmptyState, toastUndo } from "@/components/app/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,14 +36,31 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { CERT_CATEGORIES, DEFAULT_CATEGORIES, periodLabel } from "@/lib/career";
+import { CERT_CATEGORIES, periodLabel } from "@/lib/career";
 import { cn } from "@/lib/utils";
 import type { Experience } from "@/server/career";
 
 const NONE = "분류 없음";
+// 분류 편집(목록·편집 화면 공용): 이름을 바꾸거나 지우면 경험에 붙은 분류도 같이 바뀜
+const catEditor = (categories: string[], onRenamed?: (from: string, to: string) => void, onRemoved?: (name: string) => void) => ({
+  title: "경험 분류 편집",
+  items: categories.map((c) => ({ key: c, name: c })),
+  removeNote: "이 분류가 붙은 경험에서도 빠져요",
+  onAdd: addExpCat,
+  onRename: async (it: { key: string }, name: string) => {
+    const r = await renameExpCat(it.key, name);
+    if (r.ok) onRenamed?.(it.key, name);
+    return r;
+  },
+  onRemove: async (it: { key: string }) => {
+    const r = await removeExpCat(it.key);
+    if (r.ok) onRemoved?.(it.key);
+    return r;
+  },
+});
 const chip = (on: boolean) =>
   cn(
-    "rounded-full border px-3 py-1 text-sm",
+    "rounded-full border px-3 py-1 text-sm max-md:min-h-10",
     on
       ? "border-primary bg-primary text-primary-foreground"
       : "hover:bg-accent",
@@ -62,7 +83,6 @@ function Card({ e }: { e: Experience }) {
           {sub}
           {sub && period && " · "}
           <span className="tabular-nums">{period}</span>
-          {e.ongoing && <span className="text-link"> ●</span>}
         </p>
       )}
       {e.score && <p className="mt-1 text-sm font-medium">{e.score}</p>}
@@ -133,7 +153,7 @@ export function ExperienceList({
       />
     );
   const groups = [
-    ...categories,
+    ...categories.filter((c) => items.some((e) => e.categories.includes(c))),
     ...(items.some((e) => !e.categories.length) ? [NONE] : []),
   ];
   const inGroup = (g: string) =>
@@ -160,7 +180,10 @@ export function ExperienceList({
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
-        <span className="ml-auto">{add}</span>
+        <span className="ml-auto flex items-center gap-1">
+          <CategoryEditor {...catEditor(categories)} />
+          {add}
+        </span>
       </div>
       <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:px-0">
         {[null, ...groups].map((g) => (
@@ -267,7 +290,7 @@ export function ExperienceEditor({
   const set = <K extends keyof typeof v>(k: K, val: (typeof v)[K]) =>
     setV((s) => ({ ...s, [k]: val }));
   const options = [
-    ...new Set([...categories, ...DEFAULT_CATEGORIES, ...v.categories]),
+    ...new Set([...categories, ...v.categories]),
   ];
   const toggle = (c: string) =>
     set(
@@ -338,19 +361,35 @@ export function ExperienceEditor({
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 px-4 py-4 md:px-8 md:py-6">
+      <Link
+        href="/career"
+        className="text-muted-foreground hover:text-foreground -ml-2 inline-flex h-10 items-center gap-1 px-2 text-sm"
+      >
+        <ChevronLeft className="size-4" />
+        경험 정리
+      </Link>
       <Input
         aria-label="경험명"
         placeholder="경험명 (예: 삼성청년SW·AI아카데미 13기)"
         maxLength={100}
         autoFocus={!exp}
-        className="h-12 border-0 px-0 text-title font-semibold shadow-none md:text-title focus-visible:ring-0"
+        className="focus-visible:border-primary h-12 rounded-none border-0 border-b px-0 text-title font-semibold shadow-none placeholder:font-normal md:text-title focus-visible:ring-0"
         value={v.title}
         onChange={(e) => set("title", e.target.value)}
       />
 
       <Section title="기본" open>
         <Field>
-          <FieldLabel>분류</FieldLabel>
+          <div className="-my-1 flex items-center justify-between">
+            <FieldLabel>분류</FieldLabel>
+            <CategoryEditor
+              {...catEditor(
+                categories,
+                (from, to) => set("categories", v.categories.map((x) => (x === from ? to : x))),
+                (name) => set("categories", v.categories.filter((x) => x !== name)),
+              )}
+            />
+          </div>
           <div
             className="flex flex-wrap gap-1.5"
             role="group"
@@ -371,7 +410,7 @@ export function ExperienceEditor({
               <button
                 type="button"
                 onClick={() => setNewCat("")}
-                className="text-muted-foreground hover:bg-accent flex items-center gap-1 rounded-full border border-dashed px-3 py-1 text-sm"
+                className="text-muted-foreground hover:bg-accent flex items-center gap-1 rounded-full border border-dashed px-3 py-1 text-sm max-md:min-h-10"
               >
                 <Plus className="size-3.5" /> 새 분류
               </button>
@@ -381,7 +420,7 @@ export function ExperienceEditor({
                 aria-label="새 분류 이름"
                 placeholder="예: 방송작가"
                 maxLength={20}
-                className="h-8 w-32"
+                className="h-8 w-32 max-md:h-10"
                 value={newCat}
                 onChange={(e) => setNewCat(e.target.value)}
                 onKeyDown={(e) => {
@@ -429,16 +468,20 @@ export function ExperienceEditor({
                 value={v.startText}
                 onChange={(e) => set("startText", e.target.value)}
               />
-              <span className="text-muted-foreground">~</span>
-              <Input
-                aria-label="끝난 날"
-                inputMode="numeric"
-                placeholder={v.ongoing ? "진행 중" : "끝난 날"}
-                disabled={v.ongoing}
-                className="min-w-0 flex-1"
-                value={v.ongoing ? "" : v.endText}
-                onChange={(e) => set("endText", e.target.value)}
-              />
+              {/* 진행 중이면 끝난 날 칸은 숨김(값은 남겨 둠, 저장할 땐 비움) */}
+              {!v.ongoing && (
+                <>
+                  <span className="text-muted-foreground">~</span>
+                  <Input
+                    aria-label="끝난 날"
+                    inputMode="numeric"
+                    placeholder="끝난 날"
+                    className="min-w-0 flex-1"
+                    value={v.endText}
+                    onChange={(e) => set("endText", e.target.value)}
+                  />
+                </>
+              )}
             </div>
             <label className="flex items-center gap-1.5 text-sm">
               <Checkbox
@@ -680,7 +723,10 @@ export function ExperienceEditor({
       </Section>
 
       {error && <FieldError>{error}</FieldError>}
-      <div className="bg-background/95 sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] flex gap-2 border-t py-3 backdrop-blur md:bottom-0">
+      <div
+        data-pet-avoid
+        className="bg-background/95 sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] flex gap-2 border-t py-3 backdrop-blur md:bottom-0"
+      >
         {exp && (
           <Button
             variant="ghost"
@@ -690,12 +736,8 @@ export function ExperienceEditor({
             삭제
           </Button>
         )}
-        <Button
-          variant="outline"
-          className="ml-auto"
-          onClick={() => router.back()}
-        >
-          취소
+        <Button variant="outline" className="ml-auto" asChild>
+          <Link href="/career">취소</Link>
         </Button>
         <Button disabled={!v.title.trim() || busy} onClick={save}>
           {busy && <Spinner />} 저장

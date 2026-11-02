@@ -2,7 +2,7 @@
 
 // 건강 (SCR-HLT-01·02, 04 §7.9·7.10): 체중·혈당 요약 카드(작은 추세선), 기록 목록(기간), 입력·수정·삭제
 // 판정 문구 없음(10 §2) — 숫자와 변화만. 생리 주기는 만들지 않음(D-063)
-import { Plus } from "lucide-react";
+import { Lock, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
@@ -233,12 +233,10 @@ export function HealthView({ weight, glucose, injection, today }: { weight: Heal
   const card = "bg-card space-y-2 rounded-xl border p-4";
   return (
     <div className="space-y-5">
-      <div className="flex items-center gap-2">
-        <p className="text-muted-foreground text-caption">건강 기록은 암호화해 저장하고, 홈·검색·AI에는 보이지 않아요.</p>
-        <Button className="ml-auto shrink-0" onClick={() => setForm({ kind })}>
-          <Plus /> 기록
-        </Button>
-      </div>
+      {/* 추가는 카드마다 있는 버튼으로(위쪽 공통 버튼은 중복이라 뺌) */}
+      <p className="text-muted-foreground flex items-center gap-1.5 text-caption">
+        <Lock className="size-3.5 shrink-0" /> 암호화해 저장 · 홈·검색·AI에는 안 보여요
+      </p>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
         <section className={card}>

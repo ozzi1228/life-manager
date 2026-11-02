@@ -10,7 +10,7 @@ export function EntryList({ entries, topics, today }: { entries: Entry[]; topics
   for (const e of entries) days.set(e.date, [...(days.get(e.date) ?? []), e]);
   const topic = (id: string | null) => topics.find((t) => t.id === id);
   return (
-    <div className="space-y-6">
+    <div className="max-w-3xl space-y-6">
       {[...days].map(([date, list]) => (
         <section key={date} className="space-y-2">
           <h3 className="text-muted-foreground text-sm">{dayLabel(date, fromYmd(today))}</h3>

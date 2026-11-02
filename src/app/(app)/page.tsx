@@ -1,7 +1,7 @@
 // 홈 (SCR-HOME, 04 §3.1): 인사 + 위젯(고정 구성) — 오늘 일정, 오늘의 목표(칸 체크), 이번 달 예산, 다가오는 결제, 최근 기록
 // 건강 등 민감 정보는 홈에 내보내지 않음(10 §7)
 // ponytail: 홈 편집(위젯 켜기·끄기·순서, P1)·위젯별 따로 불러오기는 아직 — 한 번에 불러옴
-import { BookOpen, CalendarDays, ChevronRight, Film, NotebookPen, StickyNote, Tv } from "lucide-react";
+import { BookOpen, ChevronRight, Film, NotebookPen, StickyNote, Tv } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BudgetBar } from "@/components/app/money";
@@ -103,9 +103,12 @@ export default async function Home() {
               {events.length > 3 && <li className="text-muted-foreground text-sm">+{events.length - 3}개 더</li>}
             </ul>
           ) : (
-            <p className="text-muted-foreground flex items-center gap-2 text-sm">
-              <CalendarDays className="size-4" /> 오늘 일정이 없어요
-            </p>
+            <div className="space-y-2">
+              <p className="text-muted-foreground text-sm">오늘 일정이 없어요</p>
+              <Button asChild size="sm" variant="outline">
+                <Link href="/calendar?new=1">일정 추가</Link>
+              </Button>
+            </div>
           )}
         </Widget>
 

@@ -32,7 +32,7 @@
 | 15 | [api-specifications](15-api-specifications.md) | 응답·오류 형식, 멱등 키, 동시 수정, 업로드, 영역별 엔드포인트, 웹훅, 예약 작업 | ●● |
 | 16 | [architecture-and-operations](16-architecture-and-operations.md) | 기술 스택, PWA, **본인 PC 자가 운영 구성**(Docker·Tailscale 사설망·상시 가동·꺼짐 대응·업데이트), 로그·백업·복구·보안 운영·비용, 클라우드 이전 경로 | ●● |
 | 17 | [development-roadmap](17-development-roadmap.md) | 0단계 검증 → MVP → 동반자 → 확장, 작업 의존성, 테스트 전략, 완료 기준 | ●● |
-| 18 | [decisions-and-open-questions](18-decisions-and-open-questions.md) | 확정 66건, 대화 합의 20건, 가정, 미결정 42건(추천·대안, 해결 17건 별도 표시), 검증 목록, 판단 근거 | ●● |
+| 18 | [decisions-and-open-questions](18-decisions-and-open-questions.md) | 확정 68건, 대화 합의 20건, 가정, 미결정 42건(추천·대안, 해결 17건 별도 표시), 검증 목록, 판단 근거 | ●● |
 | 19 | [integration-research](19-integration-research.md) | 외부 연동 실현 가능성 조사(구글·네이버·카카오·AI 3사·카드 데이터·작품 API·PWA), 출처 포함 | ●● |
 | 20 | [restraint-spending](20-restraint-spending.md) | 참은 소비: 참아야 할 금액(사치 + 예산 초과) 계산, 직접 기록, 위시 자동 포함 조건, 월 정산, 예외 | ●● |
 | 21 | [phase0-log](21-phase0-log.md) | 0단계 진행 기록: 검증 항목 상태, 만든 파일, 사용자 준비물 | ● |

@@ -21,6 +21,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { dateLabel, fromYmd, ymd } from "@/lib/format";
 import { calendarDay, KIND_LABEL, monthSummary, STATUS_OPTIONS, statusLabel, type MediaKind, type MediaStatus } from "@/lib/media";
 import { cn } from "@/lib/utils";
@@ -35,8 +36,8 @@ const WHERE: Record<MediaKind, string[]> = {
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
 const TINT: Record<MediaKind, string> = { book: "bg-chart-1/20", movie: "bg-chart-2/20", drama: "bg-chart-4/20" }; // 표지 없을 때 종류별 색
 
-/** 표지: 올린 사진, 없거나 깨지면 종류 아이콘 + 제목(04 §7.4) */
-export function Cover({ coverId, kind, title, className, faint }: { coverId: string | null; kind: MediaKind; title: string; className?: string; faint?: boolean }) {
+/** 표지: 올린 사진, 없거나 깨지면 종류 아이콘 + 제목(04 §7.4). 제목이 옆에 따로 있는 작은 표지는 title 없이 아이콘만 */
+export function Cover({ coverId, kind, title, className, faint }: { coverId: string | null; kind: MediaKind; title?: string; className?: string; faint?: boolean }) {
   const [broken, setBroken] = useState(false);
   const Icon = KIND_ICON[kind];
   return (
@@ -47,7 +48,11 @@ export function Cover({ coverId, kind, title, className, faint }: { coverId: str
       ) : (
         <span className="flex size-full flex-col items-center justify-center gap-1 p-1 text-center">
           <Icon className="size-4 shrink-0 opacity-60" />
-          <span className="line-clamp-3 text-[10px] leading-tight break-all">{title}</span>
+          {title && (
+            <span data-slot="cover-title" className="line-clamp-3 text-[10px] leading-tight break-keep">
+              {title}
+            </span>
+          )}
         </span>
       )}
     </span>
@@ -343,7 +348,7 @@ function Row({ i, today, open }: { i: MediaItem; today: string; open: () => void
   return (
     <li>
       <button type="button" onClick={open} className="hover:bg-accent/50 flex w-full items-center gap-3 px-3 py-2 text-left">
-        <Cover coverId={i.coverId} kind={i.kind} title={i.title} className="w-10" />
+        <Cover coverId={i.coverId} kind={i.kind} className="w-10" />
         <span className="min-w-0 flex-1">
           <span className="block truncate">{i.title}</span>
           <span className="text-muted-foreground block truncate text-caption">{[KIND_LABEL[i.kind], i.creator, period(i, today)].filter(Boolean).join(" · ")}</span>
@@ -383,25 +388,29 @@ function MonthGrid({ month, items, today, open }: { month: string; items: MediaI
           const d = i + 1;
           const list = (byDay.get(d) ?? []).sort((x, y) => Number(x.faint) - Number(y.faint)); // 끝낸 것 먼저, 보는 중(흐림)은 뒤로
           const isToday = `${month}-${String(d).padStart(2, "0")}` === today;
+          // 둘 다 표지 사진일 때만 겹쳐 보임(글자 표지는 겹치면 안 읽힘). 나머지는 +N
+          const n = list.length > 1 && list[0].item.coverId && list[1].item.coverId ? 2 : 1;
           return (
             <div key={d} className="min-h-20 border-r border-b p-1 md:min-h-28">
               <span className={cn("text-caption tabular-nums", isToday ? "bg-primary text-primary-foreground rounded-full px-1.5" : "text-muted-foreground")}>{d}</span>
               {list.length > 0 && (
                 <div className="relative mt-0.5 flex">
-                  {list.slice(0, 2).map(({ item, faint }, k) => (
+                  {list.slice(0, n).map(({ item, faint }, k) => (
                     <button
                       key={item.id}
                       type="button"
                       title={[item.title, item.rating ? `★${item.rating}` : null, item.oneLiner].filter(Boolean).join(" · ")}
                       aria-label={`${item.title} 보기`}
                       onClick={() => open(item)}
-                      className={cn("w-full max-w-12 md:w-3/5", k === 1 && "-ml-[30%] mt-1.5 max-md:hidden")}
+                      className={cn("relative w-full max-w-12 md:w-3/5", k === 1 && "-ml-[30%] mt-1.5 max-md:hidden")}
                     >
-                      <Cover coverId={item.coverId} kind={item.kind} title={item.title} faint={faint} className="shadow-sm ring-1 ring-background" />
+                      {/* 모바일 칸은 좁아 제목이 글자 중간에서 끊김 → 아이콘만(제목은 aria-label·title로) */}
+                      <Cover coverId={item.coverId} kind={item.kind} title={item.title} faint={faint} className="shadow-sm ring-1 ring-background max-md:[&_[data-slot=cover-title]]:hidden" />
+                      {/* +N은 마지막으로 보이는 표지 모서리에 붙임(모바일은 한 장, PC는 n장) */}
+                      {k === 0 && list.length > 1 && <span className="bg-foreground/75 text-background absolute -right-1 -bottom-1 rounded-full px-1 text-[10px] md:hidden">+{list.length - 1}</span>}
+                      {k === n - 1 && list.length > n && <span className="bg-foreground/75 text-background absolute -right-1 -bottom-1 rounded-full px-1 text-[10px] max-md:hidden">+{list.length - n}</span>}
                     </button>
                   ))}
-                  {list.length > 1 && <span className="bg-foreground/75 text-background absolute right-0 bottom-0 rounded-full px-1 text-[10px] md:hidden">+{list.length - 1}</span>}
-                  {list.length > 2 && <span className="bg-foreground/75 text-background absolute right-0 bottom-0 rounded-full px-1 text-[10px] max-md:hidden">+{list.length - 2}</span>}
                 </div>
               )}
             </div>
@@ -420,6 +429,7 @@ const GROUPS: { status: MediaStatus; label: string }[] = [
 
 export function MediaView({ items, today }: { items: MediaItem[]; today: string }) {
   const router = useRouter();
+  const mobile = useIsMobile();
   const [view, setView] = useState<"calendar" | "list">("calendar");
   const [kind, setKind] = useState<"all" | MediaKind>("all");
   const [month, setMonth] = useState(today.slice(0, 7));
@@ -442,17 +452,13 @@ export function MediaView({ items, today }: { items: MediaItem[]; today: string 
   }
 
   const add = (
-    <Button onClick={() => setForm({})}>
+    <Button variant={mobile ? "outline" : "default"} onClick={() => setForm({})}>
       <Plus /> 기록하기
     </Button>
   );
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <ToggleGroup type="single" variant="outline" size="sm" value={view} onValueChange={(x) => x && setView(x as typeof view)} aria-label="보기">
-          <ToggleGroupItem value="calendar">캘린더</ToggleGroupItem>
-          <ToggleGroupItem value="list">목록</ToggleGroupItem>
-        </ToggleGroup>
         <ToggleGroup type="single" variant="outline" size="sm" value={kind} onValueChange={(x) => x && setKind(x as typeof kind)} aria-label="종류">
           <ToggleGroupItem value="all">전체</ToggleGroupItem>
           {(["book", "movie", "drama"] as const).map((k) => (
@@ -464,12 +470,20 @@ export function MediaView({ items, today }: { items: MediaItem[]; today: string 
         <span className="ml-auto">{add}</span>
       </div>
 
+      {items.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          {view === "calendar" && <MonthSwitcher value={month} onChange={setMonth} />}
+          <ToggleGroup type="single" variant="outline" size="sm" value={view} onValueChange={(x) => x && setView(x as typeof view)} aria-label="보기" className="ml-auto">
+            <ToggleGroupItem value="calendar">캘린더</ToggleGroupItem>
+            <ToggleGroupItem value="list">목록</ToggleGroupItem>
+          </ToggleGroup>
+        </div>
+      )}
       {items.length === 0 ? (
         <EmptyState pet="hoya" title="읽은 책, 본 영화·드라마를 남겨 보세요" description="다 본 날짜에 포스터가 캘린더에 모여요." action={add} />
       ) : view === "calendar" ? (
         <>
           <div className="flex flex-wrap items-center gap-2">
-            <MonthSwitcher value={month} onChange={setMonth} />
             {ongoing.length > 0 && (
               <Button variant="secondary" size="sm" className="rounded-full" onClick={() => setView("list")}>
                 {kind === "book" ? "읽는 중" : kind === "all" ? "읽는 중·보는 중" : "보는 중"} {ongoing.length}

@@ -100,9 +100,9 @@ export default function SignupPage() {
           ) : idState === "taken" ? (
             <FieldError>이미 쓰는 아이디예요</FieldError>
           ) : idState === "invalid" ? (
-            <FieldError>4~20자, 영문 소문자로 시작, 소문자·숫자·_·. 만 쓸 수 있어요</FieldError>
+            <FieldError>영문 소문자로 시작하는 4~20자로 써 주세요. 소문자, 숫자, 밑줄(_), 마침표(.)만 쓸 수 있어요</FieldError>
           ) : (
-            <FieldDescription>4~20자, 영문 소문자로 시작, 소문자·숫자·_·.</FieldDescription>
+            <FieldDescription>영문 소문자로 시작하는 4~20자예요. 소문자, 숫자, 밑줄(_), 마침표(.)를 쓸 수 있어요</FieldDescription>
           )}
         </Field>
 

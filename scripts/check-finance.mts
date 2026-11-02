@@ -114,6 +114,17 @@ try {
   assert.equal(await code(createTransaction(A, { ...base, date: today, amount: 1, plannedExpenseId: pb.id })), "VALIDATION_FAILED", "남의 큰 지출 연결 불가");
   console.log("예산 규칙 확인 통과");
 
+  // 분류 편집: 이름 바꾸기, 같은 이름·남의 분류 불가, 지우면 목록에서 빠짐
+  const { createCategory, renameCategory, removeCategory } = await import("../src/server/finance.ts");
+  const extra = await createCategory(A, { kind: "income", name: "확인용 수입" });
+  await renameCategory(A, extra.id, "확인용 수입2");
+  assert.equal((await formData(A)).categories.find((c) => c.id === extra.id)?.name, "확인용 수입2");
+  assert.equal(await code(renameCategory(A, extra.id, salary.name)), "DUPLICATE");
+  assert.equal(await code(renameCategory(B, extra.id, "x")), "NOT_FOUND");
+  await removeCategory(A, extra.id);
+  assert.ok(!(await formData(A)).categories.some((c) => c.id === extra.id), "지운 분류는 고르기 목록에서 빠짐");
+  console.log("분류 편집 확인 통과");
+
   // 카드: 지출 입력에서 만든 카드도 목록에, 실적·혜택 예상, 남의 카드 불가, 입력 검사
   const { createCard, cardList, cardDetail, addBenefit, updateCard } = await import("../src/server/cards.ts");
   const { createPaymentMethod } = await import("../src/server/finance.ts");

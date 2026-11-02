@@ -24,7 +24,7 @@ async function Gate({ children }: { children: React.ReactNode }) {
   if (!settings?.onboardedAt) redirect("/onboarding");
   const user = session.user as { name: string; username?: string | null };
   return (
-    <AppFrame name={user.name || user.username || "나"} seenHints={settings.seenHints}>
+    <AppFrame name={user.name || user.username || "나"} seenHints={settings.seenHints} navOrder={settings.navOrder}>
       {children}
     </AppFrame>
   );

@@ -25,11 +25,11 @@ export default async function RecordsPage({ searchParams }: PageProps<"/records"
     </Button>
   );
   return (
-    <Page narrow>
+    <Page>
       <RecordsTabs />
       <div className="flex items-center justify-between gap-3">
         <MonthNav month={month} />
-        <span className="max-md:hidden">{write}</span>
+        {write}
       </div>
       {entries.length ? (
         <EntryList entries={entries} topics={topics.map((t) => ({ id: t.id, name: t.name, colorHex: t.colorHex }))} today={today} />

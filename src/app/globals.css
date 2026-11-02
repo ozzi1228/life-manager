@@ -237,8 +237,18 @@
   body {
     @apply bg-background text-foreground;
     letter-spacing: var(--tracking-normal);
+    /* 한국어는 낱말 단위로 줄바꿈, 너무 긴 낱말만 아무 데서나 */
+    word-break: keep-all;
+    overflow-wrap: anywhere;
   }
   html {
     @apply font-sans;
+  }
+}
+
+/* 모바일 날짜 칸을 ui/button의 모바일 크기(40px)에 맞춤. 레이어 밖이라 calendar의 [--cell-size:…]보다 앞섬 */
+@media (width < 48rem) {
+  [data-slot="calendar"] {
+    --cell-size: 2.5rem;
   }
 }

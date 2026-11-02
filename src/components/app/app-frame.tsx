@@ -7,6 +7,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import { HintsProvider } from "@/components/app/help";
 import { activeNav, MAIN_NAV, QUICK_ADD, titleFor } from "@/components/app/nav";
+import { NavOrderProvider, useNavOrder } from "@/components/app/nav-order";
 import { ConnectionBanner } from "@/components/app/pwa";
 import { ExpenseDialogProvider, useExpenseDialog } from "@/components/money/expense-dialog";
 import { PetLayer } from "@/components/pet/pet-layer";
@@ -39,13 +40,15 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
-type Props = { name: string; seenHints: string[]; children: ReactNode };
+type Props = { name: string; seenHints: string[]; navOrder: Record<string, string[]>; children: ReactNode };
 
 export function AppFrame(props: Props) {
   return (
-    <ExpenseDialogProvider>
-      <Frame {...props} />
-    </ExpenseDialogProvider>
+    <NavOrderProvider initial={props.navOrder}>
+      <ExpenseDialogProvider>
+        <Frame {...props} />
+      </ExpenseDialogProvider>
+    </NavOrderProvider>
   );
 }
 
@@ -57,6 +60,9 @@ function Frame({ name, seenHints, children }: Props) {
   const [quickOpen, setQuickOpen] = useState(false); // PC는 추가 메뉴, 모바일은 아래 창
   const mobile = useIsMobile();
   const { prefs, loaded: petLoaded } = usePetPrefs();
+  // 주 메뉴 순서: 끌어서 바꿈(사이드바는 위아래, 하단 탭은 좌우). 둘은 같은 순서를 씀
+  const side = useNavOrder("main", MAIN_NAV, "y");
+  const tabs = useNavOrder("main", MAIN_NAV, "x");
 
   // PC 단축키: N = 빠른 추가(입력 중이 아닐 때, 02 §5.3)
   useEffect(() => {
@@ -78,7 +84,7 @@ function Frame({ name, seenHints, children }: Props) {
   const profile = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="내 메뉴">
+        <Button variant="ghost" size="icon" className="max-md:size-11" aria-label="내 메뉴">
           <UserRound />
         </Button>
       </DropdownMenuTrigger>
@@ -112,8 +118,8 @@ function Frame({ name, seenHints, children }: Props) {
           <SidebarContent>
             <SidebarGroup>
               <SidebarMenu>
-                {MAIN_NAV.map((n) => (
-                  <SidebarMenuItem key={n.href}>
+                {side.items.map((n) => (
+                  <SidebarMenuItem key={n.href} ref={side.rowRef(n.href)} {...side.item(n.href)} className={cn("select-none", side.dragging === n.href && "bg-sidebar-accent rounded-md")}>
                     <SidebarMenuButton asChild isActive={active?.href === n.href} tooltip={n.label}>
                       <Link href={n.href}>
                         <n.icon />
@@ -163,11 +169,13 @@ function Frame({ name, seenHints, children }: Props) {
                 {QUICK_ADD.map((q) =>
                   q.dialog ? (
                     <DropdownMenuItem key={q.label} onSelect={() => openExpense()}>
-                      {q.label}
+                      <q.icon /> {q.label}
                     </DropdownMenuItem>
                   ) : (
                     <DropdownMenuItem key={q.label} asChild>
-                      <Link href={q.href}>{q.label}</Link>
+                      <Link href={q.href}>
+                        <q.icon /> {q.label}
+                      </Link>
                     </DropdownMenuItem>
                   ),
                 )}
@@ -178,7 +186,7 @@ function Frame({ name, seenHints, children }: Props) {
 
           <ConnectionBanner />
 
-          <div className="flex-1 pb-[calc(4rem+env(safe-area-inset-bottom))] md:pb-0">{children}</div>
+          <div className="flex-1 pb-[calc(8.5rem+env(safe-area-inset-bottom))] md:pb-0">{children}</div>
         </SidebarInset>
 
         {/* 모바일 빠른 추가(+): 하단 탭 위 오른쪽. 글 쓰는 화면에서는 저장 버튼을 가리지 않게 숨김 */}
@@ -200,11 +208,13 @@ function Frame({ name, seenHints, children }: Props) {
               {QUICK_ADD.map((q) =>
                 q.dialog ? (
                   <Button key={q.label} variant="outline" size="lg" className="h-12 justify-start" onClick={() => (setQuickOpen(false), openExpense())}>
-                    {q.label}
+                    <q.icon /> {q.label}
                   </Button>
                 ) : (
                   <Button key={q.label} asChild variant="outline" size="lg" className="h-12 justify-start" onClick={() => setQuickOpen(false)}>
-                    <Link href={q.href}>{q.label}</Link>
+                    <Link href={q.href}>
+                      <q.icon /> {q.label}
+                    </Link>
                   </Button>
                 ),
               )}
@@ -215,10 +225,10 @@ function Frame({ name, seenHints, children }: Props) {
         {/* 모바일 하단 탭 */}
         <nav data-pet-avoid aria-label="주 메뉴" className="bg-background/95 fixed inset-x-0 bottom-0 z-10 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
           <ul className="grid h-16 grid-cols-6">
-            {MAIN_NAV.map((n) => {
+            {tabs.items.map((n) => {
               const on = active?.href === n.href;
               return (
-                <li key={n.href}>
+                <li key={n.href} ref={tabs.rowRef(n.href)} {...tabs.item(n.href)} className={cn("select-none", tabs.dragging === n.href && "bg-accent rounded-lg")}>
                   <Link
                     href={n.href}
                     aria-current={on ? "page" : undefined}

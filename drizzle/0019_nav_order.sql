@@ -1,0 +1,1 @@
+ALTER TABLE "user_settings" ADD COLUMN "nav_order" jsonb DEFAULT '{}'::jsonb NOT NULL;

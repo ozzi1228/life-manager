@@ -13,11 +13,11 @@ export const MAIN_NAV: NavItem[] = [
 ];
 
 // 빠른 추가: 어디서든 한 번에(02 §1). 지출은 그 자리에서 입력 창, 나머지는 각 영역 화면이 ?new= 로 추가 창을 엶
-export const QUICK_ADD: { label: string; href: string; dialog?: "expense" }[] = [
-  { href: "/money", label: "지출 추가", dialog: "expense" },
-  { href: "/goals?check=today", label: "목표 체크" },
-  { href: "/calendar?new=1", label: "일정 추가" },
-  { href: "/records/journal/new", label: "기록 쓰기" },
+export const QUICK_ADD: { label: string; href: string; icon: LucideIcon; dialog?: "expense" }[] = [
+  { href: "/money", label: "지출 추가", icon: Wallet, dialog: "expense" },
+  { href: "/goals?check=today", label: "목표 체크", icon: Target },
+  { href: "/calendar?new=1", label: "일정 추가", icon: CalendarDays },
+  { href: "/records/journal/new", label: "기록 쓰기", icon: NotebookPen },
 ];
 
 const TITLES: [string, string][] = [

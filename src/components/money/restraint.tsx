@@ -23,6 +23,7 @@ import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { addMonths, dateLabel, fromYmd, money, monthLabel, ymd } from "@/lib/format";
 import { fillState } from "@/lib/restraint";
 import { cn } from "@/lib/utils";
@@ -78,7 +79,7 @@ function EntryForm({ edit, pickable, today, close, done }: { edit?: Entry; picka
           <Field>
             <FieldLabel>위시에서 고르기</FieldLabel>
             <Select value={wishId ?? "none"} onValueChange={(v) => (v === "none" ? setWishId(null) : pick(v))}>
-              <SelectTrigger aria-label="위시에서 고르기">
+              <SelectTrigger aria-label="위시에서 고르기" className="data-[size=default]:h-11 md:data-[size=default]:h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -125,6 +126,7 @@ function EntryForm({ edit, pickable, today, close, done }: { edit?: Entry; picka
 
 export function RestraintView({ v, today }: { v: View; today: string }) {
   const router = useRouter();
+  const mobile = useIsMobile();
   const [form, setForm] = useState<{ edit?: Entry } | null>(null);
   const [busy, setBusy] = useState(false);
   const state = fillState(v.target, v.filled);
@@ -154,9 +156,15 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
   const pickNow = (c: View["candidates"][number]) => call(addRestraint(crypto.randomUUID(), { name: c.name, amount: c.price, date: today, reason: null, wishItemId: c.id }), "참은 것으로 기록했어요");
 
   const add = (
-    <Button onClick={() => setForm({})}>
+    <Button variant={mobile ? "outline" : "default"} onClick={() => setForm({})}>
       <Plus /> 참은 것 기록
     </Button>
+  );
+  const tip = (
+    <InfoTip label="참은 소비 계산" title="참아야 할 금액">
+      <p>사치 분류에 쓴 돈과 분류별 예산을 넘은 금액을 더한 만큼 참아야 해요.</p>
+      <p>진짜 사고 싶었는데 참은 것을 기록해 채워요. 부족하면 다음 달로 넘어가요.</p>
+    </InfoTip>
   );
   const lines = [
     { label: "사치 지출", value: v.detail.luxury },
@@ -168,27 +176,23 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
   return (
     <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
       <div className="space-y-4">
-        <div className="flex items-center gap-1">
-          <MonthNav month={v.month} />
-          <InfoTip label="참은 소비 계산" title="참아야 할 금액">
-            <p>사치 분류에 쓴 돈과 분류별 예산을 넘은 금액을 더한 만큼 참아야 해요.</p>
-            <p>진짜 사고 싶었는데 참은 것을 기록해 채워요. 부족하면 다음 달로 넘어가요.</p>
-          </InfoTip>
-          <span className="ml-auto max-md:hidden">{add}</span>
-        </div>
+        <MonthNav month={v.month} />
 
         <section className="bg-card space-y-3 rounded-xl border p-4">
           {state === "none" ? (
-            <p className="py-2 font-semibold">{v.current ? "이번 달은" : `${mLabel}은`} 참아야 할 금액이 없어요</p>
+            <p className="flex items-center gap-1 py-2 font-semibold">
+              {v.current ? "이번 달은" : `${mLabel}은`} 참아야 할 금액이 없어요 {tip}
+            </p>
           ) : (
             <>
               <dl className="grid grid-cols-2 gap-2">
                 <div>
-                  <dt className="text-muted-foreground text-sm">참아야 할 금액</dt>
+                  <dt className="text-muted-foreground flex min-h-8 items-center gap-1 text-sm">참아야 할 금액 {tip}</dt>
                   <dd className="text-title font-semibold tabular-nums">{money(v.target)}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground text-sm">참은 금액</dt>
+                  {/* 옆 칸의 도움말 버튼만큼 높이를 맞춰 금액 줄을 나란히 */}
+                  <dt className="text-muted-foreground flex min-h-8 items-center text-sm">참은 금액</dt>
                   <dd className="text-title font-semibold tabular-nums">{money(v.filled)}</dd>
                 </div>
               </dl>
@@ -240,12 +244,14 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
             </div>
           )}
         </section>
-        <span className="block md:hidden">{add}</span>
 
         <section className="space-y-2">
-          <h2 className="text-sm font-semibold">
-            참은 소비 <span className="text-muted-foreground font-normal">{v.entries.filter((e) => e.status !== "excluded").length}</span>
-          </h2>
+          <div className="flex items-center justify-between gap-2">
+            <h2 className="text-subtitle font-semibold">
+              참은 소비 <span className="text-muted-foreground font-normal">{v.entries.filter((e) => e.status !== "excluded").length}</span>
+            </h2>
+            {add}
+          </div>
           {v.entries.length ? (
             <ul className="divide-y rounded-lg border">
               {v.entries.map((e) => {
@@ -300,7 +306,7 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
 
       {v.current && (
         <aside className="space-y-2">
-          <h2 className="flex items-center text-sm font-semibold">
+          <h2 className="text-subtitle flex items-center gap-1 font-semibold">
             이번 달 말에 들어갈 후보
             <InfoTip label="후보">1일 전부터 담아 둔 갖고 싶음·관심 위시 중 이번 달에 사지 않은 것이 다음 달 1일에 자동으로 들어가요.</InfoTip>
           </h2>
@@ -333,7 +339,7 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
             </>
           ) : (
             <div className="text-muted-foreground space-y-2 rounded-lg border border-dashed p-4 text-center text-sm">
-              <p>다음 달에 들어갈 위시가 없어요</p>
+              <p>이번 달 말에 들어갈 위시가 없어요</p>
               <Button variant="outline" size="sm" asChild>
                 <Link href="/records/wish">위시 보기</Link>
               </Button>

@@ -99,17 +99,31 @@ export function PetLayer({ petId, size = 80, reducedMotion, sleepAfterMs = 60_00
     const avoidTimer = setInterval(refreshAvoid, 500);
     const blocked = (x: number, y: number) => avoid.some((r) => hit({ l: x, t: y, r: x + size, b: y + size }, r));
     // 모달·입력칸 위에 있게 되면 가까운 빈자리로 깡충 비켜 감(걸어다니지 않음, 사용자 피드백 2026-11-01)
+    // 비킬 자리는 화면에 보이는 입력칸·버튼과 겹치는 넓이가 가장 작은 곳(저장 줄을 피하다 입력칸 위에 앉던 문제, 2026-11-02)
     const freeSpot = () => {
-      // 하단 탭 위 가장자리가 주 활동 영역(02 §5.1): 먼저 바로 위로, 안 되면 주변 아무 빈자리
-      for (let up = 16; up <= 320; up += 16) if (!blocked(s.x, Math.max(0, s.y - up))) return { x: s.x, y: Math.max(0, s.y - up) };
+      const fields = [...document.querySelectorAll<HTMLElement>("input:not([type=hidden]), textarea, select, button, [role=combobox]")]
+        .map((e) => e.getBoundingClientRect())
+        .filter((r) => r.width && r.bottom > 0 && r.top < innerHeight);
+      const covered = (x: number, y: number) =>
+        fields.reduce((sum, f) => sum + Math.max(0, Math.min(x + size, f.right) - Math.max(x, f.left)) * Math.max(0, Math.min(y + size, f.bottom) - Math.max(y, f.top)), 0);
+      // 하단 탭 위 가장자리가 주 활동 영역(02 §5.1): 먼저 바로 위로, 다음 주변, 마지막으로 좌우 가장자리
+      const spots: { x: number; y: number }[] = [];
+      for (let up = 16; up <= 320; up += 16) spots.push({ x: s.x, y: Math.max(0, s.y - up) });
       for (let i = 0; i < 24; i++) {
         const reach = 80 + i * 30; // 가까운 곳부터
         const a = Math.random() * Math.PI * 2;
-        const x = Math.max(0, Math.min(maxX(), s.x + Math.cos(a) * reach));
-        const y = Math.max(0, Math.min(maxY(), s.y + Math.sin(a) * reach));
-        if (!blocked(x, y)) return { x, y };
+        spots.push({ x: Math.max(0, Math.min(maxX(), s.x + Math.cos(a) * reach)), y: Math.max(0, Math.min(maxY(), s.y + Math.sin(a) * reach)) });
       }
-      return null;
+      for (let y = maxY(); y >= 0; y -= 32) spots.push({ x: maxX(), y }, { x: 0, y });
+      let best = null as null | { x: number; y: number };
+      let bestArea = Infinity;
+      for (const p of spots) {
+        if (blocked(p.x, p.y)) continue;
+        const area = covered(p.x, p.y);
+        if (area < bestArea) [best, bestArea] = [p, area];
+        if (!area) break;
+      }
+      return best;
     };
 
     const markInput = () => (s.lastInput = performance.now());

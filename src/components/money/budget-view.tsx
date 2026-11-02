@@ -25,7 +25,6 @@ type View = Awaited<ReturnType<typeof budgetView>>;
 type Opt = { id: string; name: string };
 
 const md = (d: string) => `${Number(d.slice(5, 7))}/${Number(d.slice(8))}`;
-const PLANNED_STATE = { none: "아직 안 씀", partial: "", done: "다 썼어요", over: "초과" } as const;
 
 export function BudgetView({ view, categories, lastActual, today }: { view: View; categories: Opt[]; lastActual: Record<string, number>; today: string }) {
   const router = useRouter();
@@ -127,13 +126,17 @@ export function BudgetView({ view, categories, lastActual, today }: { view: View
                   return (
                     <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm">
                       <span className="min-w-0 flex-1 truncate font-medium">{p.name}</span>
-                      <span className="tabular-nums">{money(p.amount)}</span>
-                      <span className={cn("w-full text-right tabular-nums sm:w-36", p.state === "over" ? "text-destructive-text" : "text-muted-foreground")}>
-                        {p.state === "partial" ? `${money(p.used)} 씀` : p.state === "over" ? `${money(p.used - p.amount)} 초과` : PLANNED_STATE[p.state]}
-                        {p.state === "done" && p.used > 0 && ` · ${money(p.used)}`}
+                      <span className="tabular-nums">
+                        {money(p.used)} <span className="text-muted-foreground">/ {money(p.amount)}</span>
                       </span>
+                      {/* 다 안 쓴 동안은 아래 체크가 상태를 말해 줘서, 글자는 다 썼거나 넘었을 때만 */}
+                      {p.used >= p.amount && (
+                        <span className={cn("tabular-nums", p.state === "over" ? "text-destructive-text" : "text-muted-foreground")}>
+                          {p.state === "over" ? `${money(p.used - p.amount)} 초과` : "다 썼어요"}
+                        </span>
+                      )}
                       {p.used < p.amount && (
-                        <label className="text-muted-foreground flex w-full items-center justify-end gap-1.5 text-caption sm:w-auto">
+                        <label className="text-muted-foreground flex min-h-11 w-full items-center justify-end gap-1.5 text-caption sm:w-auto md:min-h-0">
                           <Checkbox
                             checked={row.manuallyDone}
                             onCheckedChange={async (c) => {

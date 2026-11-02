@@ -23,6 +23,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { benefitLabel, INDUSTRIES, type Benefit } from "@/lib/cards";
 import { dayLabel, fromYmd, money } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -44,7 +45,7 @@ const PERF_TIP = "카드로 쓴 금액 중 혜택 조건 계산에 인정되는 
 const md = (d: string) => `${+d.slice(5, 7)}월 ${+d.slice(8)}일`;
 
 function PerfBar({ perf, target }: { perf: number; target: number | null }) {
-  if (!target) return <p className="tabular-nums">{money(perf)}</p>;
+  if (!target) return <p className="text-title font-semibold tabular-nums">{money(perf)}</p>;
   const met = perf >= target;
   return (
     <div className="space-y-1">
@@ -61,11 +62,12 @@ function PerfBar({ perf, target }: { perf: number; target: number | null }) {
 export function CardGrid({ cards, noPayment, categories, today }: { cards: ListCard[]; noPayment: number; categories: Opt[]; today: string }) {
   const [adding, setAdding] = useState(false);
   const router = useRouter();
+  const mobile = useIsMobile();
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-2">
         <p className="text-muted-foreground text-sm">이번 달 실적과 남은 혜택 한도</p>
-        <Button onClick={() => setAdding(true)}>
+        <Button variant={mobile ? "outline" : "default"} onClick={() => setAdding(true)}>
           <Plus /> 카드 추가
         </Button>
       </div>
@@ -103,12 +105,12 @@ export function CardGrid({ cards, noPayment, categories, today }: { cards: ListC
                   </div>
                   {c.limitTotal > 0 && (
                     <p className="text-sm tabular-nums">
-                      <span className="text-muted-foreground">할인 한도</span> {money(c.limitUsed)} / {money(c.limitTotal)}
+                      <span className="text-muted-foreground">받은 혜택</span> {money(c.limitUsed)} <span className="text-muted-foreground">/ 한도</span> {money(c.limitTotal)}
                       {c.limitUsed >= c.limitTotal && <span className="text-muted-foreground"> · 다 씀</span>}
                     </p>
                   )}
-                  <p className="text-muted-foreground truncate text-sm">{targets.length ? targets.join(" · ") : "혜택을 넣으면 한도를 계산해 드려요"}</p>
-                  {stale && <p className="text-warning-text text-caption">혜택이 바뀌었는지 확인해 보세요 · 최종 확인 {md(c.card!.verifiedAt!)}</p>}
+                  <p className="text-muted-foreground truncate text-sm">{targets.length ? `혜택 · ${targets.join(", ")}` : "혜택을 넣으면 한도를 계산해 드려요"}</p>
+                  {stale && <p className="text-warning-text text-caption">혜택이 바뀌었는지 확인해 보세요 · 혜택 정보 최종 확인 {md(c.card!.verifiedAt!)}</p>}
                 </Link>
               </li>
             );
@@ -203,10 +205,10 @@ export function CardDetailView({ c, categories, today }: { c: DetailCard; catego
                         )}
                       </span>
                     </CollapsibleTrigger>
-                    <Button variant="ghost" size="icon" aria-label="혜택 고치기" onClick={() => setBenefit(b)}>
+                    <Button variant="ghost" size="icon" aria-label="혜택 고치기" className="max-md:size-11" onClick={() => setBenefit(b)}>
                       <Pencil />
                     </Button>
-                    <Button variant="ghost" size="icon" aria-label="혜택 지우기" onClick={() => remove(b)}>
+                    <Button variant="ghost" size="icon" aria-label="혜택 지우기" className="max-md:size-11" onClick={() => remove(b)}>
                       <Trash2 />
                     </Button>
                   </div>
@@ -260,7 +262,7 @@ export function CardDetailView({ c, categories, today }: { c: DetailCard; catego
         )}
         {c.card?.verifiedAt && (
           <p className={cn("text-caption", daysSince(c.card.verifiedAt, today) > STALE_DAYS ? "text-warning-text" : "text-muted-foreground")}>
-            최종 확인 {md(c.card.verifiedAt)}
+            혜택 정보 최종 확인 {md(c.card.verifiedAt)}
             {daysSince(c.card.verifiedAt, today) > STALE_DAYS && " · 혜택이 바뀌었는지 확인해 보세요"}
           </p>
         )}
@@ -346,13 +348,14 @@ function CardForm({ edit, categories, close, done }: { edit?: DetailCard; catego
       onOpenChange={(o) => !o && close()}
       title={edit ? "카드 수정" : "카드 추가"}
       footer={
-        <div className="flex w-full flex-wrap gap-2">
+        // 모바일은 다른 서랍처럼 저장이 위에서 꽉 차게
+        <div className="flex w-full gap-2 max-md:flex-col-reverse">
           {edit && (
             <Button variant="ghost" className="text-destructive-text" onClick={hide}>
               카드 숨기기
             </Button>
           )}
-          <Button className="ml-auto" disabled={!v.name.trim() || busy} onClick={save}>
+          <Button className="md:ml-auto" disabled={!v.name.trim() || busy} onClick={save}>
             {busy && <Spinner />} {edit ? "저장" : "카드 추가"}
           </Button>
         </div>
@@ -366,7 +369,7 @@ function CardForm({ edit, categories, close, done }: { edit?: DetailCard; catego
         <div className="grid grid-cols-2 gap-3">
           <Field>
             <FieldLabel htmlFor="cd-issuer">카드사</FieldLabel>
-            <Input id="cd-issuer" list="cd-issuers" maxLength={20} value={v.issuer ?? ""} onChange={(e) => set("issuer", e.target.value)} />
+            <Input id="cd-issuer" list="cd-issuers" maxLength={20} className="h-11 text-base md:h-9 md:text-sm [&::-webkit-calendar-picker-indicator]:opacity-0" value={v.issuer ?? ""} onChange={(e) => set("issuer", e.target.value)} />
             <datalist id="cd-issuers">
               {ISSUERS.map((i) => (
                 <option key={i} value={i} />
@@ -385,7 +388,7 @@ function CardForm({ edit, categories, close, done }: { edit?: DetailCard; catego
           <Field>
             <FieldLabel>결제일</FieldLabel>
             <Select value={String(v.billingDay ?? "none")} onValueChange={(d) => set("billingDay", d === "none" ? null : Number(d))}>
-              <SelectTrigger aria-label="결제일">
+              <SelectTrigger aria-label="결제일" className="w-full data-[size=default]:h-11 md:data-[size=default]:h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="max-h-72">
@@ -436,7 +439,7 @@ function CardForm({ edit, categories, close, done }: { edit?: DetailCard; catego
 /** 고르기 칩(여러 개 선택) */
 function Toggle({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <button type="button" aria-pressed={on} onClick={onClick} className={cn("rounded-full border px-3 py-1 text-sm", on ? "border-primary bg-primary text-primary-foreground" : "hover:bg-accent")}>
+    <button type="button" aria-pressed={on} onClick={onClick} className={cn("h-9 rounded-full border px-3 text-sm max-md:h-10", on ? "border-primary bg-primary text-primary-foreground" : "hover:bg-accent")}>
       {children}
     </button>
   );
@@ -542,7 +545,7 @@ function BenefitForm({ pmId, edit, close, done }: { pmId: string; edit?: Benefit
             <Input
               aria-label="혜택 크기"
               inputMode="decimal"
-              className="h-11 w-24 text-base md:h-9 md:text-sm"
+              className="h-11 min-w-0 flex-1 basis-16 text-base md:h-9 md:w-24 md:flex-none md:text-sm"
               value={v.value ?? ""}
               onChange={(e) => {
                 const n = e.target.value.replace(/[^\d.]/g, "");
@@ -620,7 +623,7 @@ function BenefitForm({ pmId, edit, close, done }: { pmId: string; edit?: Benefit
                       </div>
                     </>
                   )}
-                  <Button variant="ghost" size="icon" aria-label="구간 빼기" onClick={() => setTiers((l) => l.filter((_, j) => j !== i))}>
+                  <Button variant="ghost" size="icon" aria-label="구간 빼기" className="max-md:size-11" onClick={() => setTiers((l) => l.filter((_, j) => j !== i))}>
                     <Trash2 />
                   </Button>
                 </div>
@@ -639,8 +642,8 @@ function BenefitForm({ pmId, edit, close, done }: { pmId: string; edit?: Benefit
                 ))}
               </ToggleGroup>
               <div className="flex items-center gap-2 text-sm">
-                <Input type="time" aria-label="시작 시각" className="w-32" value={v.timeFrom} onChange={(e) => set("timeFrom", e.target.value)} />~
-                <Input type="time" aria-label="끝 시각" className="w-32" value={v.timeTo} onChange={(e) => set("timeTo", e.target.value)} />
+                <Input type="time" aria-label="시작 시각" className="w-32 h-11 text-base md:h-9 md:text-sm" value={v.timeFrom} onChange={(e) => set("timeFrom", e.target.value)} />~
+                <Input type="time" aria-label="끝 시각" className="w-32 h-11 text-base md:h-9 md:text-sm" value={v.timeTo} onChange={(e) => set("timeTo", e.target.value)} />
               </div>
             </Field>
             <Field>
@@ -653,7 +656,7 @@ function BenefitForm({ pmId, edit, close, done }: { pmId: string; edit?: Benefit
                   <Checkbox checked={v.excludeOnline} onCheckedChange={(c) => set("excludeOnline", c === true)} /> 온라인 제외
                 </label>
               </div>
-              <Input aria-label="그 밖의 제외 조건" placeholder="예: 백화점 입점 매장 제외" maxLength={200} value={v.excludeNote} onChange={(e) => set("excludeNote", e.target.value)} />
+              <Input aria-label="그 밖의 제외 조건" placeholder="예: 백화점 입점 매장 제외" maxLength={200} className="h-11 text-base md:h-9 md:text-sm" value={v.excludeNote} onChange={(e) => set("excludeNote", e.target.value)} />
             </Field>
             <Field>
               <FieldLabel htmlFor="bf-memo">메모</FieldLabel>

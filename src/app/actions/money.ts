@@ -3,7 +3,7 @@
 // 지출 입력·수정·삭제 (SCR-FIN-03). 규칙은 서비스 계층(src/server/finance.ts)에
 import { action } from "@/server/api";
 import { budgetEffect } from "@/server/budget";
-import { createCategory, createPaymentMethod, createTransaction, formData, txRepo, updateTransaction, type TxInput } from "@/server/finance";
+import { createCategory, createPaymentMethod, removeCategory, renameCategory, createTransaction, formData, txRepo, updateTransaction, type TxInput } from "@/server/finance";
 import { historyOf } from "@/server/history";
 import { once } from "@/server/idempotency";
 import { restore } from "@/server/repo";
@@ -47,6 +47,16 @@ export async function addCategory(kind: "expense" | "income", name: string) {
     const c = await createCategory(ctx, { kind, name });
     return { id: c.id, kind: c.kind, name: c.name, restraint: c.countsTowardRestraint };
   });
+}
+
+export async function editCategory(id: string, name: string) {
+  return action(async (ctx) => {
+    await renameCategory(ctx, id, name);
+  });
+}
+
+export async function deleteCategory(id: string) {
+  return action((ctx) => removeCategory(ctx, id));
 }
 
 export async function addPaymentMethod(kind: "card" | "account" | "cash" | "pay", name: string) {

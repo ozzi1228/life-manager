@@ -29,14 +29,14 @@ export function InfoTip({ label, title, children, more }: { label: string; title
         <button
           type="button"
           aria-label={`${label} 설명`}
-          className="text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-full align-middle max-md:size-11"
+          className="text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-full align-middle max-md:-m-1.5 max-md:size-11"
           onPointerEnter={() => hover(true)}
           onPointerLeave={() => hover(false)}
         >
           <Info className="size-4" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 space-y-1 text-sm" onPointerEnter={() => hover(true)} onPointerLeave={() => hover(false)}>
+      <PopoverContent className="w-72 space-y-1 text-sm break-keep" onPointerEnter={() => hover(true)} onPointerLeave={() => hover(false)}>
         {title && <p className="font-semibold">{title}</p>}
         <div className="text-muted-foreground space-y-1">{children}</div>
         {more}
@@ -52,12 +52,12 @@ export function HowToTip({ label, steps, more }: { label: string; steps: string[
         <button
           type="button"
           aria-label={`${label} 사용 방법`}
-          className="text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-full align-middle max-md:size-11"
+          className="text-muted-foreground hover:text-foreground inline-flex size-8 items-center justify-center rounded-full align-middle max-md:-m-1.5 max-md:size-11"
         >
           <CircleHelp className="size-4" />
         </button>
       </PopoverTrigger>
-      <PopoverContent className="w-72 text-sm">
+      <PopoverContent className="w-72 text-sm break-keep">
         <ol className="list-decimal space-y-1 pl-5">
           {steps.map((s) => (
             <li key={s}>{s}</li>

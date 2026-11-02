@@ -7,6 +7,8 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from "
 import { toast } from "sonner";
 import {
   addCategory,
+  deleteCategory,
+  editCategory,
   addPaymentMethod,
   addTransaction,
   editTransaction,
@@ -16,6 +18,7 @@ import {
   transactionHistory,
 } from "@/app/actions/money";
 import { buyWish, undoBuyWish } from "@/app/actions/wish";
+import { CategoryEditor } from "@/components/app/category-editor";
 import { AmountInput } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
 import { toastUndo } from "@/components/app/states";
@@ -268,7 +271,33 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
 
       <FieldGroup className="gap-4">
         <Field data-invalid={error?.field === "category" || undefined}>
-          <FieldLabel>분류</FieldLabel>
+          <div className="-my-1 flex items-center justify-between">
+            <FieldLabel>분류</FieldLabel>
+            {/* 분류 편집: 바꾼 결과를 이 창의 목록에도 바로 반영 */}
+            <CategoryEditor
+              title={type === "income" ? "수입 분류 편집" : "지출 분류 편집"}
+              items={cats.map((x) => ({ key: x.id, name: x.name }))}
+              removeNote="지난 기록은 이름 그대로 남아요"
+              onAdd={async (name) => {
+                const r = await addCategory(type, name);
+                if (r.ok) setData((d) => d && { ...d, categories: [...d.categories, r.data] });
+                return r;
+              }}
+              onRename={async (it, name) => {
+                const r = await editCategory(it.key, name);
+                if (r.ok) setData((d) => d && { ...d, categories: d.categories.map((x) => (x.id === it.key ? { ...x, name } : x)) });
+                return r;
+              }}
+              onRemove={async (it) => {
+                const r = await deleteCategory(it.key);
+                if (r.ok) {
+                  setData((d) => d && { ...d, categories: d.categories.filter((x) => x.id !== it.key) });
+                  if (categoryId === it.key) setCategoryId(null);
+                }
+                return r;
+              }}
+            />
+          </div>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="분류">
             {shownCats.map((c) => (
               <Button
@@ -298,7 +327,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
                   autoFocus
                   aria-label="새 분류 이름"
                   placeholder="새 분류 이름"
-                  className="h-9 w-36"
+                  className="h-9 w-36 max-md:h-10"
                   maxLength={20}
                   value={newCat}
                   onChange={(e) => setNewCat(e.target.value)}
@@ -321,8 +350,8 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
                   type="button"
                   role="radio"
                   aria-checked={paymentId === p.id}
-                  variant={paymentId === p.id ? "secondary" : "outline"}
-                  className={cn(chip, paymentId === p.id && "ring-primary ring-2")}
+                  variant={paymentId === p.id ? "default" : "outline"}
+                  className={chip}
                   onClick={() => setPaymentId(paymentId === p.id ? null : p.id)}
                 >
                   {p.name}
@@ -337,7 +366,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
                   autoFocus
                   aria-label="새 결제수단 이름"
                   placeholder="예: 신한카드"
-                  className="h-9 w-36"
+                  className="h-9 w-36 max-md:h-10"
                   maxLength={20}
                   value={newPm}
                   onChange={(e) => setNewPm(e.target.value)}
@@ -381,7 +410,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
           <Field orientation="horizontal" className="items-center">
             <FieldLabel className="shrink-0">큰 지출</FieldLabel>
             <Select value={linked ?? "none"} onValueChange={(v) => setPlannedId(v === "none" ? null : v)}>
-              <SelectTrigger aria-label="큰 지출 연결" className="min-w-0 flex-1">
+              <SelectTrigger aria-label="큰 지출 연결" className="min-w-0 flex-1 data-[size=default]:h-11 md:data-[size=default]:h-9">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

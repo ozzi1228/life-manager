@@ -4,8 +4,8 @@ import { and, asc, desc, eq, inArray, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
 import { uuidv7 } from "../db/id.ts";
-import { attachments, careerDocs, careerDocVersions, careerExperiences } from "../db/schema.ts";
-import { dateKey, normDate } from "../lib/career.ts";
+import { attachments, careerDocs, careerDocVersions, careerExperiences, userSettings } from "../db/schema.ts";
+import { dateKey, DEFAULT_CATEGORIES, normDate } from "../lib/career.ts";
 import { AppError } from "./errors.ts";
 import { linkImages } from "./files.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
@@ -111,11 +111,43 @@ export async function expList(ctx: Ctx) {
 export type Experience = Awaited<ReturnType<typeof expList>>[number];
 export const getExp = async (ctx: Ctx, id: string) => toExp(await expRepo.get(ctx, id));
 
-/** 지금까지 쓴 분류(많이 쓴 순) — 고르기 목록 */
+/** 분류 목록: 분류 편집에서 고친 목록(없으면 기본 목록) + 경험에 붙어 있는데 목록에 없는 것 */
 export async function expCategories(ctx: Ctx) {
-  const count = new Map<string, number>();
-  for (const e of await expList(ctx)) for (const c of e.categories) count.set(c, (count.get(c) ?? 0) + 1);
-  return [...count].sort((a, b) => b[1] - a[1]).map(([c]) => c);
+  const [row] = await db.select({ list: userSettings.expCategories }).from(userSettings).where(eq(userSettings.userId, ctx.userId));
+  const list = [...(row?.list ?? DEFAULT_CATEGORIES)];
+  for (const e of await expList(ctx)) for (const c of e.categories) if (!list.includes(c)) list.push(c);
+  return list;
+}
+
+const catName = z.string().trim().min(1, "이름을 입력해 주세요").max(20, "분류는 20자까지 쓸 수 있어요");
+async function saveCategories(ctx: Ctx, list: string[]) {
+  await db.insert(userSettings).values({ userId: ctx.userId, expCategories: list }).onConflictDoUpdate({ target: userSettings.userId, set: { expCategories: list, updatedAt: new Date() } });
+}
+// 경험에 붙은 분류를 한꺼번에 바꿈(버전을 올려 다른 기기의 오래된 수정은 충돌로 막힘). ponytail: 변경 기록(revision)은 안 남김
+const retag = (ctx: Ctx, expr: ReturnType<typeof sql>, name: string) =>
+  db
+    .update(careerExperiences)
+    .set({ categories: expr, version: sql`${careerExperiences.version} + 1`, updatedAt: new Date() })
+    .where(and(eq(careerExperiences.userId, ctx.userId), sql`${careerExperiences.deletedAt} is null`, sql`${name} = any(${careerExperiences.categories})`));
+
+export async function addExpCategory(ctx: Ctx, name: string) {
+  const n = parse(catName, name);
+  const list = await expCategories(ctx);
+  if (list.includes(n)) throw new AppError("DUPLICATE", "이미 같은 이름의 분류가 있어요");
+  await saveCategories(ctx, [...list, n]);
+}
+export async function renameExpCategory(ctx: Ctx, from: string, to: string) {
+  const n = parse(catName, to);
+  const list = await expCategories(ctx);
+  if (n === from) return;
+  if (list.includes(n)) throw new AppError("DUPLICATE", "이미 같은 이름의 분류가 있어요");
+  await saveCategories(ctx, list.map((c) => (c === from ? n : c)));
+  await retag(ctx, sql`array_replace(${careerExperiences.categories}, ${from}, ${n})`, from);
+}
+/** 지우면 그 분류가 붙은 경험에서도 빠짐(경험은 그대로) */
+export async function removeExpCategory(ctx: Ctx, name: string) {
+  await saveCategories(ctx, (await expCategories(ctx)).filter((c) => c !== name));
+  await retag(ctx, sql`array_remove(${careerExperiences.categories}, ${name})`, name);
 }
 
 // ── 문서 ──

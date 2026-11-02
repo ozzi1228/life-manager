@@ -50,9 +50,21 @@ try {
   assert.deepEqual([list[3].startText, list[3].endText], ["2019.08", "2019.10"], "날짜 글자 다듬기");
   const te = await career.getExp(A, toeic.id);
   assert.deepEqual([te.startText, te.score, te.certNo, te.star], ["2024.10.13", "930", "1234", { result: "목표 달성" }], "빈 STAR 칸은 버림");
-  assert.deepEqual([...(await career.expCategories(A))].sort(), ["IT", "교육", "어학", "인턴"].sort(), "쓴 분류 목록");
+  const used = await career.expCategories(A);
+  assert.ok(["IT", "교육", "어학", "인턴", "경력"].every((x) => used.includes(x)), "기본 목록 + 쓴 분류");
   assert.equal((await career.expList(B)).length, 0);
   assert.equal(await code(career.updateExp(B, now.id, now.version, { title: "남의 것" })), "찾을 수 없어요");
+
+  // 분류 편집: 기본 목록에서 시작, 추가·이름 바꾸기·지우기(경험에 붙은 분류도 같이)
+  assert.ok((await career.expCategories(B)).includes("경력"), "고친 적 없으면 기본 목록");
+  await career.addExpCategory(A, "방송");
+  assert.equal(await code(career.addExpCategory(A, "방송")), "이미 같은 이름의 분류가 있어요");
+  await career.renameExpCategory(A, "교육", "교육·훈련");
+  assert.deepEqual((await career.expList(A)).find((e) => e.title === "아카데미")!.categories, ["교육·훈련", "IT"], "이름 바꾸면 경험에도");
+  await career.removeExpCategory(A, "IT");
+  assert.deepEqual((await career.expList(A)).find((e) => e.title === "아카데미")!.categories, ["교육·훈련"], "지우면 경험에서도 빠짐");
+  const cats = await career.expCategories(A);
+  assert.ok(cats.includes("방송") && cats.includes("교육·훈련") && !cats.includes("IT") && !cats.includes("교육"));
 
   // 파일: 확장자와 실제 머리가 맞아야
   const pdf = Buffer.concat([Buffer.from("%PDF-1.7\n"), Buffer.alloc(200)]);
@@ -96,6 +108,7 @@ try {
   process.exitCode = 1;
 } finally {
   for (const t of [s.careerExperiences, s.careerDocs, s.careerDocVersions, s.periodNotes, s.attachments, s.revisions, s.auditLogs]) await db.delete(t).where(inArray(t.userId, users));
+  await db.delete(s.userSettings).where(inArray(s.userSettings.userId, users)); // 분류 편집 목록
   rmSync(dir, { recursive: true, force: true });
   process.exit(process.exitCode ?? 0);
 }

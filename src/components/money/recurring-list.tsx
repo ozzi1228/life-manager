@@ -32,6 +32,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { dateLabel, fromYmd, money, ymd } from "@/lib/format";
 
 export type RecurringItem = RecurringIn & {
@@ -47,10 +48,13 @@ export type RecurringItem = RecurringIn & {
 type Opt = { id: string; name: string };
 
 const md = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8))}일`;
+/** 고르기 칸 높이를 입력칸(모바일 44px·PC 36px)과 맞춤 */
+const SEL_H = "data-[size=default]:h-11 md:data-[size=default]:h-9";
 const SUGGEST = ["넷플릭스", "유튜브 프리미엄", "쿠팡 와우", "네이버플러스", "티빙", "디즈니+", "멜론", "통신비", "인터넷", "보험", "월세", "관리비"];
 
 export function RecurringList({ items, categories, payments, today }: { items: RecurringItem[]; categories: Opt[]; payments: Opt[]; today: string }) {
   const router = useRouter();
+  const mobile = useIsMobile();
   const [detail, setDetail] = useState<RecurringItem | null>(null);
   const [form, setForm] = useState<{ item?: RecurringItem; preset?: string } | null>(null);
   const live = items.filter((i) => i.status !== "ended");
@@ -91,7 +95,7 @@ export function RecurringList({ items, categories, payments, today }: { items: R
           <span className="text-muted-foreground"> · 연 환산 {money(monthSum * 12)}</span>
         </p>
         <InfoTip label="월 환산">매년·몇 개월마다·매주 나가는 돈도 한 달 기준으로 바꿔 더했어요. 해지된 것은 빼요.</InfoTip>
-        <Button className="ml-auto" onClick={() => setForm({})}>
+        <Button className="ml-auto" variant={mobile ? "outline" : "default"} onClick={() => setForm({})}>
           <Plus /> 고정 지출 추가
         </Button>
       </div>
@@ -294,7 +298,7 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
 
   const days = (
     <Select value={String(v.dayOfMonth ?? 1)} onValueChange={(d) => set("dayOfMonth", Number(d))}>
-      <SelectTrigger className="w-24" aria-label="날짜">
+      <SelectTrigger className={`w-24 ${SEL_H}`} aria-label="날짜">
         <SelectValue />
       </SelectTrigger>
       <SelectContent className="max-h-72">
@@ -309,7 +313,7 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
   );
   const months = (value: number | null, onChange: (m: number) => void, label: string) => (
     <Select value={String(value ?? 1)} onValueChange={(m) => onChange(Number(m))}>
-      <SelectTrigger className="w-24" aria-label={label}>
+      <SelectTrigger className={`w-24 ${SEL_H}`} aria-label={label}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
@@ -336,7 +340,7 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
       <FieldGroup className="gap-5">
         <Field>
           <FieldLabel htmlFor="rc-name">이름</FieldLabel>
-          <Input id="rc-name" list="rc-suggest" autoFocus={!item} maxLength={40} className="h-11 text-base md:h-9 md:text-sm" value={v.name} onChange={(e) => set("name", e.target.value)} />
+          <Input id="rc-name" list="rc-suggest" autoFocus={!item} maxLength={40} className="h-11 text-base md:h-9 md:text-sm [&::-webkit-calendar-picker-indicator]:opacity-0" value={v.name} onChange={(e) => set("name", e.target.value)} />
           <datalist id="rc-suggest">
             {SUGGEST.map((s) => (
               <option key={s} value={s} />
@@ -356,7 +360,7 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
           </FieldLabel>
           <div className="flex flex-wrap items-center gap-2">
             <Select value={v.cycle} onValueChange={(c) => set("cycle", c as RecurringIn["cycle"])}>
-              <SelectTrigger className="w-32" aria-label="주기">
+              <SelectTrigger className={`w-32 ${SEL_H}`} aria-label="주기">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -376,7 +380,7 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
             {v.cycle === "every_n_months" && (
               <>
                 <Select value={String(v.intervalMonths ?? 3)} onValueChange={(n) => set("intervalMonths", Number(n))}>
-                  <SelectTrigger className="w-24" aria-label="간격">
+                  <SelectTrigger className={`w-24 ${SEL_H}`} aria-label="간격">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -394,7 +398,7 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
             )}
             {v.cycle === "weekly" && (
               <Select value={String(v.weekday ?? 1)} onValueChange={(w) => set("weekday", Number(w))}>
-                <SelectTrigger className="w-28" aria-label="요일">
+                <SelectTrigger className={`w-28 ${SEL_H}`} aria-label="요일">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -412,7 +416,7 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
           <Field>
             <FieldLabel>결제수단</FieldLabel>
             <Select value={v.paymentMethodId ?? "none"} onValueChange={(p) => set("paymentMethodId", p === "none" ? null : p)}>
-              <SelectTrigger aria-label="결제수단">
+              <SelectTrigger aria-label="결제수단" className={`w-full ${SEL_H}`}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -428,7 +432,7 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
           <Field>
             <FieldLabel>분류</FieldLabel>
             <Select value={v.categoryId ?? "none"} onValueChange={(c) => set("categoryId", c === "none" ? null : c)}>
-              <SelectTrigger aria-label="분류">
+              <SelectTrigger aria-label="분류" className={`w-full ${SEL_H}`}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

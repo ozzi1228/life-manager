@@ -200,9 +200,9 @@ export function TrackerGrid({ data }: { data: Data }) {
     <div className="space-y-4">
       {header}
       {mobile && (
-        <div className="-mx-4 flex gap-2 overflow-x-auto px-4" role="tablist" aria-label="주">
+        <div className="grid auto-cols-fr grid-flow-col gap-1.5" role="tablist" aria-label="주">
           {weeks.map(([a, b], i) => (
-            <Button key={a} role="tab" aria-selected={week === i} size="sm" variant={week === i ? "default" : "outline"} className="rounded-full" onClick={() => setWeek(i)}>
+            <Button key={a} role="tab" aria-selected={week === i} variant={week === i ? "default" : "outline"} className="h-10 min-w-0 rounded-full px-0 text-[13px]" onClick={() => setWeek(i)}>
               {a}~{b}
             </Button>
           ))}
@@ -277,7 +277,7 @@ export function TrackerGrid({ data }: { data: Data }) {
       {mobile && (
         <div className="flex items-center justify-between">
           <p className="text-muted-foreground text-sm tabular-nums">
-            이번 달 {items.reduce((a, i) => a + doneCount(i), 0)}/{items.length * elapsed}
+            이번 달 완료 {items.reduce((a, i) => a + doneCount(i), 0)}/{items.length * elapsed}
           </p>
           <Button variant="outline" onClick={() => setEditItem("new")}>
             <Plus /> 항목 추가
@@ -302,7 +302,7 @@ function CellEditor({ item, date, cell, close, save }: { item: Item; date: strin
       size="sm"
       footer={
         <>
-          <Button variant="ghost" className="text-destructive-text" onClick={() => commit({ itemId: item.id, date, done: false, memo: null })}>
+          <Button variant="ghost" className="text-destructive-text md:mr-auto" onClick={() => commit({ itemId: item.id, date, done: false, memo: null })}>
             지우기
           </Button>
           <Button onClick={() => commit({ itemId: item.id, date, done, memo: memo.trim() || null })}>저장</Button>
@@ -375,10 +375,13 @@ function ItemEditor({ month, item, preset, used, close, done }: { month: string;
       footer={
         <>
           {item && (
-            <Button variant="ghost" className="text-destructive-text mr-auto" onClick={remove}>
+            <Button variant="ghost" className="text-destructive-text md:mr-auto" onClick={remove}>
               삭제
             </Button>
           )}
+          <Button variant="outline" onClick={close}>
+            취소
+          </Button>
           <Button disabled={!name.trim() || !color || busy} onClick={save}>
             {busy && <Spinner />} {item ? "저장" : "항목 추가"}
           </Button>
@@ -388,7 +391,7 @@ function ItemEditor({ month, item, preset, used, close, done }: { month: string;
       <div className="space-y-5">
         <Field data-invalid={!!error || undefined}>
           <FieldLabel htmlFor="item-name">이름</FieldLabel>
-          <Input id="item-name" autoFocus={!item} maxLength={60} placeholder="예: 독서 30분" className="h-11 text-base md:h-9 md:text-sm" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input id="item-name" autoFocus={!item} maxLength={60} placeholder="예: 독서, 물 마시기" className="h-11 text-base md:h-9 md:text-sm" value={name} onChange={(e) => setName(e.target.value)} />
           {error && <FieldError>{error}</FieldError>}
         </Field>
         <Field>

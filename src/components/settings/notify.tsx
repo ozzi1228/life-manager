@@ -75,6 +75,7 @@ export function NotifySection() {
         <span className="min-w-0 flex-1">
           <span className="block font-medium">이 기기에서 알림 받기</span>
           <span className="text-muted-foreground text-sm">
+            {state === "loading" && "확인하는 중이에요"}
             {state === "on" && "켜져 있어요"}
             {state === "off" && "꺼져 있어요"}
             {state === "denied" && "브라우저에서 알림이 꺼져 있어요. 브라우저 설정에서 우나의 알림을 허용해 주세요"}

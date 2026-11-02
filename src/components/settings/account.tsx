@@ -2,6 +2,7 @@
 
 // 설정 > 계정 (SCR-SET-02, 04 §8.2): 표시 이름, 아이디, 비밀번호 변경, 로그인된 기기
 // ponytail: 카카오·네이버 연결·해제, 이메일, 탈퇴는 C-14
+import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -159,9 +160,12 @@ export function AccountSection() {
         <h3 className="font-medium">로그인된 기기</h3>
         <Devices current={data?.session.token} />
       </div>
-      <details className="group rounded-lg border p-4">
-        <summary className="cursor-pointer font-medium">비밀번호 바꾸기</summary>
-        <div className="pt-4">
+      <details className="group rounded-lg border">
+        <summary className="flex cursor-pointer list-none items-center justify-between p-4 font-medium [&::-webkit-details-marker]:hidden">
+          비밀번호 바꾸기
+          <ChevronRight className="text-muted-foreground size-4 transition-transform group-open:rotate-90" />
+        </summary>
+        <div className="px-4 pb-4">
           <Password />
         </div>
       </details>
