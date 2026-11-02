@@ -347,7 +347,7 @@ export const plannedExpenses = pgTable(
   ],
 );
 
-// 카드 (06 §6.2, 14 §4.4). 결제수단(kind=card)과 1:1 — 지출 입력에서 만든 카드도 그대로 카드 목록에 나옴. 설정은 처음 고칠 때 생김
+// 카드 (06 §6.2, 14 §4.4, D-071: 혜택·실적 계산 없이 메모로). 결제수단(kind=card)과 1:1 — 지출 입력에서 만든 카드도 그대로 카드 목록에 나옴. 설정은 처음 고칠 때 생김
 export const cards = pgTable(
   "cards",
   {
@@ -356,40 +356,10 @@ export const cards = pgTable(
     issuer: text("issuer"),
     cardType: text("card_type", { enum: ["credit", "check"] }),
     billingDay: integer("billing_day"),
-    perfExcludes: jsonb("perf_excludes").$type<{ categoryIds: string[]; industries: string[] }>().notNull().default({ categoryIds: [], industries: [] }),
     annualFee: bigint("annual_fee", { mode: "number" }),
-    verifiedAt: date("verified_at"), // 혜택을 마지막으로 확인한 날
     memo: text("memo"),
   },
   (t) => [uniqueIndex("cards_payment_method").on(t.userId, t.paymentMethodId).where(sql`${t.deletedAt} is null`)],
-);
-
-// 카드 혜택 (06 §6.3). 전월 실적 구간은 jsonb 배열로
-// ponytail: 14의 benefit_tiers·benefit_limit_groups(통합 한도) 테이블 대신 구간은 jsonb, 통합 한도는 아직 없음 — 카드사 혜택에 흔해지면 추가
-export const cardBenefits = pgTable(
-  "card_benefits",
-  {
-    ...userData(),
-    cardId: uuid("card_id").notNull(),
-    targetType: text("target_type", { enum: ["merchant", "industry"] }).notNull(),
-    targets: text("targets").array().notNull(),
-    benefitType: text("benefit_type", { enum: ["discount", "point", "cashback"] }).notNull(),
-    valueType: text("value_type", { enum: ["percent", "amount"] }).notNull(),
-    value: doublePrecision("value").notNull(),
-    perTxnMax: bigint("per_txn_max", { mode: "number" }),
-    minAmount: bigint("min_amount", { mode: "number" }),
-    limitType: text("limit_type", { enum: ["amount", "count", "none"] }).notNull().default("none"),
-    monthlyLimit: bigint("monthly_limit", { mode: "number" }),
-    tiers: jsonb("tiers").$type<{ minPrevPerf: number; value?: number | null; limit?: number | null }[]>().notNull().default([]),
-    daysOfWeek: integer("days_of_week").array(),
-    timeFrom: text("time_from"), // HH:MM, 지금은 저장만(지출에 시각이 없음)
-    timeTo: text("time_to"),
-    excludeInstallment: boolean("exclude_installment").notNull().default(false),
-    excludeOnline: boolean("exclude_online").notNull().default(false),
-    excludeNote: text("exclude_note"),
-    memo: text("memo"),
-  },
-  (t) => [index("card_benefits_card").on(t.cardId).where(sql`${t.deletedAt} is null`), check("card_benefit_value_positive", sql`${t.value} > 0`)],
 );
 
 // ── 작품 기록 (08 §3, 14 §4.6) ──

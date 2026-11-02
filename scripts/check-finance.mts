@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { inArray } from "drizzle-orm";
 import { db } from "../src/db/index.ts";
-import { budgets, cardBenefits, cards, finCategories, paymentMethods, plannedExpenses, recurringPayments, revisions, transactions } from "../src/db/schema.ts";
+import { budgets, cards, finCategories, paymentMethods, plannedExpenses, recurringPayments, revisions, transactions } from "../src/db/schema.ts";
 import { AppError } from "../src/server/errors.ts";
 import { createTransaction, formData, monthTransactions, totals } from "../src/server/finance.ts";
 import type { Ctx } from "../src/server/repo.ts";
@@ -125,28 +125,21 @@ try {
   assert.ok(!(await formData(A)).categories.some((c) => c.id === extra.id), "지운 분류는 고르기 목록에서 빠짐");
   console.log("분류 편집 확인 통과");
 
-  // 카드: 지출 입력에서 만든 카드도 목록에, 실적·혜택 예상, 남의 카드 불가, 입력 검사
-  const { createCard, cardList, cardDetail, addBenefit, updateCard } = await import("../src/server/cards.ts");
+  // 카드: 지출 입력에서 만든 카드도 목록에, 메모, 남의 카드 불가, 같은 이름 불가, 숨기면 목록에서 빠짐(D-071: 혜택 계산 없음)
+  const { createCard, cardList, updateCard, hideCard } = await import("../src/server/cards.ts");
   const { createPaymentMethod } = await import("../src/server/finance.ts");
   const quick = await createPaymentMethod(A, { kind: "card", name: "빠른카드" });
-  const pmA = await createCard(A, { name: "A카드", issuer: "우나카드", cardType: "credit", billingDay: 14, perfExcludes: { categoryIds: [luxury.id], industries: [] } });
-  assert.deepEqual((await cardList(A)).cards.map((c) => c.name).sort(), ["A카드", "빠른카드"], "지출 입력에서 만든 카드도 나옴");
-  assert.equal(await code(cardDetail(B, pmA.id)), "NOT_FOUND", "남의 카드 못 봄");
-  assert.equal(await code(addBenefit(B, pmA.id, { targetType: "industry", targets: ["카페"], benefitType: "discount", valueType: "percent", value: 10 })), "NOT_FOUND", "남의 카드에 혜택 불가");
-  assert.equal(await code(addBenefit(A, pmA.id, { targetType: "industry", targets: ["카페"], benefitType: "discount", valueType: "percent", value: 150 })), "VALIDATION_FAILED", "100% 넘는 할인 불가");
-  assert.equal(await code(addBenefit(A, pmA.id, { targetType: "industry", targets: ["카페"], benefitType: "discount", valueType: "percent", value: 10, limitType: "amount" })), "VALIDATION_FAILED", "한도 종류만 있고 금액 없음");
-  await addBenefit(A, pmA.id, { targetType: "industry", targets: ["카페"], benefitType: "discount", valueType: "percent", value: 10, limitType: "amount", monthlyLimit: 5000 });
-  await addBenefit(A, quick.id, { targetType: "merchant", targets: ["CGV"], benefitType: "discount", valueType: "amount", value: 4000 });
-  await createTransaction(A, { ...base, date: today, amount: 30000, title: "스타벅스", paymentMethodId: pmA.id });
-  await createTransaction(A, { ...base, date: today, amount: 70000, title: "투썸", paymentMethodId: pmA.id });
-  await createTransaction(A, { ...base, date: today, amount: 50000, categoryId: luxury.id, paymentMethodId: pmA.id });
-  const d = await cardDetail(A, pmA.id);
-  assert.equal(d.perf, 100000, "사치 분류는 실적 제외");
-  assert.deepEqual([d.limitUsed, d.limitTotal], [5000, 5000], "10% 할인이 월 한도 5,000원에서 멈춤");
-  assert.equal(d.card?.verifiedAt, today, "혜택을 넣으면 최종 확인일이 오늘");
+  const pmA = await createCard(A, { name: "A카드", issuer: "우나카드", cardType: "credit", billingDay: 14, memo: "- 편의점 갈 때 최대 혜택" });
+  assert.deepEqual((await cardList(A)).map((c) => c.name).sort(), ["A카드", "빠른카드"], "지출 입력에서 만든 카드도 나옴");
+  assert.equal((await cardList(A)).find((c) => c.id === pmA.id)?.card?.memo, "- 편의점 갈 때 최대 혜택");
+  assert.equal((await cardList(B)).length, 0, "남의 카드 안 보임");
+  assert.equal(await code(updateCard(B, pmA.id, 1, { name: "x" })), "NOT_FOUND", "남의 카드 못 고침");
   assert.equal(await code(updateCard(A, pmA.id, 1, { name: "빠른카드" })), "DUPLICATE", "같은 이름 카드 불가");
-  const renamed = await updateCard(A, quick.id, quick.version, { name: "B카드", billingDay: 1 });
-  assert.equal(renamed.billingDay, 1);
+  const renamed = await updateCard(A, quick.id, quick.version, { name: "B카드", billingDay: 1, memo: "주유" });
+  assert.deepEqual([renamed.billingDay, renamed.memo], [1, "주유"], "설정이 없던 카드도 고치면 생김");
+  const b2 = (await cardList(A)).find((c) => c.id === quick.id)!;
+  await hideCard(A, quick.id, b2.pmVersion);
+  assert.deepEqual((await cardList(A)).map((c) => c.name), ["A카드"], "숨긴 카드는 목록에서 빠짐");
   console.log("카드 규칙 확인 통과");
 } catch (e) {
   // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄
@@ -157,7 +150,6 @@ try {
   await db.delete(recurringPayments).where(inArray(recurringPayments.userId, users));
   await db.delete(budgets).where(inArray(budgets.userId, users));
   await db.delete(cards).where(inArray(cards.userId, users));
-  await db.delete(cardBenefits).where(inArray(cardBenefits.userId, users));
   await db.delete(plannedExpenses).where(inArray(plannedExpenses.userId, users));
   await db.delete(finCategories).where(inArray(finCategories.userId, users));
   await db.delete(paymentMethods).where(inArray(paymentMethods.userId, users));

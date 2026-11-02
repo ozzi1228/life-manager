@@ -148,6 +148,13 @@
       "when": 1793597848374,
       "tag": "0020_exp_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1793603722049,
+      "tag": "0021_card_benefits_drop",
+      "breakpoints": true
     }
   ]
 }

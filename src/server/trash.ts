@@ -41,7 +41,6 @@ const SHOWN: Record<string, { area: string; name: (r: AnyRow, batch: { entity: s
   transaction: { area: "지출", name: (r) => `${r.title ?? (r.type === "income" ? "수입" : "지출")} · ${won(r.amount)}` },
   recurring_payment: { area: "고정 지출", name: (r) => `${r.name} · ${won(r.amount)}` },
   planned_expense: { area: "예산", name: (r) => `큰 지출 ${r.name}` },
-  card_benefit: { area: "카드", name: (r) => `혜택 · ${(r.targets as string[]).join(", ")}` },
   fin_category: { area: "지출", name: (r) => `${r.name} 분류` },
   payment_method: { area: "지출", name: (r) => `${r.name} 결제수단` },
   restraint_entry: { area: "참은 소비", name: (r) => `${r.name} · ${won(r.amount)}` },
