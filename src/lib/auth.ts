@@ -94,10 +94,14 @@ export const auth = betterAuth({
         if (problem) throw new APIError("BAD_REQUEST", { message: problem, code: "WEAK_PASSWORD" });
       }
     }),
-    // 보안 기록(14 §1.5): 로그인·가입·로그아웃. 사용자 데이터 내용은 남기지 않음
+    // 보안 기록(14 §1.5, 04 §8.9): 로그인·가입·로그아웃·비밀번호 변경·기기 로그아웃. 사용자 데이터 내용은 남기지 않음
     after: createAuthMiddleware(async (ctx) => {
       const event =
-        ctx.path === "/sign-in/username" ? "login.password" : ctx.path.startsWith("/callback/") ? `login.${ctx.params?.id ?? "social"}` : ctx.path === "/sign-up/email" ? "signup.password" : ctx.path === "/sign-out" ? "logout" : null;
+        ctx.path === "/sign-in/username"
+          ? "login.password"
+          : ctx.path.startsWith("/callback/")
+            ? `login.${ctx.params?.id ?? "social"}`
+            : (({ "/sign-up/email": "signup.password", "/sign-out": "logout", "/change-password": "password.change", "/revoke-session": "session.revoke", "/revoke-other-sessions": "session.revoke_others" }) as Record<string, string>)[ctx.path] ?? null;
       if (!event) return;
       const userId = ctx.context.newSession?.user.id ?? ctx.context.session?.user.id ?? null;
       const failed = ctx.context.returned instanceof Error;

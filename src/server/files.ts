@@ -3,7 +3,7 @@
 // - 변형: 썸네일 320px·본문 1280px WebP. ponytail: 원본은 보관하지 않음(Q-071 미결정 — 정해지면 원본 보관 추가)
 // - 내려받기는 소유자 확인 후 이 서버가 직접 보냄(같은 주소, 로그인 쿠키) — 서명 주소가 필요해지면 클라우드 이전 때
 import { createHash } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import sharp, { type Metadata } from "sharp";
 import { and, eq, inArray, isNull, or } from "drizzle-orm";
@@ -93,4 +93,13 @@ export async function imagesOf(ctx: Ctx, ownerType: string, ownerIds: string[]) 
   const map = new Map<string, { id: string; width: number; height: number }[]>();
   for (const r of rows.sort((a, b) => a.sort - b.sort)) map.set(r.ownerId!, [...(map.get(r.ownerId!) ?? []), { id: r.id, width: r.width, height: r.height }]);
   return map;
+}
+
+/** 영구 삭제: 사진 파일(변형 전부) 지우기. 없는 파일은 넘어감 */
+export async function removeImageFiles(storageKeys: string[]) {
+  for (const key of storageKeys) {
+    const parts = key.split("/");
+    const id = parts.at(-1)!;
+    for (const v of Object.keys(VARIANTS)) await rm(join(filesDir(), ...parts.slice(0, -1), `${id}-${v}.webp`), { force: true });
+  }
 }

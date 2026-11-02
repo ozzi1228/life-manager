@@ -1,13 +1,15 @@
 "use client";
 
-// 설정 홈 (SCR-SET-01) 1차: 화면 모드, 펫, AI 연결, 로그아웃. 나머지 하위 설정은 M-19
-import { ChevronRight, Lock, LogOut } from "lucide-react";
+// 설정 홈 (SCR-SET-01): 계정, 화면 모드, 펫, AI 연결, 휴지통·보안 기록, 로그아웃
+// ponytail: 알림(M-21)·외부 캘린더(C-08)·건강 잠금(C-15)·내보내기·탈퇴(C-14)는 그 작업에서
+import { ChevronRight, Lock, LogOut, ShieldCheck, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useTheme } from "next-themes";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Page } from "@/components/app/page-shell";
 import { PRESET_PETS, petSrc } from "@/components/pet/pet-layer";
+import { AccountSection } from "@/components/settings/account";
 import { usePetPrefs } from "@/components/pet/use-pet-prefs";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
@@ -46,6 +48,11 @@ export default function SettingsPage() {
 
   return (
     <Page narrow>
+      <section className="space-y-3">
+        <h2 className="text-subtitle font-semibold">계정</h2>
+        <AccountSection />
+      </section>
+
       <section className="space-y-3">
         <h2 className="text-subtitle font-semibold">화면</h2>
         <ToggleGroup type="single" variant="outline" value={mounted ? theme : undefined} onValueChange={(v) => v && setTheme(v)} aria-label="화면 모드">
@@ -98,6 +105,24 @@ export default function SettingsPage() {
           </span>
           <ChevronRight className="text-muted-foreground size-5" />
         </Link>
+      </section>
+
+      <section className="space-y-3">
+        <h2 className="text-subtitle font-semibold">데이터</h2>
+        {[
+          { href: "/settings/trash", icon: Trash2, title: "휴지통", desc: "지운 항목 되살리기·영구 삭제 (90일 보관)" },
+          { href: "/settings/security", icon: ShieldCheck, title: "보안 기록", desc: "로그인·비밀번호 변경·영구 삭제 기록" },
+        ].map((l) => (
+          <Link key={l.href} href={l.href} className="hover:bg-accent flex items-center gap-3 rounded-lg border p-4">
+            <l.icon className="text-muted-foreground size-5" />
+            <span className="flex-1">
+              <span className="block font-medium">{l.title}</span>
+              <span className="text-muted-foreground text-sm">{l.desc}</span>
+            </span>
+            <ChevronRight className="text-muted-foreground size-5" />
+          </Link>
+        ))}
+        <p className="text-muted-foreground text-caption">건강 기록은 암호화해 저장하고 홈·검색·AI에는 보이지 않아요.</p>
       </section>
 
       <Button

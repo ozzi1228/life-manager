@@ -1,0 +1,48 @@
+// 변경 기록 보기 (04 §8.8, 14 §1.4): 항목 하나의 만듦·고침·휴지통·복구 타임라인. 내부 필드명은 화면 이름으로
+// ponytail: 지금은 지출(수정 화면)에서만 열고, "이 상태로 되돌리기"는 아직 — 다른 영역은 라벨만 더하면 같은 함수로
+import { and, desc, eq } from "drizzle-orm";
+import { db } from "../db/index.ts";
+import { revisions } from "../db/schema.ts";
+import { nameMaps } from "./finance.ts";
+import type { Ctx } from "./repo.ts";
+
+const FIELDS: Record<string, Record<string, string>> = {
+  transaction: { amount: "금액", date: "날짜", categoryId: "분류", paymentMethodId: "결제수단", title: "내용", memo: "메모", isRefund: "환불", type: "종류", plannedExpenseId: "큰 지출" },
+};
+const ACTION = { create: "만듦", update: "고침", delete: "휴지통으로", restore: "복구" } as const;
+
+export async function historyOf(ctx: Ctx, entity: keyof typeof FIELDS, id: string) {
+  const [rows, names] = await Promise.all([
+    db
+      .select()
+      .from(revisions)
+      .where(and(eq(revisions.userId, ctx.userId), eq(revisions.entityType, entity), eq(revisions.entityId, id)))
+      .orderBy(desc(revisions.createdAt))
+      .limit(100),
+    nameMaps(ctx),
+  ]);
+  const show = (field: string, v: unknown) => {
+    if (v === null || v === undefined || v === "") return "없음";
+    if (field === "amount") return `${Number(v).toLocaleString("ko-KR")}원`;
+    if (field === "categoryId") return names.categories[String(v)] ?? "지운 분류";
+    if (field === "paymentMethodId") return names.payments[String(v)] ?? "지운 결제수단";
+    if (field === "isRefund") return v ? "예" : "아니요";
+    if (field === "type") return v === "income" ? "수입" : "지출";
+    if (field === "plannedExpenseId") return "연결됨";
+    return String(v);
+  };
+  const labels = FIELDS[entity];
+  return rows.map((r) => ({
+    id: r.id,
+    at: r.createdAt.toISOString(),
+    action: ACTION[r.action as keyof typeof ACTION] ?? r.action,
+    by: r.actor === "user" ? null : "자동",
+    changes:
+      r.action === "update"
+        ? Object.keys(r.after ?? {})
+            .filter((f) => labels[f])
+            .map((f) => ({ label: labels[f], before: show(f, (r.before as Record<string, unknown> | null)?.[f]), after: show(f, (r.after as Record<string, unknown>)[f]) }))
+        : [],
+  }));
+}
+export type HistoryEntry = Awaited<ReturnType<typeof historyOf>>[number];

@@ -1,6 +1,6 @@
 // 내 펫 (11 §5, 15 §2 /api/v1/pets) 1차: 본인 계정에서만 보이는 펫. 그림은 데이터 폴더에, 저장소(git)에는 올리지 않음
 // 지금은 scripts/import-pet.mts로 넣음. ponytail: 업로드 화면·수정·삭제는 C-03
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { asc } from "drizzle-orm";
 import { db } from "../db/index.ts";
@@ -16,6 +16,9 @@ const petDir = (userId: string, id: string) => {
   if (!root) throw new AppError("INTERNAL", "잠시 후 다시 시도해 주세요");
   return join(root, userId, "pets", id);
 };
+
+/** 영구 삭제(휴지통): 펫 그림 폴더째 */
+export const removePetFiles = (userId: string, id: string) => rm(petDir(userId, id), { recursive: true, force: true });
 
 export async function myPets(ctx: Ctx) {
   const rows = await petRepo.list(ctx, { orderBy: [asc(pets.createdAt)] });

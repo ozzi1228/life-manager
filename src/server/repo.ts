@@ -23,6 +23,8 @@ type Insert<T extends AnyTable> = Omit<T["$inferInsert"], Common>;
 type Patch<T extends AnyTable> = Partial<Insert<T>>;
 
 const registry: { entity: string; table: AnyTable }[] = [];
+/** 등록된 사용자 데이터 테이블 전부(휴지통 목록·영구 삭제용). 서비스 모듈을 불러와야 채워짐 */
+export const registeredTables = () => registry;
 
 /** 사용자 데이터 테이블 하나의 저장소. entity는 변경 이력·휴지통에 쓰는 이름(예: "transaction") */
 export function defineRepo<T extends AnyTable>(table: T, entity: string) {

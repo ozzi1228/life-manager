@@ -4,6 +4,7 @@
 import { action } from "@/server/api";
 import { budgetEffect } from "@/server/budget";
 import { createCategory, createPaymentMethod, createTransaction, formData, txRepo, updateTransaction, type TxInput } from "@/server/finance";
+import { historyOf } from "@/server/history";
 import { once } from "@/server/idempotency";
 import { restore } from "@/server/repo";
 
@@ -53,4 +54,9 @@ export async function addPaymentMethod(kind: "card" | "account" | "cash" | "pay"
     const p = await createPaymentMethod(ctx, { kind, name });
     return { id: p.id, kind: p.kind, name: p.name };
   });
+}
+
+/** 지출 변경 기록(04 §8.8) */
+export async function transactionHistory(id: string) {
+  return action((ctx) => historyOf(ctx, "transaction", id));
 }

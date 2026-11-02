@@ -13,6 +13,7 @@ import {
   expenseFormData,
   removeTransaction,
   restoreTransaction,
+  transactionHistory,
 } from "@/app/actions/money";
 import { buyWish, undoBuyWish } from "@/app/actions/wish";
 import { AmountInput } from "@/components/app/money";
@@ -30,7 +31,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { dayLabel, fromYmd, money, ymd } from "@/lib/format";
+import { dayLabel, fromYmd, money, timeLabel, ymd } from "@/lib/format";
+import type { HistoryEntry } from "@/server/history";
 import { cn } from "@/lib/utils";
 
 export type TxEdit = {
@@ -404,6 +406,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
             <Textarea aria-label="메모" maxLength={1000} value={memo} onChange={(e) => setMemo(e.target.value)} />
           </CollapsibleContent>
         </Collapsible>
+        {edit && <History id={edit.id} />}
       </FieldGroup>
 
       {error && !error.field && <p className="text-destructive-text text-sm">{error.message}</p>}
@@ -431,5 +434,44 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
         )}
       </div>
     </form>
+  );
+}
+
+/** 변경 기록(04 §8.8): 펼칠 때 불러옴 */
+function History({ id }: { id: string }) {
+  const [list, setList] = useState<HistoryEntry[] | null>(null);
+  return (
+    <Collapsible onOpenChange={(o) => o && !list && transactionHistory(id).then((r) => setList(r.ok ? r.data : []))}>
+      <CollapsibleTrigger asChild>
+        <Button type="button" variant="ghost" size="sm" className="-ml-2">
+          <ChevronDown /> 변경 기록
+        </Button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="pt-2">
+        {!list ? (
+          <Spinner />
+        ) : (
+          <ol className="space-y-2 border-l pl-3 text-sm">
+            {list.map((h) => {
+              const d = new Date(h.at);
+              return (
+                <li key={h.id}>
+                  <span className="text-muted-foreground tabular-nums">
+                    {d.getMonth() + 1}월 {d.getDate()}일 {timeLabel(d)}
+                  </span>{" "}
+                  {h.action}
+                  {h.by && <span className="text-muted-foreground"> ({h.by})</span>}
+                  {h.changes.map((c) => (
+                    <span key={c.label} className="text-muted-foreground block text-caption">
+                      {c.label} {c.before} → {c.after}
+                    </span>
+                  ))}
+                </li>
+              );
+            })}
+          </ol>
+        )}
+      </CollapsibleContent>
+    </Collapsible>
   );
 }
