@@ -6,7 +6,12 @@ import { newRequestId } from "./api.ts";
 import type { Ctx } from "./repo.ts";
 
 export async function pageCtx(): Promise<Ctx> {
+  return (await pageUser()).ctx;
+}
+
+/** 화면에 이름도 필요할 때(홈 인사말) */
+export async function pageUser() {
   const s = await auth.api.getSession({ headers: await headers() });
   if (!s) redirect("/login");
-  return { userId: s.user.id, actor: "user", requestId: newRequestId() };
+  return { ctx: { userId: s.user.id, actor: "user", requestId: newRequestId() } as Ctx, name: s.user.name };
 }

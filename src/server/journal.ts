@@ -83,3 +83,6 @@ export async function entryWithPhotos(ctx: Ctx, id: string) {
   const photos = await imagesOf(ctx, OWNER, [id]);
   return { id: r.id, version: r.version, date: r.date, topicId: r.topicId, title: r.title, bodyMd: r.bodyMd, photos: photos.get(id) ?? [] };
 }
+
+/** 최근 글 n개(날짜 순) — 홈 "최근 기록" */
+export const recentEntries = (ctx: Ctx, n: number) => entryRepo.list(ctx, { orderBy: [desc(journalEntries.date), desc(journalEntries.createdAt)], limit: n });

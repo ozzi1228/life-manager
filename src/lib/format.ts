@@ -68,3 +68,9 @@ export function monthLabel(ym: string, today = new Date()) {
   const [y, m] = ym.split("-").map(Number);
   return y === today.getFullYear() ? `${m}월` : `${y}년 ${m}월`;
 }
+
+/** 다가오는 날: 오늘·내일·모레, 그 뒤는 dayLabel */
+export function soonLabel(d: string, today: string) {
+  const diff = Math.round((fromYmd(d).getTime() - fromYmd(today).getTime()) / 86_400_000);
+  return diff === 0 ? "오늘" : diff === 1 ? "내일" : diff === 2 ? "모레" : dayLabel(d, fromYmd(today));
+}

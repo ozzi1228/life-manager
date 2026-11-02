@@ -9,7 +9,7 @@ import { AddExpenseButton } from "@/components/money/controls";
 import { MoneyTabs } from "@/components/money/money-tabs";
 import { TxList } from "@/components/money/tx-list";
 import { Button } from "@/components/ui/button";
-import { dayLabel, fromYmd, money } from "@/lib/format";
+import { money, soonLabel } from "@/lib/format";
 import { budgetView } from "@/server/budget";
 import { monthTransactions, nameMaps, todayIn, totals, toRow } from "@/server/finance";
 import { upcoming } from "@/server/recurring";
@@ -81,7 +81,7 @@ export default async function MoneyHome() {
             <ul className="space-y-1.5">
               {soon.map((u) => (
                 <li key={u.id + u.date} className="flex items-center gap-3 text-sm">
-                  <span className="text-muted-foreground w-20 shrink-0">{upLabel(u.date, today)}</span>
+                  <span className="text-muted-foreground w-20 shrink-0">{soonLabel(u.date, today)}</span>
                   <span className="min-w-0 flex-1 truncate">
                     {u.name}
                     {u.memo && <span className="text-muted-foreground"> · {u.memo.split("\n")[0]}</span>}
@@ -145,10 +145,4 @@ export default async function MoneyHome() {
       </div>
     </Page>
   );
-}
-
-// 오늘·내일·모레, 그 뒤는 날짜
-function upLabel(d: string, today: string) {
-  const diff = Math.round((fromYmd(d).getTime() - fromYmd(today).getTime()) / 86_400_000);
-  return diff === 0 ? "오늘" : diff === 1 ? "내일" : diff === 2 ? "모레" : dayLabel(d, fromYmd(today));
 }
