@@ -57,6 +57,13 @@
       "when": 1793545368281,
       "tag": "0007_budget",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1793546474198,
+      "tag": "0008_cards",
+      "breakpoints": true
     }
   ]
 }

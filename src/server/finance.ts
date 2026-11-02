@@ -131,7 +131,7 @@ async function nextSort(table: typeof finCategories | typeof paymentMethods, ctx
 }
 
 /** 같은 이름이 있으면 409(DUPLICATE). 지운 이름은 다시 쓸 수 있음(부분 고유 인덱스) */
-const dup = (e: unknown, what: string) => {
+export const dup = (e: unknown, what: string) => {
   if ((e as { cause?: { code?: string } })?.cause?.code === "23505" || (e as { code?: string })?.code === "23505")
     throw new AppError("DUPLICATE", `이미 같은 이름의 ${what}가 있어요`, { fields: [{ path: "name", rule: "unique", message: `이미 같은 이름의 ${what}가 있어요` }] });
   throw e;

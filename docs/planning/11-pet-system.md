@@ -166,7 +166,7 @@ View: {front | right side | back}, Expression: {neutral | smiling | surprised | 
 | Dialog·Sheet·Drawer·Alert Dialog 열림 | 가장자리로 이동해 sit, 알림 말풍선 보류(알림 센터에는 쌓임) |
 | 드래그 중(사용자가 목록 정렬·파일 끌기) | 따라오기 중지 |
 | 탭 비활성(visibilitychange hidden) | 애니메이션 정지(프레임 루프 중단) |
-| `prefers-reduced-motion` | 이동 없음, 대기 프레임 1장(또는 매우 느린 숨쉬기), 말풍선은 그대로 |
+| ~~`prefers-reduced-motion`~~ (D-061: 따르지 않음) | 설정 > 펫 > 움직임 "멈추기"일 때: 이동 없음, 대기 프레임 1장, 말풍선은 그대로 |
 | 절전(배터리 저전력 감지 가능 시) / 설정 `움직임 줄이기` | 이동 없음, 애니메이션 프레임률 절반 |
 | 전체 화면 에디터(일기 작성) | 펫 숨김(작성 끝나면 등장) [제안] |
 | 키보드 열림(모바일) | 펫 숨김 |

@@ -67,10 +67,9 @@ export default function SettingsPage() {
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
           <span>
             <span className="block font-medium">움직임</span>
-            <span className="text-muted-foreground text-sm">기기에서 애니메이션을 끄면 펫도 멈춰요</span>
+            <span className="text-muted-foreground text-sm">멈추면 그 자리에 가만히 있어요</span>
           </span>
           <ToggleGroup type="single" variant="outline" size="sm" value={prefs.motion} disabled={!loaded} onValueChange={(v) => v && update({ motion: v as typeof prefs.motion })} aria-label="펫 움직임">
-            <ToggleGroupItem value="system">기기 설정</ToggleGroupItem>
             <ToggleGroupItem value="on">움직이기</ToggleGroupItem>
             <ToggleGroupItem value="off">멈추기</ToggleGroupItem>
           </ToggleGroup>

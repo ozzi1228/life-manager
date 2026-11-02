@@ -5,9 +5,9 @@
 import { useEffect, useState } from "react";
 
 const KEY = "oona.pet-prefs";
-// motion: 기기 설정 따르기(움직임 줄이기면 멈춤, 11 §6) / 움직이기 / 멈추기(11 §9 "움직임")
-export type PetPrefs = { petId: string; visible: boolean; motion: "system" | "on" | "off" };
-const DEFAULTS: PetPrefs = { petId: "meongi", visible: true, motion: "system" };
+// motion: 움직이기(기본) / 멈추기(11 §9 "움직임"). 기기의 움직임 줄이기 설정은 따르지 않음(사용자 결정 2026-11-02)
+export type PetPrefs = { petId: string; visible: boolean; motion: "on" | "off" };
+const DEFAULTS: PetPrefs = { petId: "meongi", visible: true, motion: "on" };
 
 export function usePetPrefs() {
   const [prefs, setPrefs] = useState<PetPrefs>(DEFAULTS);
@@ -17,7 +17,7 @@ export function usePetPrefs() {
     const load = () => {
       try {
         const saved = JSON.parse(localStorage.getItem(KEY) ?? "null");
-        if (saved) setPrefs({ ...DEFAULTS, ...saved });
+        if (saved) setPrefs({ ...DEFAULTS, ...saved, motion: saved.motion === "off" ? "off" : "on" });
       } catch {
         // 저장소를 쓸 수 없으면 기본값
       }
