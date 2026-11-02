@@ -483,3 +483,47 @@ export const restraintMonths = pgTable(
   },
   (t) => [uniqueIndex("restraint_months_month").on(t.userId, t.month).where(sql`${t.deletedAt} is null`)],
 );
+
+// ── 일정 (07, 14 §4.5) ──
+// 내 캘린더 여러 개(이름·색·보이기). 외부 캘린더 연결(C-08)이 붙으면 kind·external_calendar_id 추가
+export const calendars = pgTable("calendars", {
+  ...userData(),
+  name: text("name").notNull(),
+  colorHex: text("color_hex").notNull(),
+  isVisible: boolean("is_visible").notNull().default(true),
+  sort: integer("sort").notNull().default(0),
+});
+
+// 일정: 날짜 + (종일이 아니면) 시각. 반복은 RRULE 문자열(src/lib/calendar.ts)
+// ponytail: 시각은 사용자 시간대 벽시계 값(tz 열에 시간대). 알림(P1)·구글 연동(C-08)이 붙으면 UTC 시각 열 추가
+export const events = pgTable(
+  "events",
+  {
+    ...userData(),
+    calendarId: uuid("calendar_id").notNull(),
+    title: text("title").notNull(),
+    allDay: boolean("all_day").notNull().default(false),
+    startDate: date("start_date").notNull(),
+    startTime: text("start_time"), // HH:MM
+    endDate: date("end_date").notNull(),
+    endTime: text("end_time"),
+    tz: text("tz").notNull().default("Asia/Seoul"),
+    rrule: text("rrule"),
+    location: text("location"),
+    memo: text("memo"),
+  },
+  (t) => [index("events_user_start").on(t.userId, t.startDate).where(sql`${t.deletedAt} is null`), check("events_dates", sql`${t.startDate} <= ${t.endDate}`)],
+);
+
+// 반복 회차 예외: 이 회차만 고침(modified, 바뀐 값) / 이 회차만 지움(cancelled)
+export const eventExceptions = pgTable(
+  "event_exceptions",
+  {
+    ...userData(),
+    eventId: uuid("event_id").notNull(),
+    originalDate: date("original_date").notNull(),
+    kind: text("kind", { enum: ["modified", "cancelled"] }).notNull(),
+    override: jsonb("override").$type<Record<string, unknown>>(),
+  },
+  (t) => [uniqueIndex("event_exceptions_occurrence").on(t.eventId, t.originalDate).where(sql`${t.deletedAt} is null`)],
+);
