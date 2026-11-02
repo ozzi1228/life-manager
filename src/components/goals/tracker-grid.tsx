@@ -1,6 +1,6 @@
 "use client";
 
-// 월간 트래커 (SCR-GOAL-02, 04 §5.1): 항목 × 날짜 색 칸. 누르면 색이 채워지고, 메모는 칸 안 글자로
+// 습관 트래커 (SCR-GOAL-02, 04 §5.1): 항목 × 날짜 색 칸. 누르면 색이 채워지고, 메모는 칸 안 글자로
 // PC: 한 달 전체 · 모바일: 7일 창. 칸 메모는 PC 두 번 클릭(또는 Enter), 모바일 길게 누르기
 import { Check, GripVertical, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";

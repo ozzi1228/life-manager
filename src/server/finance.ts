@@ -30,7 +30,7 @@ async function ensureDefaults(ctx: Ctx) {
   });
 }
 
-/** 입력 화면용: 분류(최근 쓴 순 → 기본 순서), 결제수단(최근 쓴 순), 마지막 쓴 결제수단 */
+/** 입력 화면용: 분류(분류 편집에서 정한 순서), 결제수단(최근 쓴 순), 마지막 쓴 결제수단 */
 export async function formData(ctx: Ctx) {
   await ensureDefaults(ctx);
   const since = new Date(Date.now() - 90 * 86_400_000).toISOString().slice(0, 10);
@@ -40,10 +40,9 @@ export async function formData(ctx: Ctx) {
       .from(transactions)
       .where(and(eq(transactions.userId, ctx.userId), isNull(transactions.deletedAt), gte(transactions.date, since)))
       .groupBy(col);
-  const [cats, pms, catUse, pmUse, planned] = await Promise.all([
+  const [cats, pms, pmUse, planned] = await Promise.all([
     categoryRepo.list(ctx, { where: eq(finCategories.isHidden, false), orderBy: [asc(finCategories.sort)] }),
     paymentRepo.list(ctx, { where: eq(paymentMethods.isHidden, false), orderBy: [asc(paymentMethods.sort), asc(paymentMethods.createdAt)] }),
-    lastUse(transactions.categoryId),
     lastUse(transactions.paymentMethodId),
     plannedRepo.list(ctx, { where: gte(plannedExpenses.month, since.slice(0, 7)), orderBy: [asc(plannedExpenses.createdAt)] }),
   ]);
@@ -53,7 +52,7 @@ export async function formData(ctx: Ctx) {
   const pmRecent = recent(pmUse);
   const orderedPm = byRecent(pms, pmRecent);
   return {
-    categories: byRecent(cats, recent(catUse)).map((c) => ({ id: c.id, kind: c.kind, name: c.name, restraint: c.countsTowardRestraint })),
+    categories: cats.map((c) => ({ id: c.id, kind: c.kind, name: c.name, restraint: c.countsTowardRestraint })),
     paymentMethods: orderedPm.map((p) => ({ id: p.id, kind: p.kind, name: p.name })),
     lastPaymentMethodId: pmRecent.size ? orderedPm[0]?.id ?? null : null,
     planned: planned.map((p) => ({ id: p.id, month: p.month, name: p.name })),
@@ -155,6 +154,14 @@ export async function removeCategory(ctx: Ctx, id: string) {
   const left = await categoryRepo.list(ctx, { where: eq(finCategories.kind, cur.kind) });
   if (left.length <= 1) throw new AppError("VALIDATION_FAILED", "분류가 하나는 있어야 해요");
   await categoryRepo.remove(ctx, id);
+}
+
+/** 분류 편집: 순서 바꾸기(받은 순서대로 sort를 다시 매김) */
+export async function reorderCategories(ctx: Ctx, ids: string[]) {
+  if (ids.length > 200) throw new AppError("VALIDATION_FAILED", "순서를 저장할 수 없어요");
+  await db.transaction(async (tx) => {
+    for (const [i, id] of ids.entries()) await tx.update(finCategories).set({ sort: i + 1, updatedAt: new Date() }).where(and(eq(finCategories.id, id), eq(finCategories.userId, ctx.userId)));
+  });
 }
 
 export async function createPaymentMethod(ctx: Ctx, input: unknown) {

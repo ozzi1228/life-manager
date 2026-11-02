@@ -50,21 +50,30 @@ try {
   assert.deepEqual([list[3].startText, list[3].endText], ["2019.08", "2019.10"], "날짜 글자 다듬기");
   const te = await career.getExp(A, toeic.id);
   assert.deepEqual([te.startText, te.score, te.certNo, te.star], ["2024.10.13", "930", "1234", { result: "목표 달성" }], "빈 STAR 칸은 버림");
-  const used = await career.expCategories(A);
+  const used = (await career.expCategories(A)).map((x) => x.name);
   assert.ok(["IT", "교육", "어학", "인턴", "경력"].every((x) => used.includes(x)), "기본 목록 + 쓴 분류");
   assert.equal((await career.expList(B)).length, 0);
   assert.equal(await code(career.updateExp(B, now.id, now.version, { title: "남의 것" })), "찾을 수 없어요");
 
   // 분류 편집: 기본 목록에서 시작, 추가·이름 바꾸기·지우기(경험에 붙은 분류도 같이)
-  assert.ok((await career.expCategories(B)).includes("경력"), "고친 적 없으면 기본 목록");
+  assert.ok((await career.expCategories(B)).some((x) => x.name === "경력"), "고친 적 없으면 기본 목록");
   await career.addExpCategory(A, "방송");
   assert.equal(await code(career.addExpCategory(A, "방송")), "이미 같은 이름의 분류가 있어요");
   await career.renameExpCategory(A, "교육", "교육·훈련");
   assert.deepEqual((await career.expList(A)).find((e) => e.title === "아카데미")!.categories, ["교육·훈련", "IT"], "이름 바꾸면 경험에도");
   await career.removeExpCategory(A, "IT");
   assert.deepEqual((await career.expList(A)).find((e) => e.title === "아카데미")!.categories, ["교육·훈련"], "지우면 경험에서도 빠짐");
-  const cats = await career.expCategories(A);
-  assert.ok(cats.includes("방송") && cats.includes("교육·훈련") && !cats.includes("IT") && !cats.includes("교육"));
+  const names = (await career.expCategories(A)).map((x) => x.name);
+  assert.ok(names.includes("방송") && names.includes("교육·훈련") && !names.includes("IT") && !names.includes("교육"));
+  // 순서·색·보일 칸
+  await career.reorderExpCategories(A, ["방송", "자격증"]);
+  assert.deepEqual((await career.expCategories(A)).slice(0, 2).map((x) => x.name), ["방송", "자격증"], "순서 바꾸기");
+  assert.deepEqual((await career.expCategories(A)).find((x) => x.name === "자격증")!.sections, ["cert"], "자격증은 자격·점수 칸만");
+  await career.setExpCategory(A, "방송", { color: "#ff8a65", sections: ["content"] });
+  const bc = (await career.expCategories(A)).find((x) => x.name === "방송")!;
+  assert.deepEqual([bc.color, bc.sections], ["#FF8A65", ["content"]]);
+  assert.equal(await code(career.setExpCategory(A, "방송", { color: "red" })), "색을 다시 골라 주세요");
+  assert.equal(await code(career.setExpCategory(A, "없는 분류", { color: null })), "찾을 수 없어요");
 
   // 파일: 확장자와 실제 머리가 맞아야
   const pdf = Buffer.concat([Buffer.from("%PDF-1.7\n"), Buffer.alloc(200)]);

@@ -1,6 +1,6 @@
 "use client";
 
-// 홈 · 오늘의 목표 (04 §3.1): 트래커 항목마다 오늘 칸 하나. 누르면 바로 색이 채워지고 저장(트래커와 같은 칸)
+// 홈 · 오늘의 습관 (04 §3.1): 트래커 항목마다 오늘 칸 하나. 누르면 바로 색이 채워지고 저장(트래커와 같은 칸)
 import { Check } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";

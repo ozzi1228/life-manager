@@ -1,8 +1,17 @@
 // 커리어 화면 규칙: 경험 유형·문서 종류 이름, 링크·파일의 형식 이름(Notion·PDF·Word·PPT…). 서버·화면 공용
 /** 분류 고르기 기본 목록(사용자가 쓴 분류가 먼저, 그다음 이것) */
 export const DEFAULT_CATEGORIES = ["경력", "인턴", "아르바이트", "프로젝트", "교육", "대외활동", "동아리", "자격증", "어학", "수상", "봉사"];
-/** 이 분류가 붙으면 자격·점수 칸을 펼쳐 둠 */
-export const CERT_CATEGORIES = ["자격증", "어학"];
+/** 경험 양식에서 분류에 따라 보이고 숨는 칸(기본·비고·링크는 늘 보임) */
+export const EXP_SECTIONS = [
+  { value: "content", label: "내용" },
+  { value: "star", label: "STAR" },
+  { value: "cert", label: "자격·점수" },
+] as const;
+export type ExpSection = (typeof EXP_SECTIONS)[number]["value"];
+/** 분류 하나의 설정(분류 편집에서 고침): 이름·색·보일 칸 */
+export type ExpCategory = { name: string; color: string | null; sections: ExpSection[] };
+/** 처음 보일 칸: 자격증·어학은 자격·점수만, 교육은 내용만, 나머지는 내용·STAR */
+export const defaultSections = (name: string): ExpSection[] => (["자격증", "어학"].includes(name) ? ["cert"] : name === "교육" ? ["content"] : ["content", "star"]);
 
 /** "2024.6.1", "2024-06", "2024년 6월 1일" → "2024.06.01" / "2024.06". 없는 날이면 null */
 export function normDate(text: string | null | undefined) {

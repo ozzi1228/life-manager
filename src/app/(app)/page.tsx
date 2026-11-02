@@ -1,4 +1,4 @@
-// 홈 (SCR-HOME, 04 §3.1): 인사 + 위젯(고정 구성) — 오늘 일정, 오늘의 목표(칸 체크), 이번 달 예산, 다가오는 결제, 최근 기록
+// 홈 (SCR-HOME, 04 §3.1): 인사 + 위젯(고정 구성) — 오늘 일정, 오늘의 습관(칸 체크), 이번 달 예산, 다가오는 결제, 최근 기록
 // 건강 등 민감 정보는 홈에 내보내지 않음(10 §7)
 // ponytail: 홈 편집(위젯 켜기·끄기·순서, P1)·위젯별 따로 불러오기는 아직 — 한 번에 불러옴
 import { BookOpen, ChevronRight, Film, NotebookPen, StickyNote, Tv } from "lucide-react";
@@ -112,7 +112,7 @@ export default async function Home() {
           )}
         </Widget>
 
-        <Widget title="오늘의 목표" href="/goals">
+        <Widget title="오늘의 습관" href="/goals/habits">
           {tracker.items.length ? (
             <TodayGoals
               items={tracker.items.map((i) => ({ id: i.id, name: i.name, colorHex: i.colorHex }))}
@@ -124,7 +124,7 @@ export default async function Home() {
             <div className="space-y-2">
               <p className="text-muted-foreground text-sm">매일 할 일을 트래커에 추가해 보세요</p>
               <Button asChild size="sm" variant="outline">
-                <Link href="/goals">항목 추가</Link>
+                <Link href="/goals/habits">항목 추가</Link>
               </Button>
             </div>
           )}

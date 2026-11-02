@@ -1,6 +1,6 @@
 "use server";
 
-// 목표·월간 트래커 화면 동작 (SCR-GOAL-02~07). 규칙은 src/server/goals.ts
+// 목표·습관 트래커 화면 동작 (SCR-GOAL-02~07). 규칙은 src/server/goals.ts
 import { action } from "@/server/api";
 import {
   addItem,

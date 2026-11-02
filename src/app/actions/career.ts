@@ -2,7 +2,7 @@
 
 // 커리어: 경험 정리·문서 버전 (규칙은 src/server/career.ts)
 import { action } from "@/server/api";
-import { addExpCategory, createDoc, createExp, removeExpCategory, renameExpCategory, expRepo, removeDoc, saveVersion, updateDoc, updateExp, versionRepo, type DocInput, type ExpInput, type VersionInput } from "@/server/career";
+import { addExpCategory, createDoc, createExp, removeExpCategory, renameExpCategory, reorderExpCategories, setExpCategory, expRepo, removeDoc, saveVersion, updateDoc, updateExp, versionRepo, type DocInput, type ExpInput, type VersionInput } from "@/server/career";
 import { once } from "@/server/idempotency";
 import { restore } from "@/server/repo";
 
@@ -60,4 +60,10 @@ export async function renameExpCat(from: string, to: string) {
 }
 export async function removeExpCat(name: string) {
   return action((ctx) => removeExpCategory(ctx, name));
+}
+export async function reorderExpCats(names: string[]) {
+  return action((ctx) => reorderExpCategories(ctx, names));
+}
+export async function setExpCat(name: string, patch: { color?: string | null; sections?: string[] }) {
+  return action((ctx) => setExpCategory(ctx, name, patch));
 }

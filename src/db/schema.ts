@@ -84,8 +84,8 @@ export const userSettings = pgTable("user_settings", {
   onboardedAt: at("onboarded_at"),
   // 알림 끄기(04 §8.4): false인 종류만 저장. 없으면 켜짐 — payment(결제 하루 전)·budget(예산 80%·초과)·restraint(월 정산 결과)
   // 메뉴·탭 순서(끌어 바꾼 것만): "main" = 사이드바·하단 탭, 그 밖은 탭 묶음의 첫 주소(예: "/money") → 주소 순서
-  // 경험 분류 목록(분류 편집에서 고친 것). null이면 기본 목록(src/lib/career.ts DEFAULT_CATEGORIES)
-  expCategories: jsonb("exp_categories").$type<string[]>(),
+  // 경험 분류 목록(분류 편집에서 고친 것: 순서·이름·색·보일 칸). null이면 기본 목록(src/lib/career.ts DEFAULT_CATEGORIES). 예전 모양(이름만)도 읽음
+  expCategories: jsonb("exp_categories").$type<(string | { name: string; color?: string | null; sections?: ("content" | "star" | "cert")[] })[]>(),
   navOrder: jsonb("nav_order").$type<Record<string, string[]>>().notNull().default({}),
   notify: jsonb("notify").$type<Partial<Record<"payment" | "budget" | "restraint", boolean>>>().notNull().default({}),
   updatedAt: at("updated_at").notNull().defaultNow(),

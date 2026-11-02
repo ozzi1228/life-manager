@@ -39,14 +39,14 @@
 │   ├─ ?event=<id>                  SCR-CAL-02   일정 상세 (PC 오른쪽 패널 / 모바일 Drawer)
 │   ├─ ?new=1                       SCR-CAL-03   일정 추가·수정 (Dialog / Drawer)
 │   └─ /calendar/connections        SCR-CAL-04   외부 캘린더 연결 (설정과 공유)
-├─ /goals                           SCR-GOAL-01  목표 (탭: 월간 · 전체 목표 · 연도별)
-│   ├─ /goals/tracker/<yyyy-mm>     SCR-GOAL-02  월간 트래커
-│   │   └─ 셀 편집                  SCR-GOAL-03  셀 메모 Popover / Drawer
-│   │   └─ 항목 관리                SCR-GOAL-04  트래커 항목 추가·색상 Dialog
-│   ├─ /goals/list                  SCR-GOAL-05  전체 목표 (단기·중기·장기 필터)
+├─ /goals                           SCR-GOAL-05  목표 · 전체 목표 (탭: 전체 목표 · 연도별 · 달성 · 습관 트래커, D-069)
 │   │   └─ ?goal=<id>               SCR-GOAL-06  목표 상세 (Sheet / 전체 화면)
 │   │   └─ ?new=1                   SCR-GOAL-07  목표 추가·수정 Dialog / Drawer
-│   ├─ /goals/year/<yyyy>           SCR-GOAL-08  연도별 목표
+│   ├─ /goals/year                  SCR-GOAL-08  연도별 목표 (모든 해를 한 화면에, 올해로 스크롤)
+│   ├─ /goals/done                  —            달성한 목표 (달성한 해별)
+│   ├─ /goals/habits?month=         SCR-GOAL-02  습관 트래커
+│   │   └─ 셀 편집                  SCR-GOAL-03  셀 메모 Popover / Drawer
+│   │   └─ 항목 관리                SCR-GOAL-04  트래커 항목 추가·색상 Dialog
 │   └─ 카테고리 관리                SCR-GOAL-09  Dialog
 ├─ /money                           SCR-FIN-01   자산 · 한눈에
 │   ├─ /money/expenses              SCR-FIN-02   지출 목록

@@ -9,6 +9,7 @@ import {
   addCategory,
   deleteCategory,
   editCategory,
+  reorderCategory,
   addPaymentMethod,
   addTransaction,
   editTransaction,
@@ -271,33 +272,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
 
       <FieldGroup className="gap-4">
         <Field data-invalid={error?.field === "category" || undefined}>
-          <div className="-my-1 flex items-center justify-between">
-            <FieldLabel>분류</FieldLabel>
-            {/* 분류 편집: 바꾼 결과를 이 창의 목록에도 바로 반영 */}
-            <CategoryEditor
-              title={type === "income" ? "수입 분류 편집" : "지출 분류 편집"}
-              items={cats.map((x) => ({ key: x.id, name: x.name }))}
-              removeNote="지난 기록은 이름 그대로 남아요"
-              onAdd={async (name) => {
-                const r = await addCategory(type, name);
-                if (r.ok) setData((d) => d && { ...d, categories: [...d.categories, r.data] });
-                return r;
-              }}
-              onRename={async (it, name) => {
-                const r = await editCategory(it.key, name);
-                if (r.ok) setData((d) => d && { ...d, categories: d.categories.map((x) => (x.id === it.key ? { ...x, name } : x)) });
-                return r;
-              }}
-              onRemove={async (it) => {
-                const r = await deleteCategory(it.key);
-                if (r.ok) {
-                  setData((d) => d && { ...d, categories: d.categories.filter((x) => x.id !== it.key) });
-                  if (categoryId === it.key) setCategoryId(null);
-                }
-                return r;
-              }}
-            />
-          </div>
+          <FieldLabel>분류</FieldLabel>
           <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="분류">
             {shownCats.map((c) => (
               <Button
@@ -335,6 +310,36 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
                   onBlur={createCategory}
                 />
               ))}
+            {/* 분류 편집: 칩 줄 끝. 바꾼 결과를 이 창의 목록에도 바로 반영 */}
+            <CategoryEditor
+              title={type === "income" ? "수입 분류 편집" : "지출 분류 편집"}
+              items={cats.map((x) => ({ key: x.id, name: x.name }))}
+              removeNote="지난 기록은 이름 그대로 남아요"
+              className="h-9"
+              onReorder={async (keys) => {
+                const r = await reorderCategory(keys);
+                if (r.ok) setData((d) => d && { ...d, categories: [...d.categories].sort((x, y) => keys.indexOf(x.id) - keys.indexOf(y.id)) });
+                return r;
+              }}
+              onAdd={async (name) => {
+                const r = await addCategory(type, name);
+                if (r.ok) setData((d) => d && { ...d, categories: [...d.categories, r.data] });
+                return r;
+              }}
+              onRename={async (it, name) => {
+                const r = await editCategory(it.key, name);
+                if (r.ok) setData((d) => d && { ...d, categories: d.categories.map((x) => (x.id === it.key ? { ...x, name } : x)) });
+                return r;
+              }}
+              onRemove={async (it) => {
+                const r = await deleteCategory(it.key);
+                if (r.ok) {
+                  setData((d) => d && { ...d, categories: d.categories.filter((x) => x.id !== it.key) });
+                  if (categoryId === it.key) setCategoryId(null);
+                }
+                return r;
+              }}
+            />
           </div>
           {picked?.restraint && <p className="text-muted-foreground text-caption">이 분류에 쓴 돈만큼 참은 소비를 채워야 해요</p>}
           {error?.field === "category" && <FieldError>{error.message}</FieldError>}

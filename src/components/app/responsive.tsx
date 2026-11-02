@@ -63,7 +63,8 @@ export function ResponsiveModal({ open, onOpenChange, title, description, footer
   if (mobile)
     return (
       <Drawer open={open} onOpenChange={change} repositionInputs={false}>
-        <DrawerContent className="max-h-[90vh]">
+        {/* 열 때 첫 칸으로 저절로 가지 않게(휴대폰 키보드가 갑자기 뜨지 않게). autoFocus를 준 칸은 그대로 */}
+        <DrawerContent className="max-h-[90vh]" onOpenAutoFocus={(e) => e.preventDefault()}>
           <DrawerHeader className="text-left">
             <DrawerTitle>{title}</DrawerTitle>
             {description && <DrawerDescription>{description}</DrawerDescription>}

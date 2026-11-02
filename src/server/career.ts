@@ -5,7 +5,7 @@ import { z } from "zod";
 import { db } from "../db/index.ts";
 import { uuidv7 } from "../db/id.ts";
 import { attachments, careerDocs, careerDocVersions, careerExperiences, userSettings } from "../db/schema.ts";
-import { dateKey, DEFAULT_CATEGORIES, normDate } from "../lib/career.ts";
+import { dateKey, DEFAULT_CATEGORIES, defaultSections, EXP_SECTIONS, normDate, type ExpCategory } from "../lib/career.ts";
 import { AppError } from "./errors.ts";
 import { linkImages } from "./files.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
@@ -111,16 +111,24 @@ export async function expList(ctx: Ctx) {
 export type Experience = Awaited<ReturnType<typeof expList>>[number];
 export const getExp = async (ctx: Ctx, id: string) => toExp(await expRepo.get(ctx, id));
 
-/** 분류 목록: 분류 편집에서 고친 목록(없으면 기본 목록) + 경험에 붙어 있는데 목록에 없는 것 */
-export async function expCategories(ctx: Ctx) {
+/** 분류 목록(순서대로): 분류 편집에서 고친 목록(없으면 기본 목록) + 경험에 붙어 있는데 목록에 없는 것 */
+export async function expCategories(ctx: Ctx): Promise<ExpCategory[]> {
   const [row] = await db.select({ list: userSettings.expCategories }).from(userSettings).where(eq(userSettings.userId, ctx.userId));
-  const list = [...(row?.list ?? DEFAULT_CATEGORIES)];
-  for (const e of await expList(ctx)) for (const c of e.categories) if (!list.includes(c)) list.push(c);
+  const cat = (x: string | Partial<ExpCategory>): ExpCategory => {
+    const o = typeof x === "string" ? { name: x } : x;
+    return { name: o.name!, color: o.color ?? null, sections: o.sections ?? defaultSections(o.name!) };
+  };
+  const list = (row?.list ?? DEFAULT_CATEGORIES).map(cat);
+  for (const e of await expList(ctx)) for (const c of e.categories) if (!list.some((x) => x.name === c)) list.push(cat(c));
   return list;
 }
 
 const catName = z.string().trim().min(1, "이름을 입력해 주세요").max(20, "분류는 20자까지 쓸 수 있어요");
-async function saveCategories(ctx: Ctx, list: string[]) {
+const catPatch = z.object({
+  color: z.string().regex(/^#[0-9A-F]{6}$/i, "색을 다시 골라 주세요").nullable().optional(),
+  sections: z.array(z.enum(EXP_SECTIONS.map((x) => x.value) as ["content", "star", "cert"])).optional(),
+});
+async function saveCategories(ctx: Ctx, list: ExpCategory[]) {
   await db.insert(userSettings).values({ userId: ctx.userId, expCategories: list }).onConflictDoUpdate({ target: userSettings.userId, set: { expCategories: list, updatedAt: new Date() } });
 }
 // 경험에 붙은 분류를 한꺼번에 바꿈(버전을 올려 다른 기기의 오래된 수정은 충돌로 막힘). ponytail: 변경 기록(revision)은 안 남김
@@ -133,21 +141,39 @@ const retag = (ctx: Ctx, expr: ReturnType<typeof sql>, name: string) =>
 export async function addExpCategory(ctx: Ctx, name: string) {
   const n = parse(catName, name);
   const list = await expCategories(ctx);
-  if (list.includes(n)) throw new AppError("DUPLICATE", "이미 같은 이름의 분류가 있어요");
-  await saveCategories(ctx, [...list, n]);
+  if (list.some((x) => x.name === n)) throw new AppError("DUPLICATE", "이미 같은 이름의 분류가 있어요");
+  await saveCategories(ctx, [...list, { name: n, color: null, sections: defaultSections(n) }]);
 }
 export async function renameExpCategory(ctx: Ctx, from: string, to: string) {
   const n = parse(catName, to);
   const list = await expCategories(ctx);
   if (n === from) return;
-  if (list.includes(n)) throw new AppError("DUPLICATE", "이미 같은 이름의 분류가 있어요");
-  await saveCategories(ctx, list.map((c) => (c === from ? n : c)));
+  if (list.some((x) => x.name === n)) throw new AppError("DUPLICATE", "이미 같은 이름의 분류가 있어요");
+  await saveCategories(ctx, list.map((x) => (x.name === from ? { ...x, name: n } : x)));
   await retag(ctx, sql`array_replace(${careerExperiences.categories}, ${from}, ${n})`, from);
 }
 /** 지우면 그 분류가 붙은 경험에서도 빠짐(경험은 그대로) */
 export async function removeExpCategory(ctx: Ctx, name: string) {
-  await saveCategories(ctx, (await expCategories(ctx)).filter((c) => c !== name));
+  await saveCategories(ctx, (await expCategories(ctx)).filter((x) => x.name !== name));
   await retag(ctx, sql`array_remove(${careerExperiences.categories}, ${name})`, name);
+}
+/** 순서 바꾸기: 받은 이름 순서대로, 빠진 이름은 원래 순서로 뒤에 */
+export async function reorderExpCategories(ctx: Ctx, names: string[]) {
+  const list = await expCategories(ctx);
+  const rank = (n: string) => (names.includes(n) ? names.indexOf(n) : names.length + list.findIndex((x) => x.name === n));
+  await saveCategories(ctx, [...list].sort((a, b) => rank(a.name) - rank(b.name)));
+}
+/** 색·보일 칸 바꾸기 */
+export async function setExpCategory(ctx: Ctx, name: string, patch: unknown) {
+  const v = parse(catPatch, patch);
+  const list = await expCategories(ctx);
+  if (!list.some((x) => x.name === name)) throw new AppError("NOT_FOUND", "찾을 수 없어요");
+  const next = (x: ExpCategory): ExpCategory => ({
+    ...x,
+    ...(v.color !== undefined && { color: v.color?.toUpperCase() ?? null }),
+    ...(v.sections && { sections: v.sections }),
+  });
+  await saveCategories(ctx, list.map((x) => (x.name === name ? next(x) : x)));
 }
 
 // ── 문서 ──

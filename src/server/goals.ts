@@ -1,4 +1,4 @@
-// 목표·월간 트래커 서비스 (docs/planning/05, 15 §5)
+// 목표·습관 트래커 서비스 (docs/planning/05, 15 §5)
 import { and, asc, eq, gte, inArray, isNull, lte, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";

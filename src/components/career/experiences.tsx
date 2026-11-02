@@ -3,7 +3,14 @@
 // 커리어 · 경험 정리 (D-064): 취업 준비에서 흔히 쓰는 경험 정리 양식
 // 기본(경험명·분류·기관·역할·기간) · 내용(주요 활동·성과·배운 점·역량 키워드) · STAR(자소서용) · 자격·점수 · 비고·링크
 // 목록은 분류별 묶음(여러 분류면 묶음마다 보임), 분류를 고르면 그 분류만. 쓰기·고치기는 전체 화면
-import { ChevronDown, ChevronLeft, ExternalLink, Plus, Search, X } from "lucide-react";
+import {
+  ChevronDown,
+  ChevronLeft,
+  ExternalLink,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
@@ -15,6 +22,8 @@ import {
   editExperience,
   removeExpCat,
   renameExpCat,
+  reorderExpCats,
+  setExpCat,
   restoreExperience,
 } from "@/app/actions/career";
 import { CategoryEditor } from "@/components/app/category-editor";
@@ -36,15 +45,31 @@ import {
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { CERT_CATEGORIES, periodLabel } from "@/lib/career";
+import {
+  defaultSections,
+  EXP_SECTIONS,
+  periodLabel,
+  type ExpCategory,
+  type ExpSection,
+} from "@/lib/career";
 import { cn } from "@/lib/utils";
 import type { Experience } from "@/server/career";
 
 const NONE = "분류 없음";
 // 분류 편집(목록·편집 화면 공용): 이름을 바꾸거나 지우면 경험에 붙은 분류도 같이 바뀜
-const catEditor = (categories: string[], onRenamed?: (from: string, to: string) => void, onRemoved?: (name: string) => void) => ({
+const catEditor = (
+  categories: ExpCategory[],
+  onRenamed?: (from: string, to: string) => void,
+  onRemoved?: (name: string) => void,
+) => ({
   title: "경험 분류 편집",
-  items: categories.map((c) => ({ key: c, name: c })),
+  items: categories.map((c) => ({ key: c.name, name: c.name, color: c.color })),
+  onReorder: reorderExpCats,
+  onColor: (it: { key: string }, color: string | null) =>
+    setExpCat(it.key, { color }),
+  extra: (it: { key: string }) => (
+    <SectionToggles cat={categories.find((c) => c.name === it.key)!} />
+  ),
   removeNote: "이 분류가 붙은 경험에서도 빠져요",
   onAdd: addExpCat,
   onRename: async (it: { key: string }, name: string) => {
@@ -58,6 +83,55 @@ const catEditor = (categories: string[], onRenamed?: (from: string, to: string) 
     return r;
   },
 });
+// 분류마다 보일 칸(분류 편집 창의 줄 아래): 이 분류의 경험을 쓸 때 보일 칸을 고름
+function SectionToggles({ cat }: { cat: ExpCategory }) {
+  const router = useRouter();
+  const flip = async (s: ExpSection) => {
+    const sections = cat.sections.includes(s)
+      ? cat.sections.filter((x) => x !== s)
+      : [...cat.sections, s];
+    const r = await setExpCat(cat.name, { sections });
+    if (!r.ok) return void toast.error(r.error.message);
+    router.refresh();
+  };
+  return (
+    <div className="text-muted-foreground flex flex-wrap items-center gap-1 text-caption">
+      보일 칸
+      {EXP_SECTIONS.map((x) => (
+        <button
+          key={x.value}
+          type="button"
+          aria-pressed={cat.sections.includes(x.value)}
+          onClick={() => flip(x.value)}
+          className={cn(
+            "rounded-full border px-2 py-0.5",
+            cat.sections.includes(x.value)
+              ? "border-primary bg-primary/10 text-foreground"
+              : "hover:bg-accent",
+          )}
+        >
+          {x.label}
+        </button>
+      ))}
+    </div>
+  );
+}
+/** 분류 색으로 칠한 카드 배경·테두리(첫 번째로 색이 있는 분류) */
+const tint = (hex: string | null | undefined) =>
+  hex
+    ? {
+        background: `color-mix(in oklab, ${hex} 12%, var(--card))`,
+        borderColor: `color-mix(in oklab, ${hex} 45%, var(--border))`,
+      }
+    : undefined;
+const Dot = ({ hex }: { hex: string | null | undefined }) =>
+  hex ? (
+    <span
+      className="inline-block size-2 shrink-0 rounded-full"
+      style={{ background: hex }}
+    />
+  ) : null;
+
 const chip = (on: boolean) =>
   cn(
     "rounded-full border px-3 py-1 text-sm max-md:min-h-10",
@@ -66,12 +140,24 @@ const chip = (on: boolean) =>
       : "hover:bg-accent",
   );
 
-function Card({ e }: { e: Experience }) {
+function Card({
+  e,
+  colors,
+}: {
+  e: Experience;
+  colors: Map<string, string | null>;
+}) {
   const period = periodLabel(e.startText, e.endText, e.ongoing);
-  const sub = [e.organization !== e.title && e.organization, e.role].filter(Boolean).join(" · ");
+  const color = e.categories.map((c) => colors.get(c)).find(Boolean);
+  const sub = [e.organization !== e.title && e.organization, e.role]
+    .filter(Boolean)
+    .join(" · ");
   const lead = e.achievement || e.body;
   return (
-    <li className="bg-card hover:border-primary/40 relative rounded-xl border p-3.5">
+    <li
+      className="bg-card hover:border-primary/40 relative rounded-xl border p-3.5"
+      style={tint(color)}
+    >
       <Link
         href={`/career/exp/${e.id}`}
         className="absolute inset-0 rounded-xl"
@@ -93,7 +179,8 @@ function Card({ e }: { e: Experience }) {
         <div className="mt-1.5 flex flex-wrap gap-1">
           {e.categories.length > 1 &&
             e.categories.map((c) => (
-              <Badge key={c} variant="secondary" className="px-1.5">
+              <Badge key={c} variant="secondary" className="gap-1 px-1.5">
+                <Dot hex={colors.get(c)} />
                 {c}
               </Badge>
             ))}
@@ -113,9 +200,10 @@ export function ExperienceList({
   categories,
 }: {
   items: Experience[];
-  categories: string[];
+  categories: ExpCategory[];
 }) {
   const [cat, setCat] = useState<string | null>(null);
+  const colors = new Map(categories.map((c) => [c.name, c.color]));
   const [q, setQ] = useState("");
   const words = q.trim().toLowerCase();
   const found = items.filter(
@@ -153,7 +241,9 @@ export function ExperienceList({
       />
     );
   const groups = [
-    ...categories.filter((c) => items.some((e) => e.categories.includes(c))),
+    ...categories
+      .map((c) => c.name)
+      .filter((c) => items.some((e) => e.categories.includes(c))),
     ...(items.some((e) => !e.categories.length) ? [NONE] : []),
   ];
   const inGroup = (g: string) =>
@@ -163,7 +253,7 @@ export function ExperienceList({
   const grid = (list: Experience[]) => (
     <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
       {list.map((e) => (
-        <Card key={e.id} e={e} />
+        <Card key={e.id} e={e} colors={colors} />
       ))}
     </ul>
   );
@@ -180,10 +270,7 @@ export function ExperienceList({
             onChange={(e) => setQ(e.target.value)}
           />
         </div>
-        <span className="ml-auto flex items-center gap-1">
-          <CategoryEditor {...catEditor(categories)} />
-          {add}
-        </span>
+        <span className="ml-auto">{add}</span>
       </div>
       <div className="-mx-4 flex gap-1.5 overflow-x-auto px-4 md:mx-0 md:flex-wrap md:px-0">
         {[null, ...groups].map((g) => (
@@ -192,14 +279,20 @@ export function ExperienceList({
             type="button"
             aria-pressed={cat === g}
             onClick={() => setCat(g)}
-            className={cn("shrink-0", chip(cat === g))}
+            className={cn(
+              "flex shrink-0 items-center gap-1.5",
+              chip(cat === g),
+            )}
           >
+            {g && <Dot hex={colors.get(g)} />}
             {g ?? "전체"}{" "}
             <span className="opacity-70">
               {g ? inGroup(g).length : found.length}
             </span>
           </button>
         ))}
+        {/* 분류 칩 줄 끝에 붙여 시선이 이어지게 */}
+        <CategoryEditor {...catEditor(categories)} className="shrink-0" />
       </div>
       {cat
         ? grid(inGroup(cat))
@@ -208,7 +301,8 @@ export function ExperienceList({
             return (
               list.length > 0 && (
                 <section key={g} className="space-y-2">
-                  <h2 className="text-muted-foreground text-sm font-semibold">
+                  <h2 className="text-muted-foreground flex items-center gap-1.5 text-sm font-semibold">
+                    <Dot hex={colors.get(g)} />
                     {g} {list.length}
                   </h2>
                   {grid(list)}
@@ -259,7 +353,7 @@ export function ExperienceEditor({
   categories,
 }: {
   exp?: Experience;
-  categories: string[];
+  categories: ExpCategory[];
 }) {
   const router = useRouter();
   const [v, setV] = useState({
@@ -290,7 +384,7 @@ export function ExperienceEditor({
   const set = <K extends keyof typeof v>(k: K, val: (typeof v)[K]) =>
     setV((s) => ({ ...s, [k]: val }));
   const options = [
-    ...new Set([...categories, ...v.categories]),
+    ...new Set([...categories.map((c) => c.name), ...v.categories]),
   ];
   const toggle = (c: string) =>
     set(
@@ -299,10 +393,29 @@ export function ExperienceEditor({
         ? v.categories.filter((x) => x !== c)
         : [...v.categories, c],
     );
-  const isCert =
-    v.categories.some((c) => CERT_CATEGORIES.includes(c)) ||
-    !!(v.score || v.issuer || v.certNo || v.validUntil);
+  // 분류에 따라 보일 칸(분류 편집에서 고침). 분류가 없거나 "다른 칸 보기"면 다, 값이 있는 칸은 늘 보임
+  const colors = new Map(categories.map((c) => [c.name, c.color]));
+  const conf = new Map(categories.map((c) => [c.name, c.sections]));
+  const want = new Set<ExpSection>(
+    v.categories.length
+      ? v.categories.flatMap((c) => conf.get(c) ?? defaultSections(c))
+      : EXP_SECTIONS.map((x) => x.value),
+  );
   const hasStar = Object.values(v.star).some((x) => x.trim());
+  const filled: Record<ExpSection, boolean> = {
+    content: !!(
+      v.body.trim() ||
+      v.achievement.trim() ||
+      v.learned.trim() ||
+      v.tags.length
+    ),
+    star: hasStar,
+    cert: !!(v.score || v.issuer || v.certNo || v.validUntil),
+  };
+  const [showAll, setShowAll] = useState(false);
+  const shown = (s: ExpSection) => showAll || want.has(s) || filled[s];
+  const hidden = EXP_SECTIONS.filter((x) => !shown(x.value));
+  const isCert = want.has("cert") || filled.cert;
 
   function addCat() {
     const c = newCat?.trim();
@@ -380,16 +493,7 @@ export function ExperienceEditor({
 
       <Section title="기본" open>
         <Field>
-          <div className="-my-1 flex items-center justify-between">
-            <FieldLabel>분류</FieldLabel>
-            <CategoryEditor
-              {...catEditor(
-                categories,
-                (from, to) => set("categories", v.categories.map((x) => (x === from ? to : x))),
-                (name) => set("categories", v.categories.filter((x) => x !== name)),
-              )}
-            />
-          </div>
+          <FieldLabel>분류</FieldLabel>
           <div
             className="flex flex-wrap gap-1.5"
             role="group"
@@ -401,8 +505,12 @@ export function ExperienceEditor({
                 type="button"
                 aria-pressed={v.categories.includes(c)}
                 onClick={() => toggle(c)}
-                className={chip(v.categories.includes(c))}
+                className={cn(
+                  "flex items-center gap-1.5",
+                  chip(v.categories.includes(c)),
+                )}
               >
+                {!v.categories.includes(c) && <Dot hex={colors.get(c)} />}
                 {c}
               </button>
             ))}
@@ -432,6 +540,22 @@ export function ExperienceEditor({
                 onBlur={addCat}
               />
             )}
+            {/* 분류 칩 줄 끝: 순서·이름·색·보일 칸 */}
+            <CategoryEditor
+              {...catEditor(
+                categories,
+                (from, to) =>
+                  set(
+                    "categories",
+                    v.categories.map((x) => (x === from ? to : x)),
+                  ),
+                (name) =>
+                  set(
+                    "categories",
+                    v.categories.filter((x) => x !== name),
+                  ),
+              )}
+            />
           </div>
         </Field>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -498,159 +622,171 @@ export function ExperienceEditor({
         </Field>
       </Section>
 
-      <Section title="내용" open>
-        <Field>
-          <FieldLabel htmlFor="ex-body">주요 활동·업무</FieldLabel>
-          <Textarea
-            id="ex-body"
-            maxLength={50_000}
-            className={cn(grow, "min-h-28")}
-            placeholder="무엇을 맡아 어떻게 했는지"
-            value={v.body}
-            onChange={(e) => set("body", e.target.value)}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="ex-ach">성과·결과</FieldLabel>
-          <Textarea
-            id="ex-ach"
-            maxLength={5000}
-            className={grow}
-            placeholder="숫자로 말할 수 있으면 좋아요 (예: 매출 20% 증가, 수료 1600시간)"
-            value={v.achievement}
-            onChange={(e) => set("achievement", e.target.value)}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="ex-learn">배운 점·느낀 점</FieldLabel>
-          <Textarea
-            id="ex-learn"
-            maxLength={5000}
-            className={grow}
-            value={v.learned}
-            onChange={(e) => set("learned", e.target.value)}
-          />
-        </Field>
-        <Field>
-          <FieldLabel htmlFor="ex-tags">역량 키워드</FieldLabel>
-          <div className="flex flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5">
-            {v.tags.map((t) => (
-              <span
-                key={t}
-                className="bg-accent flex items-center gap-1 rounded-full px-2 py-0.5 text-sm"
-              >
-                #{t}
-                <button
-                  type="button"
-                  aria-label={`${t} 빼기`}
-                  onClick={() =>
-                    set(
-                      "tags",
-                      v.tags.filter((x) => x !== t),
-                    )
-                  }
-                >
-                  <X className="size-3.5" />
-                </button>
-              </span>
-            ))}
-            <input
-              id="ex-tags"
-              className="min-w-32 flex-1 bg-transparent py-1 text-sm outline-none"
-              placeholder="입력 후 Enter (예: 고객 응대, SQL)"
-              maxLength={20}
-              value={tagText}
-              onChange={(e) =>
-                e.target.value.endsWith(",")
-                  ? addTag(e.target.value.slice(0, -1))
-                  : setTagText(e.target.value)
-              }
-              onKeyDown={(e) => {
-                if (e.key === "Enter") {
-                  e.preventDefault();
-                  addTag(tagText);
-                }
-                if (e.key === "Backspace" && !tagText && v.tags.length)
-                  set("tags", v.tags.slice(0, -1));
-              }}
-              onBlur={() => tagText && addTag(tagText)}
-            />
-          </div>
-        </Field>
-      </Section>
-
-      <Section title="STAR로 정리" hint="자기소개서·면접 답변용" open={hasStar}>
-        {(
-          [
-            ["situation", "상황 (Situation)", "어떤 상황·배경이었나요?"],
-            ["task", "과제 (Task)", "해결해야 했던 문제·목표는?"],
-            ["action", "행동 (Action)", "내가 구체적으로 한 일은?"],
-            ["result", "결과 (Result)", "어떤 결과가 나왔나요?"],
-          ] as const
-        ).map(([k, label, ph]) => (
-          <Field key={k}>
-            <FieldLabel htmlFor={`ex-star-${k}`}>{label}</FieldLabel>
+      {shown("content") && (
+        <Section title="내용" open>
+          <Field>
+            <FieldLabel htmlFor="ex-body">주요 활동·업무</FieldLabel>
             <Textarea
-              id={`ex-star-${k}`}
+              id="ex-body"
+              maxLength={50_000}
+              className={cn(grow, "min-h-28")}
+              placeholder="무엇을 맡아 어떻게 했는지"
+              value={v.body}
+              onChange={(e) => set("body", e.target.value)}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="ex-ach">성과·결과</FieldLabel>
+            <Textarea
+              id="ex-ach"
               maxLength={5000}
               className={grow}
-              placeholder={ph}
-              value={v.star[k]}
-              onChange={(e) => set("star", { ...v.star, [k]: e.target.value })}
+              placeholder="숫자로 말할 수 있으면 좋아요 (예: 매출 20% 증가, 수료 1600시간)"
+              value={v.achievement}
+              onChange={(e) => set("achievement", e.target.value)}
             />
           </Field>
-        ))}
-      </Section>
+          <Field>
+            <FieldLabel htmlFor="ex-learn">배운 점·느낀 점</FieldLabel>
+            <Textarea
+              id="ex-learn"
+              maxLength={5000}
+              className={grow}
+              value={v.learned}
+              onChange={(e) => set("learned", e.target.value)}
+            />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="ex-tags">역량 키워드</FieldLabel>
+            <div className="flex flex-wrap items-center gap-1.5 rounded-md border px-2 py-1.5">
+              {v.tags.map((t) => (
+                <span
+                  key={t}
+                  className="bg-accent flex items-center gap-1 rounded-full px-2 py-0.5 text-sm"
+                >
+                  #{t}
+                  <button
+                    type="button"
+                    aria-label={`${t} 빼기`}
+                    onClick={() =>
+                      set(
+                        "tags",
+                        v.tags.filter((x) => x !== t),
+                      )
+                    }
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </span>
+              ))}
+              <input
+                id="ex-tags"
+                className="min-w-32 flex-1 bg-transparent py-1 text-sm outline-none"
+                placeholder="입력 후 Enter (예: 고객 응대, SQL)"
+                maxLength={20}
+                value={tagText}
+                onChange={(e) =>
+                  e.target.value.endsWith(",")
+                    ? addTag(e.target.value.slice(0, -1))
+                    : setTagText(e.target.value)
+                }
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") {
+                    e.preventDefault();
+                    addTag(tagText);
+                  }
+                  if (e.key === "Backspace" && !tagText && v.tags.length)
+                    set("tags", v.tags.slice(0, -1));
+                }}
+                onBlur={() => tagText && addTag(tagText)}
+              />
+            </div>
+          </Field>
+        </Section>
+      )}
+
+      {shown("star") && (
+        <Section
+          title="STAR로 정리"
+          hint="자기소개서·면접 답변용"
+          open={hasStar}
+        >
+          {(
+            [
+              ["situation", "상황 (Situation)", "어떤 상황·배경이었나요?"],
+              ["task", "과제 (Task)", "해결해야 했던 문제·목표는?"],
+              ["action", "행동 (Action)", "내가 구체적으로 한 일은?"],
+              ["result", "결과 (Result)", "어떤 결과가 나왔나요?"],
+            ] as const
+          ).map(([k, label, ph]) => (
+            <Field key={k}>
+              <FieldLabel htmlFor={`ex-star-${k}`}>{label}</FieldLabel>
+              <Textarea
+                id={`ex-star-${k}`}
+                maxLength={5000}
+                className={grow}
+                placeholder={ph}
+                value={v.star[k]}
+                onChange={(e) =>
+                  set("star", { ...v.star, [k]: e.target.value })
+                }
+              />
+            </Field>
+          ))}
+        </Section>
+      )}
 
       {/* 자격증·어학 분류를 고르면 펼쳐지도록 다시 그림(칸 값은 위 상태에 있어 그대로) */}
-      <Section
-        key={String(isCert)}
-        title="자격·점수"
-        hint="자격증·어학 시험"
-        open={isCert}
-      >
-        <div className="grid gap-3 sm:grid-cols-2">
-          <Field>
-            <FieldLabel htmlFor="ex-score">점수·등급</FieldLabel>
-            <Input
-              id="ex-score"
-              maxLength={60}
-              placeholder="예: 930 (LC 455, RC 475)"
-              value={v.score}
-              onChange={(e) => set("score", e.target.value)}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="ex-issuer">발급 기관</FieldLabel>
-            <Input
-              id="ex-issuer"
-              maxLength={60}
-              placeholder="예: 한국데이터베이스진흥원"
-              value={v.issuer}
-              onChange={(e) => set("issuer", e.target.value)}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="ex-certno">자격·수험 번호</FieldLabel>
-            <Input
-              id="ex-certno"
-              maxLength={60}
-              value={v.certNo}
-              onChange={(e) => set("certNo", e.target.value)}
-            />
-          </Field>
-          <Field>
-            <FieldLabel htmlFor="ex-valid">유효기간(까지)</FieldLabel>
-            <Input
-              id="ex-valid"
-              inputMode="numeric"
-              placeholder="예: 2026.09.20"
-              value={v.validUntil}
-              onChange={(e) => set("validUntil", e.target.value)}
-            />
-          </Field>
-        </div>
-      </Section>
+      {shown("cert") && (
+        <Section
+          key={String(isCert)}
+          title="자격·점수"
+          hint="자격증·어학 시험"
+          open={isCert}
+        >
+          <div className="grid gap-3 sm:grid-cols-2">
+            <Field>
+              <FieldLabel htmlFor="ex-score">점수·등급</FieldLabel>
+              <Input
+                id="ex-score"
+                maxLength={60}
+                placeholder="예: 930 (LC 455, RC 475)"
+                value={v.score}
+                onChange={(e) => set("score", e.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="ex-issuer">발급 기관</FieldLabel>
+              <Input
+                id="ex-issuer"
+                maxLength={60}
+                placeholder="예: 한국데이터베이스진흥원"
+                value={v.issuer}
+                onChange={(e) => set("issuer", e.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="ex-certno">자격·수험 번호</FieldLabel>
+              <Input
+                id="ex-certno"
+                maxLength={60}
+                value={v.certNo}
+                onChange={(e) => set("certNo", e.target.value)}
+              />
+            </Field>
+            <Field>
+              <FieldLabel htmlFor="ex-valid">유효기간(까지)</FieldLabel>
+              <Input
+                id="ex-valid"
+                inputMode="numeric"
+                placeholder="예: 2026.09.20"
+                value={v.validUntil}
+                onChange={(e) => set("validUntil", e.target.value)}
+              />
+            </Field>
+          </div>
+        </Section>
+      )}
 
       <Section title="비고·링크" open={!!v.note || v.links.some(Boolean)}>
         <Field>
@@ -721,6 +857,16 @@ export function ExperienceEditor({
           )}
         </Field>
       </Section>
+      {hidden.length > 0 && (
+        <button
+          type="button"
+          onClick={() => setShowAll(true)}
+          className="text-muted-foreground hover:text-foreground text-sm"
+        >
+          <Plus className="mr-1 inline size-3.5" />
+          다른 칸도 쓰기 ({hidden.map((x) => x.label).join(" · ")})
+        </button>
+      )}
 
       {error && <FieldError>{error}</FieldError>}
       <div
