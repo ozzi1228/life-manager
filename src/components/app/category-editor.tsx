@@ -1,7 +1,7 @@
 "use client";
 
 // 분류 편집 창(지출 분류·경험 분류 공용): 순서 바꾸기(손잡이 끌기)·이름 바꾸기·지우기·추가, 고를 수 있으면 색과 줄마다 덧붙는 설정
-// 바꿀 때마다 바로 저장하고 화면을 새로 읽음. 버튼은 분류 칩 줄 맨 끝에 칩 모양으로 붙음
+// 바꿀 때마다 바로 저장하고 화면을 새로 읽음. 버튼은 분류 칩 줄 맨 끝에 글자 버튼으로 붙음(칩과 구분)
 import { GripVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState, type ReactNode } from "react";
@@ -80,7 +80,7 @@ export function CategoryEditor({
       <button
         type="button"
         onClick={() => setOpen(true)}
-        className={cn("text-muted-foreground hover:bg-accent flex items-center gap-1 rounded-full border border-dashed px-3 py-1 text-sm max-md:min-h-10", className)}
+        className={cn("text-muted-foreground hover:text-foreground flex items-center gap-1 px-1.5 text-sm underline-offset-4 hover:underline max-md:min-h-10", className)}
       >
         <Pencil className="size-3.5" /> 분류 편집
       </button>
