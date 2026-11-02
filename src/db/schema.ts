@@ -527,3 +527,20 @@ export const eventExceptions = pgTable(
   },
   (t) => [uniqueIndex("event_exceptions_occurrence").on(t.eventId, t.originalDate).where(sql`${t.deletedAt} is null`)],
 );
+
+// ── 건강 (10, 14 §4.8): 체중·혈당. 생리 주기는 만들지 않음(D-063) ──
+// 값·메모는 암호화해 저장(Q-041 추천안, src/lib/ai/secret.ts). 추세는 서버에서 풀어 계산
+// ponytail: 14의 health_metrics(지표 정의) 대신 종류 열 하나 — 직접 만든 지표(P2)가 생기면 나눔
+export const healthRecords = pgTable(
+  "health_records",
+  {
+    ...userData(),
+    kind: text("kind", { enum: ["weight", "glucose"] }).notNull(),
+    date: date("date").notNull(),
+    time: text("time").notNull(), // HH:MM, 사용자 시간대
+    context: text("context", { enum: ["fasting", "before_meal", "after_1h", "after_2h", "bedtime", "other"] }), // 혈당 측정 시점
+    valueEnc: text("value_enc").notNull(),
+    memoEnc: text("memo_enc"),
+  },
+  (t) => [index("health_records_user_kind_date").on(t.userId, t.kind, t.date).where(sql`${t.deletedAt} is null`)],
+);
