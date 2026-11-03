@@ -6,7 +6,7 @@
 import { PeriodGoals, type PeriodGoal } from "@/components/goals/period-goals";
 import { ChevronLeft, ChevronRight, Clock, MapPin, Plus, Repeat, Settings2, StickyNote } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { addCalendar, addEvent, editCalendar, editEvent, removeCalendar, removeEvent, restoreCalendar, saveCalendarNote, showCalendar, undoRemoveEvent } from "@/app/actions/calendar";
 import { ColorPalettePicker } from "@/components/app/color-picker";
@@ -696,22 +696,19 @@ function YearPlanner({ year, focus, today, items, color, open, add, month }: { y
       else byDay.set(d, [e]);
     }
   }
-  // 처음엔 보던 날(오늘)이 든 달·줄이 보이게(모바일은 가로로, 둘 다 세로로 스크롤)
-  const scroller = (el: HTMLDivElement | null) => {
-    if (!el || el.dataset.scrolled) return;
-    el.dataset.scrolled = "1";
-    // 그려진 뒤에(화면 위 위치 기준으로) 옮김
-    requestAnimationFrame(() => {
-      const cell = el.querySelector<HTMLElement>(`[data-day="${focus}"]`);
-      const corner = el.querySelector<HTMLElement>("[data-corner]");
-      if (!cell || !corner) return;
-      const c = cell.getBoundingClientRect();
-      const box = el.getBoundingClientRect();
-      const head = corner.getBoundingClientRect();
-      el.scrollLeft += c.left - box.left - head.width;
-      el.scrollTop += c.top - box.top - head.height - c.height * 2;
-    });
-  };
+  // 처음엔 보던 날(오늘)이 든 달·줄이 보이게(모바일은 가로로, 둘 다 세로로 스크롤). 화면 위 위치 기준
+  const scroller = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const el = scroller.current;
+    const cell = el?.querySelector<HTMLElement>(`[data-day="${focus}"]`);
+    const corner = el?.querySelector<HTMLElement>("[data-corner]");
+    if (!el || !cell || !corner) return;
+    const c = cell.getBoundingClientRect();
+    const box = el.getBoundingClientRect();
+    const head = corner.getBoundingClientRect();
+    el.scrollLeft += c.left - box.left - head.width;
+    el.scrollTop += c.top - box.top - head.height - c.height * 2;
+  }, [focus]);
   const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
   const lengths = months.map((_, i) => new Date(Date.UTC(+year, i + 1, 0)).getUTCDate());
   return (
@@ -931,12 +928,12 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
       )}
       {view === "year" ? (
         <>
-          <YearPlanner key={date} year={date.slice(0, 4)} focus={date} today={today} items={visible} color={colorOf} open={setDetail} add={(d) => (setSelected(d), addAt(d))} month={(d) => go("month", d)} />
-          {/* 연 메모 옆(모바일은 아래)에 올해 목표 */}
+          {/* 다른 보기처럼 메모·목표를 맨 위에(연 메모 옆, 모바일은 아래에 올해 목표) */}
           <div className="grid gap-4 lg:grid-cols-2">
             <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
             {goalPanel}
           </div>
+          <YearPlanner key={date} year={date.slice(0, 4)} focus={date} today={today} items={visible} color={colorOf} open={setDetail} add={(d) => (setSelected(d), addAt(d))} month={(d) => go("month", d)} />
         </>
       ) : view === "month" ? (
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
