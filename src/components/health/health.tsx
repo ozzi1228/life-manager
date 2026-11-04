@@ -238,7 +238,7 @@ export function HealthView({ weight, glucose, injection, today }: { weight: Heal
         <Lock className="size-3.5 shrink-0" /> 암호화해 저장 · 홈·검색·AI에는 안 보여요
       </p>
 
-      <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         <section className={card}>
           <div className="flex items-center justify-between">
             <h2 className="font-semibold">체중</h2>

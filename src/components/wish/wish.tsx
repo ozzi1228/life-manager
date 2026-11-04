@@ -610,7 +610,7 @@ export function WishView({ items, today, initialTab }: { items: WishItem[]; toda
   );
   return (
     <div className="space-y-4">
-      <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center gap-2">
         {/* 쇼핑/작품 전환은 아래 필터와 구분되게 알약 모양(SubTabs와 같은 모양) */}
         <div role="group" aria-label="위시 종류" className="flex gap-1.5">
           {(

@@ -327,7 +327,7 @@ export function DocList({ docs }: { docs: CareerDoc[] }) {
               <h2 className="text-muted-foreground text-sm font-semibold">
                 {k.label} {list.length}
               </h2>
-              <ul className="grid gap-3 lg:grid-cols-2">
+              <ul className="grid grid-cols-1 gap-3 lg:grid-cols-2">
                 {list.map((d) => (
                   <DocCard key={d.id} d={d} onVersion={(v) => setVerForm({ doc: d, edit: v })} onEdit={() => setDocForm({ edit: d, kind: d.kind })} />
                 ))}

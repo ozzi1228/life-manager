@@ -659,7 +659,7 @@ function NotePanel({ note, title }: { note: Note; title: string }) {
 /** 보는 기간의 목표·메모. PC는 위에 나란히, 모바일은 한 줄로 접어 달력이 먼저 보이게 */
 function TopPanels({ label, goals, note, children }: { label: string; goals: PeriodGoal[]; note: Note; children: React.ReactNode }) {
   const mobile = useIsMobile();
-  if (!mobile) return <div className="grid gap-4 lg:grid-cols-2">{children}</div>;
+  if (!mobile) return <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{children}</div>;
   const done = goals.filter((g) => g.status === "done").length;
   return (
     <Collapsible>

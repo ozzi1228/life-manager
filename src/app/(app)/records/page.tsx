@@ -27,7 +27,7 @@ export default async function RecordsPage({ searchParams }: PageProps<"/records"
   return (
     <Page>
       <RecordsTabs />
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <MonthNav month={month} />
         {write}
       </div>

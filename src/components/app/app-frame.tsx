@@ -209,7 +209,7 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
             <DrawerHeader className="text-left">
               <DrawerTitle>빠른 추가</DrawerTitle>
             </DrawerHeader>
-            <div className="grid gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
+            <div className="grid grid-cols-1 gap-2 px-4 pb-[max(1rem,env(safe-area-inset-bottom))]">
               {QUICK_ADD.map((q) =>
                 q.dialog ? (
                   <Button key={q.label} variant="outline" size="lg" className="h-12 justify-start" onClick={() => (setQuickOpen(false), openExpense())}>

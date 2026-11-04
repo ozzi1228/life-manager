@@ -238,7 +238,7 @@ export function ExperienceList({
       g === NONE ? !e.categories.length : e.categories.includes(g),
     );
   const grid = (list: Experience[]) => (
-    <ul className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+    <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
       {list.map((e) => (
         <Card key={e.id} e={e} colors={colors} />
       ))}
@@ -544,7 +544,7 @@ export function ExperienceEditor({
             />
           </div>
         </Field>
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <Field>
             <FieldLabel htmlFor="ex-org">기관·소속</FieldLabel>
             <Input
@@ -730,7 +730,7 @@ export function ExperienceEditor({
           hint="자격증·어학 시험"
           open={isCert}
         >
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <Field>
               <FieldLabel htmlFor="ex-score">점수·등급</FieldLabel>
               <Input

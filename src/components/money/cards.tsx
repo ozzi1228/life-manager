@@ -43,7 +43,7 @@ export function CardGrid({ cards }: { cards: CardItem[] }) {
       {cards.length === 0 ? (
         <EmptyState pet="komong" title="카드를 등록해 보세요" description="결제일·연회비와 혜택 메모를 한곳에 모아 둘 수 있어요" action={add} />
       ) : (
-        <ul className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {cards.map((c) => {
             const meta = [c.card?.issuer, c.card?.cardType && TYPE[c.card.cardType], c.card?.billingDay && `매월 ${c.card.billingDay}일 결제`, c.card?.annualFee && `연회비 ${money(c.card.annualFee)}`].filter(Boolean);
             return (

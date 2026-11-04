@@ -240,6 +240,8 @@
     /* 한국어는 낱말 단위로 줄바꿈, 너무 긴 낱말만 아무 데서나 */
     word-break: keep-all;
     overflow-wrap: anywhere;
+    /* 안전장치: 무엇이 넘쳐도 휴대폰에서 화면이 옆으로 밀리지 않게. clip은 스크롤 영역을 만들지 않아 sticky가 그대로 동작 */
+    overflow-x: clip;
   }
   html {
     @apply font-sans;

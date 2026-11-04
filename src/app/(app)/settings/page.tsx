@@ -61,10 +61,17 @@ export default function SettingsPage() {
 
       <section className="space-y-3">
         <h2 className="text-subtitle font-semibold">화면</h2>
-        <ToggleGroup type="single" variant="outline" value={mounted ? theme : undefined} onValueChange={(v) => v && setTheme(v)} aria-label="화면 모드">
-          <ToggleGroupItem value="system">기기 설정 따라가기</ToggleGroupItem>
-          <ToggleGroupItem value="light">밝게</ToggleGroupItem>
-          <ToggleGroupItem value="dark">어둡게</ToggleGroupItem>
+        <ToggleGroup type="single" variant="outline" value={mounted ? theme : undefined} onValueChange={(v) => v && setTheme(v)} aria-label="화면 모드" className="w-full max-w-md">
+          {/* 세 칸을 같은 폭으로 나누고, 글씨가 크면 칸 안에서 줄바꿈(화면 밖으로 넘치지 않게) */}
+          <ToggleGroupItem value="system" className="h-auto min-h-9 min-w-0 flex-1 py-1.5 whitespace-normal">
+            기기 설정 따라가기
+          </ToggleGroupItem>
+          <ToggleGroupItem value="light" className="h-auto min-h-9 min-w-0 flex-1 py-1.5 whitespace-normal">
+            밝게
+          </ToggleGroupItem>
+          <ToggleGroupItem value="dark" className="h-auto min-h-9 min-w-0 flex-1 py-1.5 whitespace-normal">
+            어둡게
+          </ToggleGroupItem>
         </ToggleGroup>
       </section>
 

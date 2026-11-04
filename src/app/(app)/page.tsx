@@ -205,7 +205,7 @@ export default async function Home() {
         </div>
 
         {full.length > 0 && (
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
             {full.map((w) => (
               <Widget key={w.title} title={w.title} href={w.href}>
                 {w.body}
@@ -216,7 +216,7 @@ export default async function Home() {
 
         {/* 비어 있는 위젯은 한 줄씩 모아 아래에(내용 있는 위젯이 먼저 보이게) */}
         {empty.length > 0 && (
-          <section aria-label="비어 있는 항목" className="bg-card grid divide-y rounded-xl border px-4 shadow-sm md:grid-cols-2 md:divide-y-0 xl:grid-cols-3">
+          <section aria-label="비어 있는 항목" className="bg-card grid grid-cols-1 divide-y rounded-xl border px-4 shadow-sm md:grid-cols-2 md:divide-y-0 xl:grid-cols-3">
             {empty.map((w) => (
               <div key={w.title} className="flex min-h-12 items-center gap-2 py-2 text-sm md:pr-4">
                 <Link href={w.href} className="hover:text-link shrink-0 font-semibold">
