@@ -804,7 +804,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
   useEffect(() => {
     const g = new URLSearchParams(window.location.search).get("google");
     if (!g) return;
-    toast(({ connected: "구글 캘린더를 연동했어요", denied: "구글 연동을 취소했어요", off: "서버에 구글 앱 키가 없어 연동할 수 없어요" } as Record<string, string>)[g] ?? "구글 연동을 마치지 못했어요. 다시 해 주세요");
+    toast(({ connected: "구글 캘린더를 연동했어요", denied: "구글 연동을 취소했어요", off: "구글 앱 키를 먼저 넣어 주세요" } as Record<string, string>)[g] ?? "구글 연동을 마치지 못했어요. 다시 해 주세요");
     router.replace(`/calendar?view=${view}&date=${date}`, { scroll: false });
   }, [router, view, date]);
   const [scopeFor, setScopeFor] = useState<Instance | null>(null);

@@ -18,7 +18,7 @@ import {
   type NoteScope,
   type Scope,
 } from "@/server/calendar";
-import { disconnectGoogle, syncGoogle } from "@/server/google-calendar";
+import { disconnectGoogle, saveGoogleKeys, syncGoogle, testGoogleKeys } from "@/server/google-calendar";
 import { once } from "@/server/idempotency";
 import { restore } from "@/server/repo";
 
@@ -54,6 +54,13 @@ export async function colorEvent(id: string, version: number, colorHex: string |
 /** 구글 캘린더 지금 가져오기 · 연동 해제 */
 export async function syncGoogleNow() {
   return action((ctx) => syncGoogle(ctx));
+}
+/** 구글 앱 키: 확인만 / 확인 후 저장 */
+export async function checkGoogleKeys(id: string, secret: string) {
+  return action(async () => testGoogleKeys(id, secret));
+}
+export async function setGoogleKeys(id: string, secret: string) {
+  return action((ctx) => saveGoogleKeys(ctx, id, secret));
 }
 export async function unlinkGoogle() {
   return action((ctx) => disconnectGoogle(ctx));

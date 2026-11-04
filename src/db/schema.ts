@@ -479,7 +479,8 @@ export const calendars = pgTable("calendars", {
   externalId: text("external_id"),
 });
 
-// 구글 캘린더 연결(07 §4 G1 가져오기): 사용자당 하나. secret = 봉인한 refresh token(src/lib/ai/secret.ts)
+// 구글 캘린더 연결(07 §4 G1 가져오기): 사용자당 하나. secret = 봉인한 refresh token(src/lib/ai/secret.ts), 없으면 앱 키만 넣고 아직 연결 전
+// client_id·client_secret(봉인) = 사용자가 화면에서 넣은 구글 앱 키. 없으면 .env의 GOOGLE_CLIENT_ID·SECRET
 export const calendarLinks = pgTable(
   "calendar_links",
   {
@@ -487,7 +488,9 @@ export const calendarLinks = pgTable(
     userId: userRef(),
     provider: text("provider").notNull(),
     account: text("account"),
-    secret: text("secret").notNull(),
+    secret: text("secret"),
+    clientId: text("client_id"),
+    clientSecret: text("client_secret"),
     status: text("status").notNull().default("ok"), // ok | broken(구글에서 권한 해제 등 → 다시 연결)
     syncedAt: at("synced_at"),
     createdAt: at("created_at").notNull().defaultNow(),

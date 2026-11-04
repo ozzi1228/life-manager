@@ -1,18 +1,19 @@
 "use client";
 
 // 캘린더 목록(일정 화면 왼쪽, 좁은 화면은 "캘린더" 창): 체크로 보이기, 내 캘린더 추가·고치기, 구글 캘린더 연동(07 §4 G1)
-import { Pencil, Plus, RefreshCw } from "lucide-react";
+// 구글: 제목 옆 + → 연결 창(앱 키 만드는 법 → 키 넣고 연결 테스트 → 구글 계정 연결)
+import { Check, Copy, ExternalLink, Pencil, Plus, RefreshCw } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { addCalendar, editCalendar, removeCalendar, restoreCalendar, syncGoogleNow, unlinkGoogle } from "@/app/actions/calendar";
+import { addCalendar, checkGoogleKeys, editCalendar, removeCalendar, restoreCalendar, setGoogleKeys, syncGoogleNow, unlinkGoogle } from "@/app/actions/calendar";
 import { ColorPalettePicker } from "@/components/app/color-picker";
 import { ResponsiveModal } from "@/components/app/responsive";
 import { toastUndo } from "@/components/app/states";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { FieldError, FieldGroup } from "@/components/ui/field";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { textOn } from "@/lib/palette";
@@ -105,6 +106,135 @@ const GoogleMark = () => (
   </svg>
 );
 
+const GUIDE = [
+  { t: "구글 클라우드 콘솔에서 프로젝트를 만들어요", href: "https://console.cloud.google.com/projectcreate" },
+  { t: "Google Calendar API를 사용 설정해요", href: "https://console.cloud.google.com/apis/library/calendar-json.googleapis.com" },
+  { t: "OAuth 동의 화면: 외부 사용자로 만들고, 게시 상태를 '프로덕션'으로 바꿔요(테스트 상태면 7일마다 연결이 끊겨요)", href: "https://console.cloud.google.com/auth/overview" },
+  { t: "클라이언트 만들기: 유형은 '웹 애플리케이션', 승인된 리디렉션 URI에 아래 주소를 넣어요", href: "https://console.cloud.google.com/auth/clients/create" },
+  { t: "만든 클라이언트의 ID와 보안 비밀번호를 아래에 붙여 넣어요" },
+];
+
+/** 구글 캘린더 연결 창: 앱 키가 이미 있으면 바로 "구글 계정 연결", 없으면(또는 바꾸기) 만드는 법 + 입력 + 연결 테스트 */
+function GoogleConnect({ google, close }: { google: GoogleStatus; close: () => void }) {
+  const [form, setForm] = useState(!google.keys);
+  const [id, setId] = useState(google.clientId ?? "");
+  const [secret, setSecret] = useState("");
+  const [test, setTest] = useState<{ ok: boolean; message: string } | null>(null);
+  const [busy, setBusy] = useState<"test" | "save" | null>(null);
+  const [copied, setCopied] = useState(false);
+  // API가 구글 동의 화면으로 보내므로 페이지 이동이 아니라 전체 이동
+  // eslint-disable-next-line @next/next/no-location-assign-relative-destination
+  const go = () => (window.location.href = "/api/v1/google/connect");
+
+  async function check() {
+    setBusy("test");
+    const r = await checkGoogleKeys(id, secret);
+    setBusy(null);
+    setTest(r.ok ? r.data : { ok: false, message: r.error.message });
+  }
+  async function connect() {
+    setBusy("save");
+    const r = await setGoogleKeys(id, secret);
+    if (!r.ok) {
+      setBusy(null);
+      return setTest({ ok: false, message: r.error.message });
+    }
+    go(); // 구글 동의 화면 → 돌아오면 "연동했어요"
+  }
+  const copy = async () => {
+    await navigator.clipboard.writeText(google.redirectUri).catch(() => {});
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  if (!form)
+    return (
+      <ResponsiveModal
+        open
+        onOpenChange={(o) => !o && close()}
+        title="구글 캘린더 연결"
+        size="sm"
+        footer={
+          <Button className="w-full" onClick={go}>
+            <GoogleMark /> 구글 계정 연결
+          </Button>
+        }
+      >
+        <div className="space-y-3 text-sm">
+          <p>구글 계정을 고르면 그 계정의 캘린더를 가져와요. 구글 일정은 여기서 읽기만 하고, 고치기는 구글에서 해요.</p>
+          {google.keys === "user" && (
+            <p className="text-muted-foreground text-caption">
+              앱 키: <span className="font-mono">{google.clientId?.slice(0, 18)}…</span>{" "}
+              <button type="button" className="text-link underline-offset-2 hover:underline" onClick={() => setForm(true)}>
+                바꾸기
+              </button>
+            </p>
+          )}
+        </div>
+      </ResponsiveModal>
+    );
+
+  return (
+    <ResponsiveModal
+      open
+      onOpenChange={(o) => !o && close()}
+      title="구글 캘린더 연결"
+      description="처음 한 번, 내 구글 앱 키를 만들어 넣어요(5분쯤)"
+      footer={
+        <div className="flex w-full gap-2">
+          <Button variant="outline" disabled={!id.trim() || !secret.trim() || !!busy} onClick={check}>
+            {busy === "test" && <Spinner />} 연결 테스트
+          </Button>
+          <Button className="flex-1" disabled={!test?.ok || !!busy} onClick={connect}>
+            {busy === "save" ? <Spinner /> : <GoogleMark />} 구글 계정 연결
+          </Button>
+        </div>
+      }
+    >
+      <div className="space-y-4">
+        <ol className="space-y-2 text-sm">
+          {GUIDE.map((g, i) => (
+            <li key={i} className="flex gap-2">
+              <span className="bg-muted flex size-5 shrink-0 items-center justify-center rounded-full text-caption tabular-nums">{i + 1}</span>
+              <span className="min-w-0">
+                {g.t}
+                {g.href && (
+                  <a href={g.href} target="_blank" rel="noreferrer" className="text-link ml-1 inline-flex items-center gap-0.5 whitespace-nowrap underline-offset-2 hover:underline">
+                    열기 <ExternalLink className="size-3" />
+                  </a>
+                )}
+                {i === 3 && (
+                  <span className="bg-muted mt-1.5 flex items-center gap-1 rounded-md py-1 pr-1 pl-2">
+                    <code className="min-w-0 flex-1 truncate text-caption">{google.redirectUri}</code>
+                    <Button type="button" variant="ghost" size="icon" className="size-7 shrink-0" aria-label="리디렉션 URI 복사" onClick={copy}>
+                      {copied ? <Check className="size-3.5" /> : <Copy className="size-3.5" />}
+                    </Button>
+                  </span>
+                )}
+              </span>
+            </li>
+          ))}
+        </ol>
+        <FieldGroup className="gap-3">
+          <Field>
+            <FieldLabel htmlFor="g-id">클라이언트 ID</FieldLabel>
+            <Input id="g-id" autoComplete="off" spellCheck={false} placeholder="1234-abcd.apps.googleusercontent.com" value={id} onChange={(e) => (setId(e.target.value), setTest(null))} />
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="g-secret">클라이언트 보안 비밀번호</FieldLabel>
+            <Input id="g-secret" type="password" autoComplete="off" placeholder="GOCSPX-…" value={secret} onChange={(e) => (setSecret(e.target.value), setTest(null))} />
+          </Field>
+          {test && (
+            <p role="status" className={test.ok ? "text-success-text flex items-center gap-1 text-sm" : "text-destructive-text text-sm"}>
+              {test.ok && <Check className="size-4" />} {test.message}
+            </p>
+          )}
+        </FieldGroup>
+      </div>
+    </ResponsiveModal>
+  );
+}
+
 const ago = (iso: string) => {
   const m = Math.floor((Date.now() - Date.parse(iso)) / 60_000);
   return m < 1 ? "방금" : m < 60 ? `${m}분 전` : m < 1440 ? `${Math.floor(m / 60)}시간 전` : `${Math.floor(m / 1440)}일 전`;
@@ -116,6 +246,7 @@ export function CalendarList({ calendars, hidden, toggle, google }: { calendars:
   const [edit, setEdit] = useState<Edit | null>(null);
   const [syncing, setSyncing] = useState(false);
   const [unlink, setUnlink] = useState(false);
+  const [connect, setConnect] = useState(false);
   const mine = calendars.filter((c) => !c.google);
   const gcals = calendars.filter((c) => c.google);
   const link = google.link;
@@ -165,32 +296,27 @@ export function CalendarList({ calendars, hidden, toggle, google }: { calendars:
         <div className="flex items-center gap-1.5 pl-2">
           <GoogleMark />
           <h2 className="text-sm font-semibold">구글 캘린더</h2>
-          {link?.status === "ok" && (
+          {link?.status === "ok" ? (
             <Button variant="ghost" size="icon" className="ml-auto size-7 max-md:size-9" aria-label="지금 가져오기" title="지금 가져오기" disabled={syncing} onClick={() => sync()}>
               <RefreshCw className={syncing ? "size-3.5 animate-spin" : "size-3.5"} />
             </Button>
+          ) : (
+            !link && (
+              <Button variant="ghost" size="icon" className="ml-auto size-7 max-md:size-9" aria-label="구글 캘린더 연결" title="구글 캘린더 연결" onClick={() => setConnect(true)}>
+                <Plus className="size-4" />
+              </Button>
+            )
           )}
         </div>
         {!link ? (
-          <div className="space-y-2 px-2 pt-1">
-            <p className="text-muted-foreground text-caption">구글 일정을 가져와 여기서 함께 볼 수 있어요. 안 해도 이 앱 캘린더는 그대로 써요.</p>
-            {google.enabled ? (
-              <Button variant="outline" size="sm" className="w-full max-md:h-11" asChild>
-                <a href="/api/v1/google/connect">
-                  <GoogleMark /> 구글 캘린더 연동하기
-                </a>
-              </Button>
-            ) : (
-              <p className="text-muted-foreground bg-muted/50 rounded-md p-2 text-caption">서버에 구글 앱 키(GOOGLE_CLIENT_ID)를 넣으면 연동할 수 있어요 · docs/operations.md</p>
-            )}
-          </div>
+          <p className="text-muted-foreground px-2 text-caption">연결 안 됨</p>
         ) : (
           <>
             {link.status === "broken" && (
               <div className="bg-destructive/10 mx-2 space-y-2 rounded-md p-2 text-caption">
                 <p>구글 캘린더 연결이 끊겼어요.</p>
-                <Button variant="outline" size="sm" className="w-full" asChild>
-                  <a href="/api/v1/google/connect">다시 연결</a>
+                <Button variant="outline" size="sm" className="w-full" onClick={() => setConnect(true)}>
+                  다시 연결
                 </Button>
               </div>
             )}
@@ -212,6 +338,7 @@ export function CalendarList({ calendars, hidden, toggle, google }: { calendars:
         )}
       </section>
 
+      {connect && <GoogleConnect google={google} close={() => setConnect(false)} />}
       {edit && <CalendarEditor edit={edit} calendars={calendars} close={() => setEdit(null)} />}
       <AlertDialog open={unlink} onOpenChange={setUnlink}>
         <AlertDialogContent>

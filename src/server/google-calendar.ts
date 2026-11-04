@@ -15,27 +15,45 @@ const SCOPES = ["https://www.googleapis.com/auth/calendar.calendarlist.readonly"
 const API = "https://www.googleapis.com/calendar/v3";
 const TZ = "Asia/Seoul";
 
-export const googleEnabled = () => !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET);
-const redirectUri = () => `${process.env.BETTER_AUTH_URL}/api/v1/google/callback`;
+type Client = { id: string; secret: string };
+export const redirectUri = () => `${process.env.BETTER_AUTH_URL}/api/v1/google/callback`;
 
-export const authUrl = (state: string) =>
-  `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
-    client_id: process.env.GOOGLE_CLIENT_ID!,
+/** 쓸 구글 앱 키: 사용자가 화면에서 넣은 것 → 없으면 .env */
+async function client(ctx: Ctx): Promise<Client | null> {
+  const l = await getLink(ctx);
+  if (l?.clientId && l.clientSecret) return { id: l.clientId, secret: unseal(l.clientSecret) };
+  return process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? { id: process.env.GOOGLE_CLIENT_ID, secret: process.env.GOOGLE_CLIENT_SECRET } : null;
+}
+async function needClient(ctx: Ctx) {
+  const c = await client(ctx);
+  if (!c) throw new AppError("BUSINESS_RULE", "구글 앱 키를 먼저 넣어 주세요");
+  return c;
+}
+
+/** 동의 화면 주소. 앱 키가 없으면 null */
+export async function authUrl(ctx: Ctx, state: string) {
+  const c = await client(ctx);
+  return (
+    c &&
+    `https://accounts.google.com/o/oauth2/v2/auth?${new URLSearchParams({
+    client_id: c.id,
     redirect_uri: redirectUri(),
     response_type: "code",
     scope: SCOPES.join(" "),
     access_type: "offline",
     prompt: "consent", // 다시 연결할 때도 refresh token을 받게
     state,
-  })}`;
+  })}`
+  );
+}
 
-async function token(body: Record<string, string>) {
+async function token(c: Client, body: Record<string, string>) {
   const r = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "content-type": "application/x-www-form-urlencoded" },
-    body: new URLSearchParams({ client_id: process.env.GOOGLE_CLIENT_ID!, client_secret: process.env.GOOGLE_CLIENT_SECRET!, ...body }),
+    body: new URLSearchParams({ client_id: c.id, client_secret: c.secret, ...body }),
   });
-  const j = (await r.json().catch(() => ({}))) as { access_token?: string; refresh_token?: string; error?: string };
+  const j = (await r.json().catch(() => ({}))) as { access_token?: string; refresh_token?: string; error?: string; error_description?: string };
   return { ok: r.ok, ...j };
 }
 
@@ -51,16 +69,48 @@ type GEvent = { id: string; status?: string; summary?: string; location?: string
 
 const getLink = async (ctx: Ctx) => (await db.select().from(calendarLinks).where(and(eq(calendarLinks.userId, ctx.userId), eq(calendarLinks.provider, "google"))))[0];
 
-/** 화면용 연결 상태 */
+/** 화면용 연결 상태. keys: 쓸 앱 키가 어디 있는지(user = 화면에서 넣음, env = 서버 설정) */
 export async function googleStatus(ctx: Ctx) {
   const l = await getLink(ctx);
-  return { enabled: googleEnabled(), link: l ? { account: l.account, status: l.status as "ok" | "broken", syncedAt: l.syncedAt?.toISOString() ?? null } : null };
+  const keys = l?.clientId ? ("user" as const) : process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET ? ("env" as const) : null;
+  return {
+    keys,
+    clientId: l?.clientId ?? null,
+    redirectUri: redirectUri(),
+    link: l?.secret ? { account: l.account, status: l.status as "ok" | "broken", syncedAt: l.syncedAt?.toISOString() ?? null } : null,
+  };
+}
+
+/**
+ * 앱 키 확인: 가짜 인증 코드로 토큰을 요청해 구글이 키를 알아보는지 봄
+ * invalid_grant(코드가 틀림) = 키는 맞음 / invalid_client·unauthorized_client = 키가 틀림
+ */
+export async function testGoogleKeys(id: string, secret: string) {
+  const c = { id: id.trim(), secret: secret.trim() };
+  if (!/\.apps\.googleusercontent\.com$/.test(c.id)) return { ok: false, message: "클라이언트 ID는 ….apps.googleusercontent.com 으로 끝나요" };
+  if (!c.secret) return { ok: false, message: "클라이언트 보안 비밀번호를 넣어 주세요" };
+  const t = await token(c, { code: "oona-key-check", grant_type: "authorization_code", redirect_uri: redirectUri() }).catch(() => null);
+  if (!t) return { ok: false, message: "구글에 닿지 않아요. 인터넷 연결을 확인해 주세요" };
+  if (t.error === "invalid_grant") return { ok: true, message: "앱 키가 맞아요" };
+  if (t.error === "redirect_uri_mismatch") return { ok: false, message: "승인된 리디렉션 URI에 아래 주소를 넣어 주세요" };
+  return { ok: false, message: t.error === "invalid_client" || t.error === "unauthorized_client" ? "클라이언트 ID나 보안 비밀번호가 맞지 않아요" : `확인하지 못했어요(${t.error ?? "알 수 없음"})` };
+}
+
+/** 앱 키 저장(확인을 통과한 것만, 보안 비밀번호는 봉인). 이미 연결돼 있으면 연결은 그대로 */
+export async function saveGoogleKeys(ctx: Ctx, id: string, secret: string) {
+  const r = await testGoogleKeys(id, secret);
+  if (!r.ok) throw new AppError("BUSINESS_RULE", r.message);
+  const v = { clientId: id.trim(), clientSecret: seal(secret.trim()), updatedAt: new Date() };
+  await db
+    .insert(calendarLinks)
+    .values({ userId: ctx.userId, provider: "google", ...v })
+    .onConflictDoUpdate({ target: [calendarLinks.userId, calendarLinks.provider], set: v });
 }
 export type GoogleStatus = Awaited<ReturnType<typeof googleStatus>>;
 
 /** OAuth 콜백: 코드 → refresh token 봉인 저장 → 첫 가져오기 */
 export async function connectGoogle(ctx: Ctx, code: string) {
-  const t = await token({ code, grant_type: "authorization_code", redirect_uri: redirectUri() });
+  const t = await token(await needClient(ctx), { code, grant_type: "authorization_code", redirect_uri: redirectUri() });
   if (!t.ok || !t.refresh_token || !t.access_token) throw new AppError("BAD_REQUEST", "구글 연결을 마치지 못했어요");
   const secret = seal(t.refresh_token);
   await db
@@ -73,9 +123,9 @@ export async function connectGoogle(ctx: Ctx, code: string) {
 /** 가져오기. 토큰이 무효면 연결을 broken으로(화면에 "다시 연결") */
 export async function syncGoogle(ctx: Ctx, access?: string) {
   const link = await getLink(ctx);
-  if (!link) return;
+  if (!link?.secret) return;
   if (!access) {
-    const t = await token({ refresh_token: unseal(link.secret), grant_type: "refresh_token" });
+    const t = await token(await needClient(ctx), { refresh_token: unseal(link.secret), grant_type: "refresh_token" });
     if (!t.ok || !t.access_token) {
       if (t.error === "invalid_grant") await db.update(calendarLinks).set({ status: "broken", updatedAt: new Date() }).where(eq(calendarLinks.id, link.id));
       throw new AppError("BUSINESS_RULE", "구글 캘린더 연결이 끊겼어요. 다시 연결해 주세요");
@@ -162,12 +212,12 @@ async function dropCalendars(ctx: Ctx, ids: string[]) {
   });
 }
 
-/** 연결 해제: 구글 권한 돌려주고(실패해도 진행) 가져온 사본 지움. 구글 원본은 그대로 */
+/** 연결 해제: 구글 권한 돌려주고(실패해도 진행) 가져온 사본 지움. 구글 원본·넣어 둔 앱 키는 그대로(다시 연결하기 쉽게) */
 export async function disconnectGoogle(ctx: Ctx) {
   const link = await getLink(ctx);
-  if (!link) return;
+  if (!link?.secret) return;
   await fetch("https://oauth2.googleapis.com/revoke", { method: "POST", headers: { "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ token: unseal(link.secret) }) }).catch(() => {});
   const mine = await db.select({ id: calendars.id }).from(calendars).where(and(eq(calendars.userId, ctx.userId), eq(calendars.source, "google")));
   if (mine.length) await dropCalendars(ctx, mine.map((c) => c.id));
-  await db.delete(calendarLinks).where(eq(calendarLinks.id, link.id));
+  await db.update(calendarLinks).set({ secret: null, account: null, syncedAt: null, status: "ok", updatedAt: new Date() }).where(eq(calendarLinks.id, link.id));
 }
