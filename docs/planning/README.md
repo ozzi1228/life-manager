@@ -36,6 +36,7 @@
 | 19 | [integration-research](19-integration-research.md) | 외부 연동 실현 가능성 조사(구글·네이버·카카오·AI 3사·카드 데이터·작품 API·PWA), 출처 포함 | ●● |
 | 20 | [restraint-spending](20-restraint-spending.md) | 참은 소비: 참아야 할 금액(사치 + 예산 초과) 계산, 직접 기록, 위시 자동 포함 조건, 월 정산, 예외 | ●● |
 | 21 | [phase0-log](21-phase0-log.md) | 0단계 진행 기록: 검증 항목 상태, 만든 파일, 사용자 준비물 | ● |
+| 22 | [personas-and-test-scenarios](22-personas-and-test-scenarios.md) | 페르소나 8명, 페르소나별 시나리오, 입력·날짜 경계값/극한값 테스트, 발견한 문제(BUG-01 일기 삭제 후 404) | ●● |
 | — | [assets/theme-salesforce.json](assets/theme-salesforce.json) | 선택한 tweakcn 테마 원본 값 | |
 
 ## 문서 간 관계

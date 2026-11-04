@@ -88,8 +88,8 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
     if (!entry) return;
     await removeEntry(entry.id);
     localStorage.removeItem(draftKey(entry.id));
-    router.push(`/records?month=${entry.date.slice(0, 7)}`);
-    router.refresh();
+    // 이동만(목록은 이동하며 새로 불러옴). 바로 refresh하면 지운 일기 주소를 다시 불러와 404가 뜸
+    router.replace(`/records?month=${entry.date.slice(0, 7)}`);
     toastUndo("휴지통으로 옮겼어요", async () => {
       await restoreEntry(entry.id);
       router.refresh();
