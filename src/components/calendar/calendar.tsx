@@ -597,17 +597,14 @@ function EventForm({ draft, edit, calendars, close, done }: { draft: Draft; edit
             </SelectContent>
           </Select>
         </Field>
-        <Collapsible defaultOpen={!!(draft.location || draft.memo)}>
-          <CollapsibleTrigger asChild>
-            <Button type="button" variant="ghost" size="sm" className="text-muted-foreground -ml-2">
-              <Plus /> 장소·메모 추가
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="space-y-2 pt-2">
-            <Input aria-label="장소" placeholder="장소" maxLength={200} value={v.location ?? ""} onChange={(e) => set("location", e.target.value)} />
-            <Textarea aria-label="메모" placeholder="메모" maxLength={2000} value={v.memo ?? ""} onChange={(e) => set("memo", e.target.value)} />
-          </CollapsibleContent>
-        </Collapsible>
+        <Field>
+          <FieldLabel htmlFor="ev-location">장소</FieldLabel>
+          <Input id="ev-location" maxLength={200} value={v.location ?? ""} onChange={(e) => set("location", e.target.value)} />
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="ev-memo">메모</FieldLabel>
+          <Textarea id="ev-memo" maxLength={2000} className="min-h-16" value={v.memo ?? ""} onChange={(e) => set("memo", e.target.value)} />
+        </Field>
         {error && <FieldError>{error}</FieldError>}
       </FieldGroup>
     </ResponsiveModal>
