@@ -3,12 +3,13 @@
 // 캘린더 목록(일정 화면 왼쪽, 좁은 화면은 "캘린더" 창): 체크로 보이기, 내 캘린더 추가·고치기, 구글 캘린더 연동(07 §4 G1)
 // 내 캘린더는 끌어 순서 바꾸기(휴대폰은 길게 누른 뒤 끌기). 맨 위가 기본 캘린더 — 우클릭(길게 누르고 있기) "기본 캘린더로 지정"은 맨 위로 올림
 // 구글: 제목 옆 + → 연결 창(앱 키 만드는 법 → 키 넣고 연결 테스트 → 구글 계정 연결)
-import { Check, Copy, ExternalLink, Pencil, Plus, RefreshCw, Star } from "lucide-react";
+import { Check, Copy, Ellipsis, ExternalLink, Pencil, Plus, RefreshCw, Star, Unlink } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { addCalendar, checkGoogleKeys, editCalendar, removeCalendar, reorderCalendar, restoreCalendar, setGoogleKeys, syncGoogleNow, unlinkGoogle } from "@/app/actions/calendar";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useDragSort } from "@/hooks/use-drag-sort";
 import { ColorPalettePicker } from "@/components/app/color-picker";
 import { ResponsiveModal } from "@/components/app/responsive";
@@ -20,6 +21,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
 import { textOn } from "@/lib/palette";
+import { cn } from "@/lib/utils";
 import type { CalendarItem } from "@/server/calendar";
 import type { GoogleStatus } from "@/server/google-calendar";
 
@@ -332,16 +334,31 @@ export function CalendarList({ calendars, hidden, toggle, google }: { calendars:
         <div className="flex items-center gap-1.5 pl-2">
           <GoogleMark />
           <h2 className="text-sm font-semibold">구글 캘린더</h2>
-          {link?.status === "ok" ? (
+          {link?.status === "ok" && (
             <Button variant="ghost" size="icon" className="ml-auto size-7 max-md:size-9" aria-label="지금 가져오기" title="지금 가져오기" disabled={syncing} onClick={() => sync()}>
               <RefreshCw className={syncing ? "size-3.5 animate-spin" : "size-3.5"} />
             </Button>
+          )}
+          {/* 연동 해제는 자주 안 쓰니 ⋯ 메뉴 안에(목록 아래에 늘 보이면 거슬려서) */}
+          {link ? (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className={cn("text-muted-foreground size-7 max-md:size-9", link.status !== "ok" && "ml-auto")} aria-label="구글 캘린더 더 보기">
+                  <Ellipsis className="size-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                {link.account && <DropdownMenuLabel className="text-muted-foreground truncate font-normal">{link.account}</DropdownMenuLabel>}
+                {link.account && <DropdownMenuSeparator />}
+                <DropdownMenuItem variant="destructive" onSelect={() => setUnlink(true)}>
+                  <Unlink /> 연동 해제
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           ) : (
-            !link && (
-              <Button variant="ghost" size="icon" className="ml-auto size-7 max-md:size-9" aria-label="구글 캘린더 연결" title="구글 캘린더 연결" onClick={() => setConnect(true)}>
-                <Plus className="size-4" />
-              </Button>
-            )
+            <Button variant="ghost" size="icon" className="ml-auto size-7 max-md:size-9" aria-label="구글 캘린더 연결" title="구글 캘린더 연결" onClick={() => setConnect(true)}>
+              <Plus className="size-4" />
+            </Button>
           )}
         </div>
         {!link ? (
@@ -361,15 +378,11 @@ export function CalendarList({ calendars, hidden, toggle, google }: { calendars:
                 <Item key={c.id} c={c} on={!hidden.has(c.id)} toggle={(on) => toggle(c, on)} edit={() => setEdit({ ...c })} />
               ))}
             </ul>
-            <div className="text-muted-foreground flex items-center gap-2 px-2 text-caption">
-              <span className="min-w-0 truncate" title={link.account ?? undefined}>
-                {link.account}
-                {link.syncedAt && ` · ${ago(link.syncedAt)} 가져옴`}
-              </span>
-              <button type="button" className="hover:text-foreground ml-auto shrink-0 underline-offset-2 hover:underline" onClick={() => setUnlink(true)}>
-                연동 해제
-              </button>
-            </div>
+            {link.syncedAt && (
+              <p className="text-muted-foreground px-2 text-caption" title={link.account ?? undefined}>
+                {ago(link.syncedAt)} 가져옴
+              </p>
+            )}
           </>
         )}
       </section>
