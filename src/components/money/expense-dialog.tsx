@@ -1,7 +1,7 @@
 "use client";
 
 // 지출 입력·수정 (SCR-FIN-03, 04 §6.3): 결제 직후 15초 안에. 어느 화면에서든 열 수 있게 앱 셸에 하나만 둠
-import { ChevronDown, Plus } from "lucide-react";
+import { ChevronDown, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -51,6 +51,7 @@ export type TxEdit = {
   paymentMethodId: string | null;
   title: string | null;
   memo: string | null;
+  tags?: string[];
   plannedExpenseId?: string | null;
 };
 /** 위시 구매(09 §6, 04 §7.8): 가격·이름·쇼핑 분류로 채워 열고, 저장하면 지출 + 위시 구매함을 한 번에 */
@@ -93,6 +94,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
   const [date, setDate] = useState(edit?.date ?? ymd(new Date()));
   const [title, setTitle] = useState(edit?.title ?? wish?.name.slice(0, 60) ?? "");
   const [memo, setMemo] = useState(edit?.memo ?? "");
+  const [tags, setTags] = useState(edit?.tags ?? []);
   const [plannedId, setPlannedId] = useState<string | null>(edit?.plannedExpenseId ?? null);
   const [allCats, setAllCats] = useState(false);
   const [newCat, setNewCat] = useState<string | null>(null);
@@ -127,7 +129,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
     if (!categoryId) return setError({ field: "category", message: "분류를 골라 주세요" });
     setBusy(true);
     setError(null);
-    const input = { type, amount, isRefund: type === "expense" && refund, restraint: type === "expense" && restraint, date, categoryId, paymentMethodId: paymentId, title: title.trim() || null, memo: memo.trim() || null, plannedExpenseId: linked };
+    const input = { type, amount, isRefund: type === "expense" && refund, restraint: type === "expense" && restraint, date, categoryId, paymentMethodId: paymentId, title: title.trim() || null, memo: memo.trim() || null, tags, plannedExpenseId: linked };
     const r = edit ? await editTransaction(edit.id, edit.version, input) : wish ? await buyWish(key, wish.id, wish.version, input) : await addTransaction(key, input);
     setBusy(false);
     if (!r.ok) {
@@ -155,6 +157,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
       setAmount(null);
       setTitle("");
       setMemo("");
+      setTags([]);
       setCategoryId(null);
       setRestraint(false);
       setKey(newKey());
@@ -436,6 +439,8 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
           <Input id="tx-title" maxLength={60} placeholder={picked ? picked.name : "예: 점심"} className="h-11 text-base md:h-9 md:text-sm" value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
 
+        <TagInput value={tags} onChange={setTags} suggestions={data.tags} />
+
         {plannedOpts.length > 0 && (
           <Field orientation="horizontal" className="items-center">
             <FieldLabel className="shrink-0">큰 지출</FieldLabel>
@@ -493,6 +498,76 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
         )}
       </div>
     </form>
+  );
+}
+
+/** 태그(분류와 별개, 여러 개): 엔터·쉼표로 넣고, 많이 쓴 태그를 눌러 넣음. 정리 규칙은 서버 cleanTags와 같음 */
+function TagInput({ value, onChange, suggestions }: { value: string[]; onChange: (v: string[]) => void; suggestions: string[] }) {
+  const [text, setText] = useState("");
+  const [focused, setFocused] = useState(false);
+  const norm = (t: string) => t.replace(/[#,]/g, "").replace(/\s+/g, " ").trim().slice(0, 20);
+  const q = norm(text);
+  const add = (...ts: string[]) => {
+    const next = [...value];
+    for (const t of ts.map(norm)) if (t && !next.includes(t) && next.length < 10) next.push(t);
+    if (next.length > value.length) onChange(next);
+    setText("");
+  };
+  const hints = suggestions.filter((s) => !value.includes(s) && s.includes(q)).slice(0, 8);
+  const full = value.length >= 10;
+  return (
+    <Field>
+      <FieldLabel htmlFor="tx-tags">태그</FieldLabel>
+      <div className="border-input focus-within:border-ring focus-within:ring-ring/50 flex min-h-11 flex-wrap items-center gap-1.5 rounded-md border px-2 py-1 focus-within:ring-[3px] md:min-h-9">
+        {value.map((t) => (
+          <Badge key={t} variant="secondary" className="h-7 gap-0.5 pr-0.5 text-sm">
+            #{t}
+            <button type="button" aria-label={`${t} 태그 빼기`} className="hover:bg-background/60 rounded-full p-1" onClick={() => onChange(value.filter((x) => x !== t))}>
+              <X className="size-3.5" />
+            </button>
+          </Badge>
+        ))}
+        <input
+          id="tx-tags"
+          value={text}
+          disabled={full}
+          maxLength={24}
+          enterKeyHint="done"
+          autoComplete="off"
+          placeholder={full ? "10개까지 달 수 있어요" : value.length ? "" : "예: 여행-제주, 데이트"}
+          className="h-8 min-w-24 flex-1 bg-transparent text-base outline-none md:text-sm"
+          onChange={(e) => {
+            // 쉼표 앞은 태그로(붙여 넣은 "a, b"도), 뒤는 계속 입력
+            const parts = e.target.value.split(",");
+            if (parts.length > 1) add(...parts.slice(0, -1));
+            setText(parts.at(-1)!);
+          }}
+          onKeyDown={(e) => {
+            if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              add(q);
+            } else if (e.key === "Backspace" && !text && value.length) onChange(value.slice(0, -1));
+          }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => (setFocused(false), add(q))}
+        />
+      </div>
+      {/* 누를 때 칸이 포커스를 잃지 않게(onMouseDown) → 쓰던 글자가 따로 들어가지 않음 */}
+      {focused && !full && (hints.length > 0 || q) && (
+        <div className="flex flex-wrap gap-1.5" onMouseDown={(e) => e.preventDefault()}>
+          {hints.map((t) => (
+            <Button key={t} type="button" variant="outline" className="h-9 rounded-full border-dashed px-3 md:h-7" onClick={() => add(t)}>
+              <Plus /> {t}
+            </Button>
+          ))}
+          {q && !suggestions.includes(q) && !value.includes(q) && (
+            <Button type="button" variant="outline" className="text-accent-foreground h-9 rounded-full border-dashed px-3 md:h-7" onClick={() => add(q)}>
+              <Plus /> &quot;{q}&quot; 새로 만들기
+            </Button>
+          )}
+        </div>
+      )}
+    </Field>
   );
 }
 

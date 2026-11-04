@@ -154,6 +154,7 @@ export const transactions = pgTable(
     title: text("title"),
     memo: text("memo"),
     installmentMonths: integer("installment_months").notNull().default(1),
+    tags: text("tags").array().notNull().default(sql`'{}'::text[]`), // 개인 태그(분류와 별개, 여러 개). 정리 규칙은 finance.ts cleanTags
     plannedExpenseId: uuid("planned_expense_id"), // 큰 지출에 연결되면 분류별 예산 사용에서 빠짐(06 §4.1)
   },
   (t) => [

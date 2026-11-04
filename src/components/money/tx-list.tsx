@@ -40,6 +40,11 @@ export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; c
                       </span>
                       <span className="text-muted-foreground block truncate text-caption">
                         {[r.title ? categories[r.categoryId] : null, r.paymentMethodId ? payments[r.paymentMethodId] : null].filter(Boolean).join(" · ")}
+                        {r.tags?.map((t) => (
+                          <span key={t} className="text-accent-foreground ml-1.5">
+                            #{t}
+                          </span>
+                        ))}
                       </span>
                     </span>
                     <span className="shrink-0 tabular-nums">

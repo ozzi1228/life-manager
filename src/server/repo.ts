@@ -50,7 +50,7 @@ export function defineRepo<T extends AnyTable>(table: T, entity: string) {
         .from(table as PgTable)
         .where(alive(ctx, o.where))
         .orderBy(...(o.orderBy ?? [desc(table.id)]))
-        .limit(Math.min(o.limit ?? 200, 1000))) as Row<T>[];
+        .limit(Math.min(o.limit ?? 200, 5000))) as Row<T>[];
     },
 
     async create(ctx: Ctx, values: Insert<T>, o: { source?: string; tx?: Tx } = {}): Promise<Row<T>> {

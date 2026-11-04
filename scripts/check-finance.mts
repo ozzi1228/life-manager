@@ -44,6 +44,42 @@ try {
   assert.equal((await monthTransactions(B, "2026-11")).length, 0);
   console.log("지출 규칙 확인 통과");
 
+  // 태그·검색·필터·통계(SCR-FIN-02)
+  const { readFilter, txStats } = await import("../src/lib/tx-search.ts");
+  const { searchTransactions, tagList } = await import("../src/server/finance.ts");
+  const jeju = await createTransaction(A, { ...base, date: "2026-10-20", amount: 30000, title: "흑돼지 100%", memo: "제주 둘째 날", tags: ["#여행-제주", " 데이트 ", "여행-제주", ""] });
+  assert.deepEqual(jeju.row.tags, ["여행-제주", "데이트"], "태그 정리: # 빼고, 공백 정리, 같은 건 하나");
+  await createTransaction(A, { ...base, date: "2026-10-21", amount: 8000, title: "공항 김밥", tags: ["여행-제주"] });
+  assert.deepEqual((await tagList(A)).slice(0, 2), ["여행-제주", "데이트"], "많이 쓴 태그 먼저");
+  const now = "2026-11-04";
+  const find = (sp: Record<string, string | string[]>) => searchTransactions(A, readFilter(sp, now));
+  assert.equal((await find({})).length, 4, "기본은 이번 달");
+  assert.equal((await find({ period: "all", tag: "여행-제주" })).length, 2, "태그로 전체 기간");
+  assert.equal((await find({ period: "all", q: "제주" })).length, 2, "검색: 메모·태그");
+  assert.equal((await find({ period: "all", q: "100%" })).length, 1, "검색어의 %는 글자 그대로");
+  assert.equal((await find({ period: "all", q: "식비" })).length, 6, "검색: 분류 이름");
+  assert.equal((await find({ period: "all", q: "제주" }).then((r) => r.length)) + (await searchTransactions(B, readFilter({ period: "all", q: "제주" }, now))).length, 2, "남의 것은 안 보임");
+  assert.equal((await find({ type: "refund" })).length, 1);
+  assert.equal((await find({ type: "expense" })).length, 2, "지출 = 환불 뺀 지출");
+  assert.equal((await find({ restraint: "1" })).length, 1);
+  assert.equal((await find({ period: "all", min: "10000", max: "40000" })).length, 2, "금액 범위");
+  assert.equal((await find({ period: "range", from: "2026-10-21", to: "2026-10-01" })).length, 3, "거꾸로 고른 기간도");
+  assert.equal(readFilter({ cat: ["x", food.id] }, now).cats.length, 1, "잘못된 id는 버림");
+
+  const s = txStats(await find({}), "2026-11-01", "2026-11-30");
+  assert.deepEqual([s.kind, s.total, s.income, s.refund, s.restraint, s.count], ["expense", 60000, 100000, 2000, 50000, 4]);
+  assert.equal(s.avg, 30000, "평균 = 합계(환불 차감) / 환불 아닌 지출 건수");
+  assert.equal(s.top[0].amount, 50000);
+  assert.deepEqual(s.byCategory, [{ key: food.id, amount: 60000, count: 2 }]);
+  assert.equal(s.trend.unit, "day");
+  assert.equal(s.trend.points.length, 30, "빈 날도 채움");
+  assert.equal(s.trend.points[0].amount, 60000);
+  const st = txStats(await find({ period: "all", tag: "여행-제주" }));
+  assert.deepEqual(st.byTag.map((p) => [p.key, p.amount]), [["여행-제주", 38000], ["데이트", 30000]], "태그별 합계");
+  assert.equal(txStats(await find({ period: "year" }), "2026-01-01", "2026-12-31").trend.unit, "month");
+  assert.equal(txStats(await find({ type: "income" })).kind, "income");
+  console.log("검색·필터·통계 확인 통과");
+
   // 고정 지출: 주기별 필수 값, 해지 예정·해지됨, 남의 결제수단 불가
   const { createRecurring, scheduleEnd, endNow, cancelEnd, recurringList, upcoming, paysBetween } = await import("../src/server/recurring.ts");
   const { todayIn } = await import("../src/server/time.ts");

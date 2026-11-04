@@ -1,8 +1,9 @@
 // 돈 서비스 (docs/planning/06 §3, 15 §6). 화면(Server Action)과 이후 /api/v1이 함께 씀
-import { and, asc, desc, eq, gte, isNull, lt, max, sql } from "drizzle-orm";
+import { and, arrayOverlaps, asc, desc, eq, gte, ilike, inArray, isNull, lt, lte, max, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { db, type Tx } from "../db/index.ts";
 import { finCategories, paymentMethods, plannedExpenses, transactions } from "../db/schema.ts";
+import type { TxFilter } from "../lib/tx-search.ts";
 import { parse } from "./validate.ts";
 import { AppError } from "./errors.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
@@ -40,11 +41,12 @@ export async function formData(ctx: Ctx) {
       .from(transactions)
       .where(and(eq(transactions.userId, ctx.userId), isNull(transactions.deletedAt), gte(transactions.date, since)))
       .groupBy(col);
-  const [cats, pms, pmUse, planned] = await Promise.all([
+  const [cats, pms, pmUse, planned, tags] = await Promise.all([
     categoryRepo.list(ctx, { where: eq(finCategories.isHidden, false), orderBy: [asc(finCategories.sort)] }),
     paymentRepo.list(ctx, { where: eq(paymentMethods.isHidden, false), orderBy: [asc(paymentMethods.sort), asc(paymentMethods.createdAt)] }),
     lastUse(transactions.paymentMethodId),
     plannedRepo.list(ctx, { where: gte(plannedExpenses.month, since.slice(0, 7)), orderBy: [asc(plannedExpenses.createdAt)] }),
+    tagList(ctx),
   ]);
   const recent = (uses: { id: string | null; last: Date | null }[]) => new Map(uses.map((u) => [u.id, u.last?.getTime() ?? 0]));
   const byRecent = <T extends { id: string; sort: number }>(list: T[], use: Map<string | null, number>) =>
@@ -56,7 +58,19 @@ export async function formData(ctx: Ctx) {
     paymentMethods: orderedPm.map((p) => ({ id: p.id, kind: p.kind, name: p.name })),
     lastPaymentMethodId: pmRecent.size ? orderedPm[0]?.id ?? null : null,
     planned: planned.map((p) => ({ id: p.id, month: p.month, name: p.name })),
+    tags,
   };
+}
+
+/** 태그 정리: #·쉼표 빼고 공백은 한 칸, 20자, 같은 건 하나만, 10개까지 */
+export const cleanTags = (tags: string[]) => [...new Set(tags.map((t) => t.replace(/[#,]/g, "").replace(/\s+/g, " ").trim().slice(0, 20)).filter(Boolean))].slice(0, 10);
+
+/** 내가 쓴 태그(많이 쓴 순) — 입력 자동완성·필터용 */
+export async function tagList(ctx: Ctx) {
+  const r = await db.execute<{ tag: string }>(sql`
+    select tag from (select unnest(${transactions.tags}) as tag from ${transactions} where ${transactions.userId} = ${ctx.userId} and ${transactions.deletedAt} is null) t
+    group by tag order by count(*) desc, tag limit 100`);
+  return r.rows.map((x) => x.tag);
 }
 
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜를 다시 선택해 주세요");
@@ -70,6 +84,7 @@ export const txInput = z.object({
   paymentMethodId: z.uuid().nullable().default(null),
   title: z.string().trim().max(60, "내용은 60자까지 쓸 수 있어요").nullable().default(null),
   memo: z.string().trim().max(1000).nullable().default(null),
+  tags: z.array(z.string().max(100)).max(30).default([]).transform(cleanTags),
   plannedExpenseId: z.uuid().nullable().default(null),
 });
 export type TxInput = z.input<typeof txInput>;
@@ -109,6 +124,40 @@ export async function monthTransactions(ctx: Ctx, month: string, type?: "expense
     orderBy: [desc(transactions.date), desc(transactions.createdAt)],
     limit: 1000,
   });
+}
+
+/** 검색·필터(src/lib/tx-search.ts readFilter). 검색어는 내용·메모·태그·분류 이름·결제수단 이름에서 찾음 */
+// ponytail: 5000건까지만 불러와 화면에서 셈. 더 쌓이면 통계를 SQL 집계로
+export const SEARCH_LIMIT = 5000;
+export async function searchTransactions(ctx: Ctx, f: TxFilter) {
+  const t = transactions;
+  const w: (SQL | undefined)[] = [f.from ? gte(t.date, f.from) : undefined, f.to ? lte(t.date, f.to) : undefined];
+  if (f.q) {
+    const like = `%${f.q.replace(/[\\%_]/g, "\\$&")}%`; // % _ \ 는 글자 그대로
+    const [cats, pms] = await Promise.all([
+      db.select({ id: finCategories.id }).from(finCategories).where(and(eq(finCategories.userId, ctx.userId), ilike(finCategories.name, like))),
+      db.select({ id: paymentMethods.id }).from(paymentMethods).where(and(eq(paymentMethods.userId, ctx.userId), ilike(paymentMethods.name, like))),
+    ]);
+    w.push(
+      or(
+        ilike(t.title, like),
+        ilike(t.memo, like),
+        sql`array_to_string(${t.tags}, ' ') ilike ${like}`,
+        cats.length ? inArray(t.categoryId, cats.map((c) => c.id)) : undefined,
+        pms.length ? inArray(t.paymentMethodId, pms.map((p) => p.id)) : undefined,
+      ),
+    );
+  }
+  if (f.type === "income") w.push(eq(t.type, "income"));
+  if (f.type === "expense") w.push(eq(t.type, "expense"), eq(t.isRefund, false));
+  if (f.type === "refund") w.push(eq(t.isRefund, true));
+  if (f.cats.length) w.push(inArray(t.categoryId, f.cats));
+  if (f.pms.length) w.push(inArray(t.paymentMethodId, f.pms));
+  if (f.tags.length) w.push(arrayOverlaps(t.tags, f.tags)); // 고른 태그 중 하나라도
+  if (f.min !== undefined) w.push(gte(t.amount, f.min));
+  if (f.max !== undefined) w.push(lte(t.amount, f.max));
+  if (f.restraint) w.push(eq(t.restraint, true));
+  return txRepo.list(ctx, { where: and(...w), orderBy: [desc(t.date), desc(t.createdAt)], limit: SEARCH_LIMIT });
 }
 
 /** 지출 합계(환불 차감)와 수입 합계 */
@@ -194,5 +243,6 @@ export const toRow = (r: typeof transactions.$inferSelect) => ({
   paymentMethodId: r.paymentMethodId,
   title: r.title,
   memo: r.memo,
+  tags: r.tags,
   plannedExpenseId: r.plannedExpenseId,
 });
