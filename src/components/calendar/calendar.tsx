@@ -3,9 +3,10 @@
 // 일정 (SCR-CAL-01~03, 04 §4): 연(연간 계획표)·월·주·일 보기, 선택한 날 목록, 상세, 추가·수정(반복), 반복 범위 고르기, 내 캘린더 관리
 // 주소: /calendar?view=year|month|week|day&date=YYYY-MM-DD. 키보드: T 오늘, Y/M/W/D 보기
 // 우클릭(휴대폰은 길게 누르기): 빈 칸 → 일정 추가, 일정 → 상세·수정·복제·배경색·삭제. 칸·일정은 data-day·data-time·data-ev로 찾음
-// ponytail: 칩 끌어 옮기기·주간 드래그로 시간 고르기·모바일 스와이프는 아직 — 빈 칸 누르기(PC 두 번 클릭)로 그 날·그 시간 추가
+// 월 보기: 칸을 누르면 그 날 일정 목록(PC 오른쪽 시트·모바일 서랍) → 일정을 누르면 상세. PC는 칩을 바로 눌러도 상세
+// ponytail: 칩 끌어 옮기기·주간 드래그로 시간 고르기·모바일 스와이프는 아직 — 주·일 보기는 빈 칸 누르기로 그 시간 추가
 import { PeriodGoals, type PeriodGoal } from "@/components/goals/period-goals";
-import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Copy, Eye, Layers, MapPin, Palette, Pencil, Plus, Repeat, StickyNote, Trash2 } from "lucide-react";
+import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Copy, Eye, Layers, MapPin, Palette, Pencil, Plus, Repeat, StickyNote, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -128,9 +129,10 @@ function DayList({ day, items, color, open, add, today, compact }: { day: string
 
 // ── 월 보기 ──
 
-function MonthGrid({ from, month, selected, today, items, color, select, open, add, mobile }: { from: string; month: string; selected: string; today: string; items: Instance[]; color: (e: Instance) => string; select: (d: string) => void; open: (e: Instance) => void; add: (d: string) => void; mobile: boolean }) {
+function MonthGrid({ from, month, selected, today, items, color, openDay, open, mobile }: { from: string; month: string; selected: string; today: string; items: Instance[]; color: (e: Instance) => string; openDay: (d: string) => void; open: (e: Instance) => void; mobile: boolean }) {
   const days = Array.from({ length: 42 }, (_, i) => addDays(from, i));
   const rows = days[35].slice(0, 7) === month ? 6 : 5;
+  const max = mobile ? 2 : 4;
   return (
     <div className="rounded-lg border">
       <div className="grid grid-cols-7 border-b text-center text-caption">
@@ -144,7 +146,6 @@ function MonthGrid({ from, month, selected, today, items, color, select, open, a
         {days.slice(0, rows * 7).map((d) => {
           const list = items.filter((e) => onDay(e, d));
           const out = d.slice(0, 7) !== month;
-          const max = 3;
           return (
             <div
               key={d}
@@ -153,10 +154,9 @@ function MonthGrid({ from, month, selected, today, items, color, select, open, a
               aria-label={`${dayTitle(d)}${list.length ? `, 일정 ${list.length}개` : ""}`}
               aria-selected={d === selected}
               tabIndex={d === selected ? 0 : -1}
-              onClick={() => select(d)}
-              onDoubleClick={() => add(d)}
-              onKeyDown={(ev) => ev.key === "Enter" && add(d)}
-              className={cn("min-h-16 cursor-pointer border-r border-b p-1 text-left md:min-h-24", out && "bg-muted/40", d === selected && "bg-accent/60")}
+              onClick={() => openDay(d)}
+              onKeyDown={(ev) => ev.key === "Enter" && openDay(d)}
+              className={cn("hover:bg-accent/30 min-h-20 min-w-0 cursor-pointer border-r border-b p-0.5 text-left md:min-h-28 md:p-1 xl:min-h-32", out && "bg-muted/40", d === selected && "bg-accent/60")}
             >
               <span
                 className={cn(
@@ -166,25 +166,58 @@ function MonthGrid({ from, month, selected, today, items, color, select, open, a
               >
                 {+d.slice(8)}
               </span>
-              {mobile ? (
-                <span className="flex justify-center gap-0.5 pt-0.5">
-                  {list.slice(0, 3).map((e) => (
-                    <span key={e.id + e.occurrenceDate} className="size-1.5 rounded-full" style={{ background: color(e) }} />
-                  ))}
-                </span>
-              ) : (
-                <div className="space-y-0.5">
-                  {list.slice(0, max).map((e) => (
+              <div className="space-y-0.5">
+                {list.slice(0, max).map((e) =>
+                  mobile ? (
+                    // 모바일: 칸이 좁아 누르면 그 날 목록(칩은 누를 수 없는 짧은 제목 막대, 길게 누르면 일정 메뉴)
+                    <span key={e.id + e.occurrenceDate} data-ev={evKey(e)} className="block truncate rounded-[3px] px-0.5 text-[10px] leading-4" style={{ background: `${color(e)}33`, borderLeft: `2px solid ${color(e)}` }}>
+                      {e.title}
+                    </span>
+                  ) : (
                     <Chip key={e.id + e.occurrenceDate} e={e} color={color(e)} onOpen={() => open(e)} day={d} />
-                  ))}
-                  {list.length > max && <span className="text-muted-foreground block px-1 text-caption">+{list.length - max}</span>}
-                </div>
-              )}
+                  ),
+                )}
+                {list.length > max && <span className="text-muted-foreground block px-0.5 text-[10px] leading-4 md:px-1 md:text-caption">+{list.length - max}</span>}
+              </div>
             </div>
           );
         })}
       </div>
     </div>
+  );
+}
+
+// ── 그 날 일정 목록(달력 칸을 누르면): PC 오른쪽 시트, 모바일 아래 서랍. 일정을 누르면 상세가 그 위에 ──
+
+function DaySheet({ day, today, items, color, open, add, close, wrap }: { day: string; today: string; items: Instance[]; color: (e: Instance) => string; open: (e: Instance) => void; add: () => void; close: () => void; wrap: (n: React.ReactNode) => React.ReactNode }) {
+  return (
+    <ResponsiveDetail
+      open
+      onOpenChange={(o) => !o && close()}
+      title={
+        <>
+          {dayTitle(day)} {day === today && <span className="text-link text-sm">오늘</span>}
+        </>
+      }
+      description={items.length ? `일정 ${items.length}개` : undefined}
+      footer={
+        <Button className="w-full" onClick={add}>
+          <Plus /> 이 날 일정 추가
+        </Button>
+      }
+    >
+      {items.length ? (
+        wrap(
+          <ul data-day={day} className="-mx-2">
+            {items.map((e) => (
+              <Row key={e.id + e.occurrenceDate} e={e} color={color(e)} onOpen={() => open(e)} day={day} />
+            ))}
+          </ul>,
+        )
+      ) : (
+        <p className="text-muted-foreground py-6 text-center text-sm">일정이 없어요</p>
+      )}
+    </ResponsiveDetail>
   );
 }
 
@@ -629,6 +662,27 @@ function NotePanel({ note, title }: { note: Note; title: string }) {
   );
 }
 
+/** 보는 기간의 목표·메모. PC는 위에 나란히, 모바일은 한 줄로 접어 달력이 먼저 보이게 */
+function TopPanels({ label, goals, note, children }: { label: string; goals: PeriodGoal[]; note: Note; children: React.ReactNode }) {
+  const mobile = useIsMobile();
+  if (!mobile) return <div className="grid gap-4 lg:grid-cols-2">{children}</div>;
+  const done = goals.filter((g) => g.status === "done").length;
+  return (
+    <Collapsible>
+      <CollapsibleTrigger asChild>
+        <button type="button" className="bg-card flex h-11 w-full items-center gap-2 rounded-lg border px-3 text-left text-sm [&[data-state=open]>svg]:rotate-180">
+          <span className="font-semibold">{label} 목표·메모</span>
+          <span className="text-muted-foreground min-w-0 flex-1 truncate text-caption">
+            {[goals.length ? `목표 ${done}/${goals.length}` : "목표 없음", note.body.trim() ? `메모: ${note.body.trim().split("\n")[0]}` : ""].filter(Boolean).join(" · ")}
+          </span>
+          <ChevronDown className="text-muted-foreground size-4 shrink-0 transition-transform" />
+        </button>
+      </CollapsibleTrigger>
+      <CollapsibleContent className="space-y-3 pt-3">{children}</CollapsibleContent>
+    </Collapsible>
+  );
+}
+
 // ── 연 보기: 연간 계획표(가로 1~12월 × 세로 1~31일) ──
 // 칸을 누르면 그 날 일정 추가, 칩을 누르면 상세, +N은 그 달 보기. 없는 날(2월 30일 등)은 회색
 // ponytail: 공휴일 데이터가 없어 일요일만 분홍 — 공휴일 목록이 생기면 같은 색으로 칠하기
@@ -757,6 +811,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
   const [listOpen, setListOpen] = useState(false);
   const [hidden, setHidden] = useState(() => new Set(calendars.filter((c) => !c.isVisible).map((c) => c.id)));
   const [target, setTarget] = useState<Target>(null);
+  const [dayOpen, setDayOpen] = useState<string | null>(null); // 그 날 일정 목록(월 보기 칸 누르기)
 
   const go = (v: View, d: string) => router.push(`/calendar?view=${v}&date=${d}`, { scroll: false });
   const step = (n: number) => {
@@ -957,33 +1012,17 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
           </Button>
         </div>
 
-        {(view === "week" || view === "day") && (
-          <div className="grid gap-4 lg:grid-cols-2">
-            <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
-            {goalPanel}
-          </div>
-        )}
+        {/* 모든 보기: 목표·메모를 맨 위에(모바일은 접어 둠) */}
+        <TopPanels label={goalLabel} goals={goals} note={note}>
+          {goalPanel}
+          <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
+        </TopPanels>
         {view === "year" ? (
           <>
-            {/* 다른 보기처럼 메모·목표를 맨 위에(연 메모 옆, 모바일은 아래에 올해 목표) */}
-            <div className="grid gap-4 lg:grid-cols-2">
-              <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
-              {goalPanel}
-            </div>
             {menu(<YearPlanner key={date} year={date.slice(0, 4)} focus={date} today={today} items={visible} color={colorOf} open={setDetail} add={(d) => (setSelected(d), addAt(d))} month={(d) => go("month", d)} />)}
           </>
         ) : view === "month" ? (
-          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-            {menu(<MonthGrid from={from} month={date.slice(0, 7)} selected={selected} today={today} items={visible} color={colorOf} select={setSelected} open={setDetail} add={addAt} mobile={mobile} />)}
-            {/* 모바일은 고른 날 일정 → 메모 순 */}
-            <div className="flex flex-col gap-4">
-              <div className="flex flex-col gap-4 max-lg:order-last">
-                {goalPanel}
-                <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
-              </div>
-              {menu(<DayList day={selected} items={dayItems(selected)} color={colorOf} open={setDetail} add={() => addAt(selected)} today={today} />)}
-            </div>
-          </div>
+          menu(<MonthGrid from={from} month={date.slice(0, 7)} selected={selected} today={today} items={visible} color={colorOf} openDay={(d) => (setSelected(d), setDayOpen(d))} open={setDetail} mobile={mobile} />)
         ) : view === "week" && mobile ? (
           menu(
             <div className="divide-y">
@@ -999,6 +1038,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
         )}
       </div>
 
+      {dayOpen && view === "month" && <DaySheet day={dayOpen} today={today} items={dayItems(dayOpen)} color={colorOf} open={setDetail} add={() => addAt(dayOpen)} close={() => setDayOpen(null)} wrap={menu} />}
       {detail && <Detail e={detail} cal={calOf(detail)} close={() => setDetail(null)} edit={() => editOf(detail)} copy={() => copyOf(detail)} remove={() => askRemove(detail)} />}
       {scopeFor && <ScopeDialog title="반복 일정을 어떻게 지울까요?" close={() => setScopeFor(null)} pick={(s) => remove(scopeFor, s)} />}
       {form && <EventForm key={form.edit?.id ?? "new"} draft={form.draft} edit={form.edit} calendars={calendars} close={() => setForm(null)} done={done} />}
