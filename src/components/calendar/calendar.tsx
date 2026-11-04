@@ -4,7 +4,7 @@
 // 주소: /calendar?view=year|month|week|day&date=YYYY-MM-DD. 키보드: T 오늘, Y/M/W/D 보기
 // 우클릭(휴대폰은 길게 누르기): 빈 칸 → 일정 추가, 일정 → 상세·수정·복제·배경색·삭제. 칸·일정은 data-day·data-time·data-ev로 찾음
 // 월 보기: 칸을 누르면 그 날 일정 목록(PC 오른쪽 시트·모바일 서랍) → 일정을 누르면 상세. PC는 칩을 바로 눌러도 상세
-// ponytail: 칩 끌어 옮기기·주간 드래그로 시간 고르기·모바일 스와이프는 아직 — 주·일 보기는 빈 칸 누르기로 그 시간 추가
+// 주·일 보기: 시간표 대신 날짜별 목록(시간순). ponytail: 칩 끌어 옮기기·모바일 스와이프는 아직
 import { PeriodGoals, type PeriodGoal } from "@/components/goals/period-goals";
 import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Copy, Eye, Layers, MapPin, Palette, Pencil, Plus, Repeat, StickyNote, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
@@ -38,7 +38,6 @@ import type { GoogleStatus } from "@/server/google-calendar";
 
 type View = "year" | "month" | "week" | "day";
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
-const HOUR = 48; // 시간축 한 시간 높이(px)
 
 const md = (d: string) => `${+d.slice(5, 7)}월 ${+d.slice(8)}일`;
 const dayTitle = (d: string) => `${md(d)} (${WEEK[dayOfWeek(d)]})`;
@@ -221,118 +220,6 @@ function DaySheet({ day, today, items, color, open, add, close, wrap }: { day: s
       )}
     </ResponsiveDetail>
   );
-}
-
-// ── 주·일 보기(시간축) ──
-
-/** 하루의 시간 일정 조각: 여러 날 일정은 그 날 0시~24시로 자름. 겹치면 옆으로 나눔 */
-function layout(day: string, items: Instance[]) {
-  const segs = items
-    .filter((e) => !e.allDay && onDay(e, day))
-    .map((e) => ({ e, top: e.startDate === day ? minutes(e.startTime) : 0, bottom: e.endDate === day ? Math.max(minutes(e.endTime), minutes(e.startTime) + 15) : 1440 }))
-    .sort((a, b) => a.top - b.top || b.bottom - a.bottom);
-  const out: { e: Instance; top: number; bottom: number; col: number; cols: number }[] = [];
-  let cluster: typeof out = [];
-  let clusterEnd = -1;
-  const flush = () => {
-    const cols = Math.max(1, ...cluster.map((c) => c.col + 1));
-    for (const c of cluster) out.push({ ...c, cols });
-    cluster = [];
-  };
-  for (const s of segs) {
-    if (s.top >= clusterEnd) flush();
-    const used = new Set(cluster.filter((c) => c.bottom > s.top).map((c) => c.col));
-    let col = 0;
-    while (used.has(col)) col++;
-    cluster.push({ ...s, col, cols: 1 });
-    clusterEnd = Math.max(clusterEnd, s.bottom);
-  }
-  flush();
-  return out;
-}
-
-function TimeGrid({ days, today, items, color, open, add }: { days: string[]; today: string; items: Instance[]; color: (e: Instance) => string; open: (e: Instance) => void; add: (d: string, time?: string) => void }) {
-  // 처음엔 아침 7시쯤이 보이게
-  const scroller = (el: HTMLDivElement | null) => {
-    if (el && !el.dataset.scrolled) {
-      el.scrollTop = 7 * HOUR - 12;
-      el.dataset.scrolled = "1";
-    }
-  };
-  const allDay = (d: string) => items.filter((e) => e.allDay && onDay(e, d));
-  const cols = `48px repeat(${days.length}, minmax(0, 1fr))`;
-  return (
-    <div className="overflow-hidden rounded-lg border">
-      <div ref={scroller} className="max-h-[70vh] overflow-y-auto">
-        <div className="bg-card sticky top-0 z-10 grid border-b" style={{ gridTemplateColumns: cols }}>
-          <span />
-          {days.map((d) => (
-            <div key={d} data-day={d} className="border-l px-1 py-1 text-center">
-              <span className={cn("text-caption", dayOfWeek(d) === 0 ? "text-destructive-text" : "text-muted-foreground")}>{WEEK[dayOfWeek(d)]}</span>
-              <span className={cn("mx-auto flex size-7 items-center justify-center rounded-full tabular-nums", d === today && "bg-primary text-primary-foreground font-semibold")}>{+d.slice(8)}</span>
-              <div className="space-y-0.5">
-                {allDay(d).map((e) => (
-                  <Chip key={e.id + e.occurrenceDate} e={e} color={color(e)} onOpen={() => open(e)} day={d} />
-                ))}
-              </div>
-            </div>
-          ))}
-        </div>
-        <div className="relative grid" style={{ gridTemplateColumns: cols, height: 24 * HOUR }}>
-          <div>
-            {Array.from({ length: 24 }, (_, h) => (
-              <div key={h} className="text-muted-foreground relative pr-1 text-right text-micro" style={{ height: HOUR }}>
-                {h > 0 && <span className="relative -top-2">{h}시</span>}
-              </div>
-            ))}
-          </div>
-          {days.map((d) => (
-            <div key={d} className="relative border-l">
-              {Array.from({ length: 24 }, (_, h) => (
-                <button
-                  key={h}
-                  type="button"
-                  data-day={d}
-                  data-time={toHm(h * 60)}
-                  aria-label={`${dayTitle(d)} ${h}시에 일정 추가`}
-                  onClick={() => add(d, toHm(h * 60))}
-                  className="hover:bg-accent/40 block w-full border-b border-dashed"
-                  style={{ height: HOUR }}
-                />
-              ))}
-              {d === today && <NowLine />}
-              {layout(d, items).map(({ e, top, bottom, col, cols: n }) => (
-                <button
-                  key={e.id + e.occurrenceDate}
-                  type="button"
-                  data-ev={evKey(e)}
-                  onClick={() => open(e)}
-                  title={`${e.title} · ${whenLabel(e)}`}
-                  className="absolute overflow-hidden rounded-sm px-1 text-left text-caption leading-tight hover:brightness-95"
-                  style={{ ...tint(color(e)), top: (top / 60) * HOUR, height: Math.max(18, ((bottom - top) / 60) * HOUR - 2), left: `calc(${(col / n) * 100}% + 1px)`, width: `calc(${100 / n}% - 2px)` }}
-                >
-                  <span className="block truncate font-medium">{e.title}</span>
-                  {bottom - top >= 45 && e.startDate === d && <span className="text-muted-foreground block truncate tabular-nums">{e.startTime}</span>}
-                </button>
-              ))}
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function NowLine() {
-  const [now, setNow] = useState<number | null>(null);
-  useEffect(() => {
-    const tick = () => setNow(new Date().getHours() * 60 + new Date().getMinutes());
-    tick();
-    const t = setInterval(tick, 60_000);
-    return () => clearInterval(t);
-  }, []);
-  if (now === null) return null;
-  return <span aria-hidden className="bg-destructive pointer-events-none absolute right-0 left-0 h-0.5" style={{ top: (now / 60) * HOUR }} />;
 }
 
 // ── 상세 ──
@@ -960,7 +847,10 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
       : view === "week"
         ? `${md(from)} ~ ${addDays(from, 6).slice(5, 7) === from.slice(5, 7) ? `${+addDays(from, 6).slice(8)}일` : md(addDays(from, 6))}`
         : dayTitle(date);
-  const dayItems = (d: string) => visible.filter((e) => onDay(e, d));
+  const dayItems = (d: string) =>
+    visible
+      .filter((e) => onDay(e, d))
+      .sort((a, b) => (a.allDay || a.startDate < d ? "" : a.startTime!).localeCompare(b.allDay || b.startDate < d ? "" : b.startTime!));
   // 보는 기간의 목표(목표 메뉴의 기간별 목표와 같은 것): 바로 추가·달성 체크
   const goalLabel = view === "year" ? `${date.slice(0, 4)}년` : view === "month" ? `${+date.slice(5, 7)}월` : view === "week" ? label : md(date);
   const goalPanel = <PeriodGoals key={`goals-${view}-${note.key}`} scope={view} periodKey={note.key} label={goalLabel} goals={goals} />;
@@ -1014,18 +904,17 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
           </>
         ) : view === "month" ? (
           menu(<MonthGrid from={from} month={date.slice(0, 7)} selected={selected} today={today} items={visible} color={colorOf} openDay={(d) => (setSelected(d), setDayOpen(d))} open={setDetail} mobile={mobile} />)
-        ) : view === "week" && mobile ? (
+        ) : (
+          // 주·일 보기: 시간표 대신 날짜별 목록(시간 · 제목 · 장소, 시간순)
           menu(
-            <div className="divide-y">
-              {Array.from({ length: 7 }, (_, i) => addDays(from, i)).map((d) => (
+            <div className="bg-card divide-y rounded-lg border px-3">
+              {(view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(from, i)) : [date]).map((d) => (
                 <div key={d} className="py-2">
                   <DayList day={d} items={dayItems(d)} color={colorOf} open={setDetail} add={() => addAt(d)} today={today} compact />
                 </div>
               ))}
             </div>,
           )
-        ) : (
-          menu(<TimeGrid days={view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(from, i)) : [date]} today={today} items={visible} color={colorOf} open={setDetail} add={addAt} />)
         )}
       </div>
 
