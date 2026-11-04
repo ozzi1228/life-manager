@@ -80,6 +80,8 @@ export function ExpenseDialogProvider({ children }: { children: ReactNode }) {
 }
 
 const newKey = () => crypto.randomUUID();
+const OFFLINE_LOAD = "연결이 끊겨 불러오지 못했어요. 연결되면 다시 열어 주세요";
+const OFFLINE_SAVE = "연결이 끊겨 저장하지 못했어요. 입력한 값은 그대로 있어요. 연결되면 다시 눌러 주세요";
 
 function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; close: () => void }) {
   const router = useRouter();
@@ -107,12 +109,14 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
 
   // 열릴 때 한 번 불러옴(분류·결제수단, 마지막 쓴 결제수단)
   useEffect(() => {
-    expenseFormData().then((r) => {
-      if (!r.ok) return setLoadError(r.error.message);
-      setData(r.data);
-      if (!edit) setPaymentId(r.data.lastPaymentMethodId);
-      if (wish) setCategoryId(r.data.categories.find((c) => c.kind === "expense" && c.name === "쇼핑")?.id ?? null);
-    });
+    expenseFormData()
+      .then((r) => {
+        if (!r.ok) return setLoadError(r.error.message);
+        setData(r.data);
+        if (!edit) setPaymentId(r.data.lastPaymentMethodId);
+        if (wish) setCategoryId(r.data.categories.find((c) => c.kind === "expense" && c.name === "쇼핑")?.id ?? null);
+      })
+      .catch(() => setLoadError(OFFLINE_LOAD)); // 연결이 끊기면 요청 자체가 실패함(무한 로딩 방지)
   }, [edit, wish]);
 
   const cats = data?.categories.filter((c) => c.kind === type) ?? [];
@@ -130,8 +134,10 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
     setBusy(true);
     setError(null);
     const input = { type, amount, isRefund: type === "expense" && refund, restraint: type === "expense" && restraint, date, categoryId, paymentMethodId: paymentId, title: title.trim() || null, memo: memo.trim() || null, tags, plannedExpenseId: linked };
-    const r = edit ? await editTransaction(edit.id, edit.version, input) : wish ? await buyWish(key, wish.id, wish.version, input) : await addTransaction(key, input);
+    // 연결이 끊기면 요청 자체가 실패함 → 입력은 그대로 두고 안내(같은 key로 다시 눌러도 한 건만 저장)
+    const r = await (edit ? editTransaction(edit.id, edit.version, input) : wish ? buyWish(key, wish.id, wish.version, input) : addTransaction(key, input)).catch(() => null);
     setBusy(false);
+    if (!r) return setError({ message: OFFLINE_SAVE });
     if (!r.ok) {
       if (r.error.code === "VERSION_CONFLICT") return setError({ message: "다른 기기에서 먼저 수정했어요. 닫고 다시 열어 주세요" });
       const f = r.error.fields?.[0];

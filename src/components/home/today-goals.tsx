@@ -2,6 +2,7 @@
 
 // 홈 · 오늘의 습관 (04 §3.1): 트래커 항목마다 오늘 칸 하나. 누르면 바로 색이 채워지고 저장(트래커와 같은 칸)
 import { Check } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { saveCell } from "@/app/actions/goals";
@@ -11,8 +12,14 @@ import { cn } from "@/lib/utils";
 type Item = { id: string; name: string; colorHex: string };
 
 export function TodayGoals({ items, done, memos, today }: { items: Item[]; done: string[]; memos: Record<string, string | null>; today: string }) {
+  const router = useRouter();
   const [on, setOn] = useState(() => new Set(done));
   async function toggle(i: Item) {
+    // 화면을 연 채로 자정이 지나면 어제 칸에 체크되지 않게 새로 불러옴(한국 시간 기준, 서버 todayIn과 같게)
+    if (new Date().toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" }) !== today) {
+      toast("날짜가 바뀌어서 오늘 칸으로 새로 불러왔어요");
+      return router.refresh();
+    }
     const next = !on.has(i.id);
     const flip = (v: boolean) =>
       setOn((s) => {

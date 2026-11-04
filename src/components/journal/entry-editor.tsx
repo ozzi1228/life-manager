@@ -75,7 +75,8 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
     setBusy(true);
     setError("");
     const input = { date, topicId, title: title.trim() || null, bodyMd: body, photoIds: photos.map((p) => p.id) };
-    const r = entry ? await editEntry(entry.id, entry.version, input) : await addEntry(key.current, input);
+    // 연결이 끊기면 요청 자체가 실패함 → 아래 실패 처리로(임시 저장 + 안내)
+    const r = await (entry ? editEntry(entry.id, entry.version, input) : addEntry(key.current, input)).catch(() => ({ ok: false as const, error: { code: "OFFLINE", message: "연결이 끊겨 저장하지 못했어요. 쓴 내용은 이 기기에 임시 저장돼 있어요. 연결되면 다시 눌러 주세요", fields: undefined } }));
     setBusy(false);
     if (!r.ok) {
       // 5초마다 하는 임시 저장을 기다리지 않고 지금 쓴 내용을 바로 남김(아래 안내가 "임시 저장돼 있어요"라고 말하므로)

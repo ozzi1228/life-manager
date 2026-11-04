@@ -108,6 +108,7 @@ export default async function Home() {
           href: "/goals/habits",
           body: (
             <TodayGoals
+              key={today} // 날짜가 바뀌어 새로 불러오면 체크 상태도 새로
               items={tracker.items.map((i) => ({ id: i.id, name: i.name, colorHex: i.colorHex }))}
               done={todayCells.filter((c) => c.done).map((c) => c.itemId)}
               memos={Object.fromEntries(todayCells.map((c) => [c.itemId, c.memo]))}

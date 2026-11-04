@@ -62,7 +62,8 @@ export function LoginForm({ providers }: { providers: Provider[] }) {
     if (error) {
       setBusy(false);
       // 아이디·비밀번호 중 무엇이 틀렸는지 구분하지 않음(13 §3.3)
-      setMsg(error.status === 429 ? "잠시 후 다시 시도해 주세요" : "아이디 또는 비밀번호가 맞지 않아요");
+      // 401만 "맞지 않아요". 서버·연결 문제(403·5xx 등)를 비밀번호 탓으로 안내하지 않음(22 §5)
+      setMsg(error.status === 401 ? "아이디 또는 비밀번호가 맞지 않아요" : error.status === 429 ? "잠시 후 다시 시도해 주세요" : "지금은 로그인할 수 없어요. 잠시 후 다시 시도해 주세요");
       return;
     }
     if (linking && social) {
