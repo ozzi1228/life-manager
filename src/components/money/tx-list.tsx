@@ -1,6 +1,6 @@
 "use client";
 
-// 지출 목록 (SCR-FIN-02, 04 §6.2): 날짜별 묶음 · 행 = 제목 / #태그 / 분류·결제수단 · 금액. 행을 누르면 수정
+// 지출 목록 (SCR-FIN-02, 04 §6.2): 날짜별 묶음 · 행 = 제목 #태그 / 분류·결제수단 · 금액. 행을 누르면 수정
 import { StickyNote } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useExpenseDialog, type TxEdit } from "@/components/money/expense-dialog";
@@ -33,12 +33,12 @@ export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; c
                     <span className="min-w-0 flex-1">
                       <span className="flex items-center gap-1.5">
                         <span className="truncate">{r.title || categories[r.categoryId] || "분류 없음"}</span>
+                        {!!r.tags?.length && <span className="text-accent-foreground min-w-0 truncate text-caption">{r.tags.map((t) => `#${t}`).join(" ")}</span>}
                         {r.memo && <StickyNote className="text-muted-foreground size-3.5 shrink-0" aria-label="메모 있음" />}
                         {r.isRefund && <Badge variant="secondary">환불</Badge>}
                         {r.restraint && <Badge variant="outline">갚기</Badge>}
                         {date > today && <Badge variant="outline">예정</Badge>}
                       </span>
-                      {!!r.tags?.length && <span className="text-accent-foreground block truncate text-caption">{r.tags.map((t) => `#${t}`).join(" ")}</span>}
                       <span className="text-muted-foreground block truncate text-caption">
                         {[r.title ? categories[r.categoryId] : null, r.paymentMethodId ? payments[r.paymentMethodId] : null].filter(Boolean).join(" · ")}
                       </span>
