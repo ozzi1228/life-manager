@@ -57,6 +57,15 @@ export function useBackToClose(open: boolean, onOpenChange: (open: boolean) => v
 
 const WIDTH = { sm: "sm:max-w-[400px]", md: "sm:max-w-[520px]", lg: "sm:max-w-[720px]" };
 
+/** 입력 창에서 Ctrl+Enter(맥은 ⌘+Enter) = 저장: 창 안 마지막 기본(채운) 버튼을 누름. 꺼져 있으면(빈 칸 등) 아무 일 없음 */
+function saveOnCtrlEnter(e: React.KeyboardEvent<HTMLElement>) {
+  if (e.key !== "Enter" || !(e.ctrlKey || e.metaKey) || e.nativeEvent.isComposing) return;
+  const save = [...e.currentTarget.querySelectorAll<HTMLButtonElement>('button[data-variant="default"]:not(:disabled)')].at(-1);
+  if (!save) return;
+  e.preventDefault();
+  save.click();
+}
+
 export function ResponsiveModal({ open, onOpenChange, title, description, footer, children, size = "md" }: Props & { size?: keyof typeof WIDTH }) {
   const mobile = useIsMobile();
   const change = useBackToClose(open, onOpenChange);
@@ -64,7 +73,7 @@ export function ResponsiveModal({ open, onOpenChange, title, description, footer
     return (
       <Drawer open={open} onOpenChange={change} repositionInputs={false}>
         {/* 열 때 첫 칸으로 저절로 가지 않게(휴대폰 키보드가 갑자기 뜨지 않게). autoFocus를 준 칸은 그대로 */}
-        <DrawerContent className="max-h-[90vh]" onOpenAutoFocus={(e) => e.preventDefault()}>
+        <DrawerContent className="max-h-[90vh]" onOpenAutoFocus={(e) => e.preventDefault()} onKeyDown={saveOnCtrlEnter}>
           <DrawerHeader className="text-left">
             <DrawerTitle>{title}</DrawerTitle>
             {description && <DrawerDescription>{description}</DrawerDescription>}
@@ -78,7 +87,7 @@ export function ResponsiveModal({ open, onOpenChange, title, description, footer
   return (
     <Dialog open={open} onOpenChange={change}>
       {/* 본문만 스크롤, 저장 버튼(footer)은 늘 보이게 */}
-      <DialogContent className={cn(WIDTH[size], "flex max-h-[85vh] flex-col")}>
+      <DialogContent className={cn(WIDTH[size], "flex max-h-[85vh] flex-col")} onKeyDown={saveOnCtrlEnter}>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
           {description && <DialogDescription>{description}</DialogDescription>}
