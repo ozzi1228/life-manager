@@ -1,7 +1,8 @@
 // 일정 서비스 (docs/planning/07 §2, 15 §7). 날짜·반복 계산은 src/lib/calendar.ts
 // 반복 일정 고치기·지우기 범위(07 §2.3): 이 일정만(예외) / 이후 일정(원래 반복을 전날로 끝내고 새 반복) / 모든 일정(원본)
-// ponytail: 알림(웹 푸시)·겹쳐 보기(결제일 등)·외부 캘린더는 P1(M-21·C-08)
-import { and, asc, eq, gte, inArray, isNotNull, lte, or } from "drizzle-orm";
+// 구글 캘린더(source "google")는 가져온 읽기 전용 사본 — 고치기·지우기는 막고 배경색·보이기만(src/server/google-calendar.ts)
+// ponytail: 알림(웹 푸시)·겹쳐 보기(결제일 등)는 P1(M-21)
+import { and, asc, eq, gte, inArray, isNotNull, lte, ne, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
 import { uuidv7 } from "../db/id.ts";
@@ -20,8 +21,8 @@ export const exceptionRepo = defineRepo(eventExceptions, "event_exception");
 
 export async function calendarList(ctx: Ctx) {
   const list = await calendarRepo.list(ctx, { orderBy: [asc(calendars.sort), asc(calendars.createdAt)] });
-  if (list.length) return list;
-  const [any] = await db.select({ id: calendars.id }).from(calendars).where(eq(calendars.userId, ctx.userId)).limit(1);
+  if (list.some((c) => c.source !== "google")) return list;
+  const [any] = await db.select({ id: calendars.id }).from(calendars).where(and(eq(calendars.userId, ctx.userId), ne(calendars.source, "google"))).limit(1);
   if (any) return list; // 사용자가 다 지운 경우는 다시 만들지 않음 — 일정 추가 때 만듦
   await calendarRepo.create(ctx, { name: "내 일정", colorHex: GOAL_PALETTE[7].hex, sort: 0 }, { source: "default" });
   return calendarRepo.list(ctx, { orderBy: [asc(calendars.sort), asc(calendars.createdAt)] });
@@ -33,7 +34,7 @@ export type CalendarInput = z.input<typeof calendarInput>;
 
 export async function createCalendar(ctx: Ctx, input: unknown) {
   const v = parse(calendarInput, input);
-  const list = await calendarRepo.list(ctx);
+  const list = await calendarRepo.list(ctx, { where: ne(calendars.source, "google") });
   return calendarRepo.create(ctx, { ...v, sort: list.length });
 }
 export const updateCalendar = async (ctx: Ctx, id: string, version: number, input: unknown) => calendarRepo.update(ctx, id, version, parse(calendarInput, input));
@@ -42,8 +43,10 @@ export const setCalendarVisible = (ctx: Ctx, id: string, version: number, visibl
 /** 캘린더 지우기: 그 캘린더의 일정도 한 묶음으로 휴지통에(함께 복구). 마지막 하나는 못 지움 */
 export async function deleteCalendar(ctx: Ctx, id: string) {
   const list = await calendarRepo.list(ctx);
-  if (!list.some((c) => c.id === id)) throw new AppError("NOT_FOUND", "찾을 수 없어요");
-  if (list.length === 1) throw new AppError("BUSINESS_RULE", "캘린더가 하나는 있어야 해요");
+  const cal = list.find((c) => c.id === id);
+  if (!cal) throw new AppError("NOT_FOUND", "찾을 수 없어요");
+  if (cal.source === "google") throw new AppError("BUSINESS_RULE", "구글 캘린더는 체크를 끄면 숨겨져요. 없애려면 구글 연동을 해제해 주세요");
+  if (list.filter((c) => c.source !== "google").length === 1) throw new AppError("BUSINESS_RULE", "캘린더가 하나는 있어야 해요");
   const evs = await eventRepo.list(ctx, { where: eq(events.calendarId, id), limit: 1000 });
   const batchId = uuidv7();
   await db.transaction(async (tx) => {
@@ -85,7 +88,9 @@ export type EventInput = z.input<typeof eventInput>;
 export type Scope = "this" | "following" | "all";
 
 async function checkCalendar(ctx: Ctx, id: string) {
-  if (!(await calendarRepo.get(ctx, id).catch(() => null))) throw new AppError("VALIDATION_FAILED", "캘린더를 골라 주세요", { fields: [{ path: "calendarId", rule: "exists", message: "캘린더를 골라 주세요" }] });
+  const cal = await calendarRepo.get(ctx, id).catch(() => null);
+  if (cal?.source === "google") throw new AppError("BUSINESS_RULE", "구글 캘린더에는 여기서 일정을 넣을 수 없어요. 내 캘린더를 골라 주세요");
+  if (!cal) throw new AppError("VALIDATION_FAILED", "캘린더를 골라 주세요", { fields: [{ path: "calendarId", rule: "exists", message: "캘린더를 골라 주세요" }] });
 }
 
 export async function createEvent(ctx: Ctx, input: unknown) {
@@ -93,6 +98,14 @@ export async function createEvent(ctx: Ctx, input: unknown) {
   await checkCalendar(ctx, v.calendarId);
   return eventRepo.create(ctx, v);
 }
+
+const writable = <E extends { source: string }>(e: E) => {
+  if (e.source === "google") throw new AppError("BUSINESS_RULE", "구글 캘린더 일정은 구글에서 고쳐 주세요");
+  return e;
+};
+
+/** 일정 배경색(null = 캘린더 색). 반복 일정은 모든 회차. 구글 일정도 됨(이 앱에서만 보이는 색) */
+export const setEventColor = (ctx: Ctx, id: string, version: number, colorHex: string | null) => eventRepo.update(ctx, id, version, { colorHex: colorHex === null ? null : parse(hex, colorHex) });
 
 const overrideOf = (v: z.infer<typeof eventInput>) => {
   const { rrule: _rrule, ...rest } = v;
@@ -104,7 +117,7 @@ const overrideOf = (v: z.infer<typeof eventInput>) => {
 export async function updateEvent(ctx: Ctx, id: string, version: number, input: unknown, scope: Scope = "all", occurrenceDate?: string) {
   const v = parse(eventInput, input);
   await checkCalendar(ctx, v.calendarId);
-  const e = await eventRepo.get(ctx, id);
+  const e = writable(await eventRepo.get(ctx, id));
   const rule = parseRule(e.rrule);
   const occ = occurrenceDate ?? e.startDate;
   if (!rule || scope === "all" || (scope === "following" && occ <= e.startDate)) {
@@ -129,13 +142,13 @@ export async function updateEvent(ctx: Ctx, id: string, version: number, input: 
     await eventRepo.update(ctx, id, version, { rrule: ruleString({ ...rule, until: addDays(occ, -1), count: null }) }, { tx });
     const next = parseRule(v.rrule);
     const rrule = next && v.rrule === e.rrule && rule.count ? ruleString({ ...next, count: Math.max(1, rule.count - countBefore(e.startDate, rule, occ)) }) : v.rrule;
-    return eventRepo.create(ctx, { ...v, rrule }, { tx });
+    return eventRepo.create(ctx, { ...v, rrule, colorHex: e.colorHex }, { tx });
   });
 }
 
 /** 지우기. 반환값은 되돌리기용: { restoreId } = 휴지통 복구, { exceptionId } = 그 예외 지우기, 없으면 되돌리기 없음 */
 export async function deleteEvent(ctx: Ctx, id: string, scope: Scope = "all", occurrenceDate?: string): Promise<{ restoreId?: string; exceptionId?: string }> {
-  const e = await eventRepo.get(ctx, id);
+  const e = writable(await eventRepo.get(ctx, id));
   const rule = parseRule(e.rrule);
   const occ = occurrenceDate ?? e.startDate;
   if (!rule || scope === "all" || (scope === "following" && occ <= e.startDate)) {
@@ -197,12 +210,13 @@ export async function rangeView(ctx: Ctx, from: string, to: string) {
         endTime: i.endTime,
         location: i.location,
         memo: i.memo,
+        colorHex: e.colorHex,
         rrule: e.rrule,
         seriesStart: e.startDate,
       })),
     )
     .sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
-  return { calendars: cals.map((c) => ({ id: c.id, version: c.version, name: c.name, colorHex: c.colorHex, isVisible: c.isVisible })), instances };
+  return { calendars: cals.map((c) => ({ id: c.id, version: c.version, name: c.name, colorHex: c.colorHex, isVisible: c.isVisible, google: c.source === "google" })), instances };
 }
 export type Instance = Awaited<ReturnType<typeof rangeView>>["instances"][number];
 export type CalendarItem = Awaited<ReturnType<typeof rangeView>>["calendars"][number];

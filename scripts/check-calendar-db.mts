@@ -74,6 +74,28 @@ try {
   await restore(A, "calendar", work.id);
   assert.ok((await view()).some((s) => s.includes("회의")), "캘린더 복구 때 일정도");
   assert.equal(await code(cal.deleteCalendar(B, bCal.id)), "BUSINESS_RULE");
+
+  // 일정 배경색: 고르기 → 보기에 나옴, null이면 캘린더 색
+  const [m0] = (await cal.rangeView(A, "2026-11-05", "2026-11-05")).instances.filter((i) => i.title === "회의");
+  await cal.setEventColor(A, m0.id, m0.version, "#e5737a");
+  const [m1] = (await cal.rangeView(A, "2026-11-05", "2026-11-05")).instances.filter((i) => i.title === "회의");
+  assert.equal(m1.colorHex, "#E5737A");
+  await cal.setEventColor(A, m1.id, m1.version, null);
+
+  // 구글 사본: 고치기·지우기·일정 넣기·캘린더 지우기는 막고, 배경색은 됨
+  const g = await cal.calendarRepo.create(A, { name: "구글", colorHex: "#4285F4", externalId: "g1" }, { source: "google" });
+  const ge = await cal.eventRepo.create(A, { calendarId: g.id, title: "구글 일정", allDay: true, startDate: "2026-11-06", endDate: "2026-11-06", externalId: "e1" }, { source: "google" });
+  assert.equal(await code(cal.updateEvent(A, ge.id, ge.version, { ...base, calendarId: work.id, startDate: "2026-11-06", endDate: "2026-11-06" })), "BUSINESS_RULE");
+  assert.equal(await code(cal.deleteEvent(A, ge.id)), "BUSINESS_RULE");
+  assert.equal(await code(cal.createEvent(A, { ...base, calendarId: g.id, startDate: "2026-11-06", endDate: "2026-11-06" })), "BUSINESS_RULE");
+  assert.equal(await code(cal.deleteCalendar(A, g.id)), "BUSINESS_RULE");
+  await cal.setEventColor(A, ge.id, ge.version, "#5CB88A");
+
+  // 구글 일정 → 행: 종일은 끝 날짜가 다음 날(배타적), 시각은 서울 시간, 자정에 끝나면 그 전날 23:59
+  const { toRow } = await import("../src/server/google-calendar.ts");
+  assert.deepEqual(toRow({ id: "a", start: { date: "2026-11-06" }, end: { date: "2026-11-08" } }), { externalId: "a", title: "(제목 없음)", location: null, memo: null, allDay: true, startDate: "2026-11-06", startTime: null, endDate: "2026-11-07", endTime: null });
+  const t = toRow({ id: "b", summary: "회의", start: { dateTime: "2026-11-06T01:00:00Z" }, end: { dateTime: "2026-11-06T15:00:00Z" } })!;
+  assert.deepEqual([t.startDate, t.startTime, t.endDate, t.endTime], ["2026-11-06", "10:00", "2026-11-06", "23:59"]);
   console.log("일정 규칙 확인 통과");
 } catch (e) {
   // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄

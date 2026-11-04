@@ -468,14 +468,32 @@ export const restraintMonths = pgTable(
 );
 
 // ── 일정 (07, 14 §4.5) ──
-// 내 캘린더 여러 개(이름·색·보이기). 외부 캘린더 연결(C-08)이 붙으면 kind·external_calendar_id 추가
+// 내 캘린더 여러 개(이름·색·보이기). source "google"이면 구글에서 가져온 읽기 전용 사본(external_id = 구글 캘린더 id)
 export const calendars = pgTable("calendars", {
   ...userData(),
   name: text("name").notNull(),
   colorHex: text("color_hex").notNull(),
   isVisible: boolean("is_visible").notNull().default(true),
   sort: integer("sort").notNull().default(0),
+  externalId: text("external_id"),
 });
+
+// 구글 캘린더 연결(07 §4 G1 가져오기): 사용자당 하나. secret = 봉인한 refresh token(src/lib/ai/secret.ts)
+export const calendarLinks = pgTable(
+  "calendar_links",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    userId: userRef(),
+    provider: text("provider").notNull(),
+    account: text("account"),
+    secret: text("secret").notNull(),
+    status: text("status").notNull().default("ok"), // ok | broken(구글에서 권한 해제 등 → 다시 연결)
+    syncedAt: at("synced_at"),
+    createdAt: at("created_at").notNull().defaultNow(),
+    updatedAt: at("updated_at").notNull().defaultNow(),
+  },
+  (t) => [unique("calendar_links_user_provider").on(t.userId, t.provider)],
+);
 
 // 일정: 날짜 + (종일이 아니면) 시각. 반복은 RRULE 문자열(src/lib/calendar.ts)
 // ponytail: 시각은 사용자 시간대 벽시계 값(tz 열에 시간대). 알림(P1)·구글 연동(C-08)이 붙으면 UTC 시각 열 추가
@@ -494,6 +512,8 @@ export const events = pgTable(
     rrule: text("rrule"),
     location: text("location"),
     memo: text("memo"),
+    colorHex: text("color_hex"), // 일정만의 배경색(없으면 캘린더 색)
+    externalId: text("external_id"), // 구글 일정 id(가져온 사본)
   },
   (t) => [index("events_user_start").on(t.userId, t.startDate).where(sql`${t.deletedAt} is null`), check("events_dates", sql`${t.startDate} <= ${t.endDate}`)],
 );

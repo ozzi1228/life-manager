@@ -10,6 +10,7 @@ import {
   exceptionRepo,
   saveNote,
   setCalendarVisible,
+  setEventColor,
   updateCalendar,
   updateEvent,
   type CalendarInput,
@@ -17,6 +18,7 @@ import {
   type NoteScope,
   type Scope,
 } from "@/server/calendar";
+import { disconnectGoogle, syncGoogle } from "@/server/google-calendar";
 import { once } from "@/server/idempotency";
 import { restore } from "@/server/repo";
 
@@ -40,6 +42,21 @@ export async function undoRemoveEvent(undo: { restoreId?: string; exceptionId?: 
     if (undo.restoreId) await restore(ctx, "event", undo.restoreId);
     if (undo.exceptionId) await exceptionRepo.remove(ctx, undo.exceptionId);
   });
+}
+
+/** 일정 배경색(null = 캘린더 색) */
+export async function colorEvent(id: string, version: number, colorHex: string | null) {
+  return action(async (ctx) => {
+    await setEventColor(ctx, id, version, colorHex);
+  });
+}
+
+/** 구글 캘린더 지금 가져오기 · 연동 해제 */
+export async function syncGoogleNow() {
+  return action((ctx) => syncGoogle(ctx));
+}
+export async function unlinkGoogle() {
+  return action((ctx) => disconnectGoogle(ctx));
 }
 
 export async function addCalendar(input: CalendarInput) {

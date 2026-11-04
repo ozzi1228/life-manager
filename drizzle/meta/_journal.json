@@ -162,6 +162,13 @@
       "when": 1793604616422,
       "tag": "0022_goal_period",
       "breakpoints": true
+    },
+    {
+      "idx": 23,
+      "version": "7",
+      "when": 1793695833686,
+      "tag": "0023_calendar_google",
+      "breakpoints": true
     }
   ]
 }

@@ -58,3 +58,10 @@
 
 - 휴대폰: 설정 > 알림 > 이 기기에서 알림 받기. iPhone은 홈 화면에 추가한 앱에서만 된다.
 - 보내는 것: 고정 지출 결제 하루 전(9시 뒤), 이번 달 예산 80%·초과(그달 한 번씩), 매달 1일 참은 소비 정산 결과. 종류별로 끌 수 있다.
+
+## 7. 구글 캘린더 연동 켜기 (07 §4 G1)
+
+1. [Google Cloud 콘솔](https://console.cloud.google.com/)에서 프로젝트 → **Google Calendar API** 사용 설정
+2. OAuth 동의 화면: 외부, 범위 `calendar.calendarlist.readonly`·`calendar.events.readonly`. **게시 상태를 Production으로**(Testing이면 7일마다 연결이 끊김. "확인되지 않은 앱" 경고는 본인 사용엔 괜찮음)
+3. 사용자 인증 정보 → OAuth 클라이언트 ID(웹 애플리케이션). 승인된 리디렉션 URI: `<BETTER_AUTH_URL>/api/v1/google/callback` (개발 `http://localhost:3330/api/v1/google/callback`, 운영 `https://oona.<tailnet>.ts.net/api/v1/google/callback`)
+4. `.env`에 `GOOGLE_CLIENT_ID`·`GOOGLE_CLIENT_SECRET` 넣고 다시 시작 → 일정 화면 왼쪽 "구글 캘린더 연동하기"

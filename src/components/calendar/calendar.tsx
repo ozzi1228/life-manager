@@ -2,23 +2,25 @@
 
 // 일정 (SCR-CAL-01~03, 04 §4): 연(연간 계획표)·월·주·일 보기, 선택한 날 목록, 상세, 추가·수정(반복), 반복 범위 고르기, 내 캘린더 관리
 // 주소: /calendar?view=year|month|week|day&date=YYYY-MM-DD. 키보드: T 오늘, Y/M/W/D 보기
+// 우클릭(휴대폰은 길게 누르기): 빈 칸 → 일정 추가, 일정 → 상세·수정·복제·배경색·삭제. 칸·일정은 data-day·data-time·data-ev로 찾음
 // ponytail: 칩 끌어 옮기기·주간 드래그로 시간 고르기·모바일 스와이프는 아직 — 빈 칸 누르기(PC 두 번 클릭)로 그 날·그 시간 추가
 import { PeriodGoals, type PeriodGoal } from "@/components/goals/period-goals";
-import { ChevronLeft, ChevronRight, Clock, MapPin, Plus, Repeat, Settings2, StickyNote } from "lucide-react";
+import { CalendarDays, Check, ChevronLeft, ChevronRight, Clock, Copy, Eye, Layers, MapPin, Palette, Pencil, Plus, Repeat, StickyNote, Trash2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { addCalendar, addEvent, editCalendar, editEvent, removeCalendar, removeEvent, restoreCalendar, saveCalendarNote, showCalendar, undoRemoveEvent } from "@/app/actions/calendar";
-import { ColorPalettePicker } from "@/components/app/color-picker";
+import { addEvent, colorEvent, editEvent, removeEvent, saveCalendarNote, showCalendar, undoRemoveEvent } from "@/app/actions/calendar";
+import { CalendarList } from "@/components/calendar/calendar-list";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
 import { toastUndo } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
-import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuLabel, ContextMenuSeparator, ContextMenuSub, ContextMenuSubContent, ContextMenuSubTrigger, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { GOAL_PALETTE } from "@/lib/palette";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -29,6 +31,7 @@ import { addDays, dayOfWeek, daysBetween, parseRule, ruleLabel, ruleString, type
 import { fromYmd, ymd } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { CalendarItem, EventInput, Instance, NoteScope, Scope } from "@/server/calendar";
+import type { GoogleStatus } from "@/server/google-calendar";
 
 type View = "year" | "month" | "week" | "day";
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
@@ -50,6 +53,8 @@ function whenLabel(e: Pick<Instance, "allDay" | "startDate" | "startTime" | "end
 }
 const onDay = (e: Instance, d: string) => e.startDate <= d && e.endDate >= d;
 const tint = (hex: string) => ({ background: `${hex}26`, borderLeft: `3px solid ${hex}` });
+/** 우클릭 메뉴가 찾는 일정 표시 */
+const evKey = (e: Instance) => `${e.id}|${e.occurrenceDate}`;
 
 // ── 일정 칩·행 ──
 
@@ -57,6 +62,7 @@ function Chip({ e, color, onOpen, day }: { e: Instance; color: string; onOpen: (
   return (
     <button
       type="button"
+      data-ev={evKey(e)}
       onClick={(ev) => (ev.stopPropagation(), onOpen())}
       onDoubleClick={(ev) => ev.stopPropagation()}
       title={`${e.title} · ${whenLabel(e)}`}
@@ -72,7 +78,7 @@ function Chip({ e, color, onOpen, day }: { e: Instance; color: string; onOpen: (
 function Row({ e, color, onOpen, day }: { e: Instance; color: string; onOpen: () => void; day: string }) {
   return (
     <li>
-      <button type="button" onClick={onOpen} className="hover:bg-accent/50 flex w-full items-start gap-3 rounded-md px-2 py-2 text-left">
+      <button type="button" data-ev={evKey(e)} onClick={onOpen} className="hover:bg-accent/50 flex w-full items-start gap-3 rounded-md px-2 py-2 text-left">
         <span className="text-muted-foreground w-16 shrink-0 text-sm tabular-nums">{e.allDay || e.startDate !== day ? (e.allDay ? "종일" : "이어서") : hmLabel(e.startTime!)}</span>
         <span className="mt-1.5 size-2.5 shrink-0 rounded-full" style={{ background: color }} />
         <span className="min-w-0 flex-1">
@@ -90,7 +96,7 @@ function Row({ e, color, onOpen, day }: { e: Instance; color: string; onOpen: ()
 function DayList({ day, items, color, open, add, today, compact }: { day: string; items: Instance[]; color: (e: Instance) => string; open: (e: Instance) => void; add: () => void; today: string; compact?: boolean }) {
   // compact(모바일 주 보기): 머리 줄에 + 버튼, 빈 날은 한 줄
   return (
-    <section className={compact ? "space-y-1" : "space-y-2"}>
+    <section data-day={day} className={compact ? "space-y-1" : "space-y-2"}>
       <div className="flex items-center gap-2">
         <h2 className="font-semibold">
           {dayTitle(day)} {day === today && <span className="text-link text-sm">오늘</span>}
@@ -143,6 +149,7 @@ function MonthGrid({ from, month, selected, today, items, color, select, open, a
             <div
               key={d}
               role="gridcell"
+              data-day={d}
               aria-label={`${dayTitle(d)}${list.length ? `, 일정 ${list.length}개` : ""}`}
               aria-selected={d === selected}
               tabIndex={d === selected ? 0 : -1}
@@ -225,7 +232,7 @@ function TimeGrid({ days, today, items, color, open, add }: { days: string[]; to
         <div className="bg-card sticky top-0 z-10 grid border-b" style={{ gridTemplateColumns: cols }}>
           <span />
           {days.map((d) => (
-            <div key={d} className="border-l px-1 py-1 text-center">
+            <div key={d} data-day={d} className="border-l px-1 py-1 text-center">
               <span className={cn("text-caption", dayOfWeek(d) === 0 ? "text-destructive-text" : "text-muted-foreground")}>{WEEK[dayOfWeek(d)]}</span>
               <span className={cn("mx-auto flex size-7 items-center justify-center rounded-full tabular-nums", d === today && "bg-primary text-primary-foreground font-semibold")}>{+d.slice(8)}</span>
               <div className="space-y-0.5">
@@ -250,6 +257,8 @@ function TimeGrid({ days, today, items, color, open, add }: { days: string[]; to
                 <button
                   key={h}
                   type="button"
+                  data-day={d}
+                  data-time={toHm(h * 60)}
                   aria-label={`${dayTitle(d)} ${h}시에 일정 추가`}
                   onClick={() => add(d, toHm(h * 60))}
                   className="hover:bg-accent/40 block w-full border-b border-dashed"
@@ -261,6 +270,7 @@ function TimeGrid({ days, today, items, color, open, add }: { days: string[]; to
                 <button
                   key={e.id + e.occurrenceDate}
                   type="button"
+                  data-ev={evKey(e)}
                   onClick={() => open(e)}
                   title={`${e.title} · ${whenLabel(e)}`}
                   className="absolute overflow-hidden rounded-sm px-1 text-left text-caption leading-tight hover:brightness-95"
@@ -293,6 +303,7 @@ function NowLine() {
 // ── 상세 ──
 
 function Detail({ e, cal, close, edit, copy, remove }: { e: Instance; cal?: CalendarItem; close: () => void; edit: () => void; copy: () => void; remove: () => void }) {
+  const ro = !!cal?.google;
   return (
     <ResponsiveDetail
       open
@@ -300,15 +311,19 @@ function Detail({ e, cal, close, edit, copy, remove }: { e: Instance; cal?: Cale
       title={e.title}
       footer={
         <div className="flex w-full gap-2">
-          <Button variant="ghost" className="text-destructive-text" onClick={remove}>
-            삭제
-          </Button>
+          {!ro && (
+            <Button variant="ghost" className="text-destructive-text" onClick={remove}>
+              삭제
+            </Button>
+          )}
           <Button variant="ghost" onClick={copy}>
-            복제
+            {ro ? "내 캘린더로 복제" : "복제"}
           </Button>
-          <Button variant="outline" className="ml-auto" onClick={edit}>
-            수정
-          </Button>
+          {!ro && (
+            <Button variant="outline" className="ml-auto" onClick={edit}>
+              수정
+            </Button>
+          )}
         </div>
       }
     >
@@ -335,6 +350,7 @@ function Detail({ e, cal, close, edit, copy, remove }: { e: Instance; cal?: Cale
         {cal && (
           <li className="flex items-center gap-2">
             <span className="mx-[3px] size-2.5 rounded-full" style={{ background: cal.colorHex }} /> {cal.name}
+            {ro && <span className="text-muted-foreground">· 구글에서 가져옴(고치기는 구글에서)</span>}
           </li>
         )}
       </ul>
@@ -538,7 +554,7 @@ function EventForm({ draft, edit, calendars, close, done }: { draft: Draft; edit
               </SelectValue>
             </SelectTrigger>
             <SelectContent>
-              {calendars.map((c) => (
+              {calendars.filter((c) => !c.google).map((c) => (
                 <SelectItem key={c.id} value={c.id}>
                   <span className="size-2.5 rounded-full" style={{ background: c.colorHex }} /> {c.name}
                 </SelectItem>
@@ -559,75 +575,6 @@ function EventForm({ draft, edit, calendars, close, done }: { draft: Draft; edit
         </Collapsible>
         {error && <FieldError>{error}</FieldError>}
       </FieldGroup>
-    </ResponsiveModal>
-  );
-}
-
-// ── 내 캘린더 ──
-
-function CalendarManager({ calendars, close, refresh }: { calendars: CalendarItem[]; close: () => void; refresh: () => void }) {
-  const [edit, setEdit] = useState<{ id?: string; version?: number; name: string; colorHex: string } | null>(null);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function save() {
-    if (!edit) return;
-    setBusy(true);
-    const input = { name: edit.name, colorHex: edit.colorHex };
-    const r = edit.id ? await editCalendar(edit.id, edit.version!, input) : await addCalendar(input);
-    setBusy(false);
-    if (!r.ok) return setError(r.error.fields?.[0]?.message ?? r.error.message);
-    setEdit(null);
-    refresh();
-  }
-  async function remove(c: CalendarItem) {
-    const r = await removeCalendar(c.id);
-    if (!r.ok) return toast(r.error.message);
-    setEdit(null);
-    refresh();
-    toastUndo(`${c.name} 캘린더와 일정을 휴지통으로 옮겼어요`, async () => {
-      await restoreCalendar(c.id);
-      refresh();
-    });
-  }
-
-  return (
-    <ResponsiveModal open onOpenChange={(o) => !o && close()} title="내 캘린더">
-      {edit ? (
-        <FieldGroup className="gap-4">
-          <Input autoFocus aria-label="캘린더 이름" placeholder="예: 회사, 가족" maxLength={20} value={edit.name} onChange={(e) => setEdit({ ...edit, name: e.target.value })} />
-          <ColorPalettePicker value={edit.colorHex} onChange={(colorHex) => setEdit({ ...edit, colorHex })} used={calendars.filter((c) => c.id !== edit.id).map((c) => c.colorHex)} />
-          {error && <FieldError>{error}</FieldError>}
-          <div className="flex gap-2">
-            {edit.id && calendars.length > 1 && (
-              <Button variant="ghost" className="text-destructive-text" onClick={() => remove(calendars.find((c) => c.id === edit.id)!)}>
-                삭제
-              </Button>
-            )}
-            <Button variant="outline" className="ml-auto" onClick={() => setEdit(null)}>
-              취소
-            </Button>
-            <Button disabled={!edit.name.trim() || busy} onClick={save}>
-              저장
-            </Button>
-          </div>
-        </FieldGroup>
-      ) : (
-        <div className="space-y-2">
-          <ul className="divide-y rounded-lg border">
-            {calendars.map((c) => (
-              <li key={c.id}>
-                <button type="button" onClick={() => setEdit({ ...c })} className="hover:bg-accent/50 flex w-full items-center gap-3 px-3 py-2.5 text-left">
-                  <span className="size-3 rounded-full" style={{ background: c.colorHex }} /> {c.name}
-                </button>
-              </li>
-            ))}
-          </ul>
-          <Button variant="outline" onClick={() => setEdit({ name: "", colorHex: "#5B8DEF" })}>
-            <Plus /> 캘린더 추가
-          </Button>
-        </div>
-      )}
     </ResponsiveModal>
   );
 }
@@ -749,6 +696,7 @@ function YearPlanner({ year, focus, today, items, color, open, add, month }: { y
                     <button
                       key={e.id + e.occurrenceDate}
                       type="button"
+                      data-ev={evKey(e)}
                       onClick={() => open(e)}
                       title={`${e.title} · ${whenLabel(e)}`}
                       className="pointer-events-auto block w-full truncate rounded-[3px] px-0.5 text-left text-micro leading-3.5 hover:brightness-95"
@@ -780,7 +728,9 @@ function newDraft(calendarId: string, d: string, time?: string): Draft {
   return { calendarId, title: "", allDay: false, startDate: d, startTime: start, endDate: d, endTime: toHm(Math.min(minutes(start) + 60, 1439)), rrule: null, location: null, memo: null };
 }
 
-export function CalendarView({ view, date, from, today, calendars, instances, note, goals, startNew }: { view: View; date: string; from: string; today: string; calendars: CalendarItem[]; instances: Instance[]; note: Note; goals: PeriodGoal[]; startNew?: boolean }) {
+type Target = { kind: "day"; day: string; time?: string } | { kind: "ev"; e: Instance } | null;
+
+export function CalendarView({ view, date, from, today, calendars, instances, note, goals, google, startNew }: { view: View; date: string; from: string; today: string; calendars: CalendarItem[]; instances: Instance[]; note: Note; goals: PeriodGoal[]; google: GoogleStatus; startNew?: boolean }) {
   const router = useRouter();
   const mobile = useIsMobile();
   const [selected, setSelected] = useState(date);
@@ -790,14 +740,23 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
     setSelected(date);
   }
   const [detail, setDetail] = useState<Instance | null>(null);
+  const writable = calendars.filter((c) => !c.google);
   // 빠른 추가(+ → 일정 추가, ?new=1)면 처음부터 추가 창
-  const [form, setForm] = useState<{ draft: Draft; edit?: Instance } | null>(() => (startNew ? { draft: newDraft(calendars.find((c) => c.isVisible)?.id ?? calendars[0]?.id ?? "", date) } : null));
+  const [form, setForm] = useState<{ draft: Draft; edit?: Instance } | null>(() => (startNew ? { draft: newDraft(writable.find((c) => c.isVisible)?.id ?? writable[0]?.id ?? "", date) } : null));
   useEffect(() => {
     if (startNew) router.replace(`/calendar?view=${view}&date=${date}`, { scroll: false });
   }, [startNew, router, view, date]);
+  // 구글 연동하고 돌아왔을 때(?google=connected|denied|error|off)
+  useEffect(() => {
+    const g = new URLSearchParams(window.location.search).get("google");
+    if (!g) return;
+    toast(({ connected: "구글 캘린더를 연동했어요", denied: "구글 연동을 취소했어요", off: "서버에 구글 앱 키가 없어 연동할 수 없어요" } as Record<string, string>)[g] ?? "구글 연동을 마치지 못했어요. 다시 해 주세요");
+    router.replace(`/calendar?view=${view}&date=${date}`, { scroll: false });
+  }, [router, view, date]);
   const [scopeFor, setScopeFor] = useState<Instance | null>(null);
-  const [manage, setManage] = useState(false);
+  const [listOpen, setListOpen] = useState(false);
   const [hidden, setHidden] = useState(() => new Set(calendars.filter((c) => !c.isVisible).map((c) => c.id)));
+  const [target, setTarget] = useState<Target>(null);
 
   const go = (v: View, d: string) => router.push(`/calendar?view=${v}&date=${d}`, { scroll: false });
   const step = (n: number) => {
@@ -814,7 +773,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement;
-      if (e.metaKey || e.ctrlKey || e.altKey || t.closest("input, textarea, [contenteditable], [role=dialog]")) return;
+      if (e.metaKey || e.ctrlKey || e.altKey || t.closest("input, textarea, [contenteditable], [role=dialog], [role=menu]")) return;
       const k = e.key.toLowerCase();
       if (k === "t") go(view, today);
       else if (k === "y" || k === "m" || k === "w" || k === "d") go(({ y: "year", m: "month", w: "week", d: "day" } as const)[k], selected);
@@ -824,10 +783,14 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
   });
 
   const visible = instances.filter((e) => !hidden.has(e.calendarId));
-  const colorOf = (e: Instance) => calendars.find((c) => c.id === e.calendarId)?.colorHex ?? "#888888";
-  const defaultCal = calendars.find((c) => !hidden.has(c.id))?.id ?? calendars[0]?.id ?? "";
+  const calOf = (e: Instance) => calendars.find((c) => c.id === e.calendarId);
+  const colorOf = (e: Instance) => e.colorHex ?? calOf(e)?.colorHex ?? "#888888";
+  const defaultCal = writable.find((c) => !hidden.has(c.id))?.id ?? writable[0]?.id ?? "";
   const addAt = (d: string, time?: string) => setForm({ draft: newDraft(defaultCal, d, time) });
-  const draftOf = (e: Instance): Draft => ({ calendarId: e.calendarId, title: e.title, allDay: e.allDay, startDate: e.startDate, startTime: e.startTime, endDate: e.endDate, endTime: e.endTime, rrule: e.rrule, location: e.location, memo: e.memo });
+  const draftOf = (e: Instance): Draft => ({ calendarId: calOf(e)?.google ? defaultCal : e.calendarId, title: e.title, allDay: e.allDay, startDate: e.startDate, startTime: e.startTime, endDate: e.endDate, endTime: e.endTime, rrule: e.rrule, location: e.location, memo: e.memo });
+  const editOf = (e: Instance) => (setForm({ draft: draftOf(e), edit: e }), setDetail(null));
+  const copyOf = (e: Instance) => (setForm({ draft: { ...draftOf(e), title: calOf(e)?.google ? e.title : `${e.title} (복제)`, rrule: null } }), setDetail(null));
+  const askRemove = (e: Instance) => (e.rrule ? (setScopeFor(e), setDetail(null)) : remove(e));
   const done = (d: string) => {
     setForm(null);
     router.refresh();
@@ -848,6 +811,11 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
       });
     else toast("이후 일정을 지웠어요");
   }
+  async function setColor(e: Instance, hex: string | null) {
+    const r = await colorEvent(e.id, e.version, hex);
+    if (!r.ok) return toast(r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 고쳤어요. 다시 해 주세요" : r.error.message);
+    router.refresh();
+  }
   async function toggleCal(c: CalendarItem, on: boolean) {
     setHidden((h) => {
       const n = new Set(h);
@@ -858,6 +826,85 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
     const r = await showCalendar(c.id, c.version, on);
     if (r.ok) router.refresh();
   }
+
+  // 우클릭·길게 누르기: 누른 곳의 일정(data-ev) 또는 칸(data-day·data-time)을 기억해 메뉴 내용을 정함. 둘 다 아니면 메뉴를 안 띄움
+  const pick = (ev: React.SyntheticEvent) => {
+    const el = ev.target as HTMLElement;
+    const evEl = el.closest<HTMLElement>("[data-ev]");
+    const dayEl = el.closest<HTMLElement>("[data-day]");
+    const e = evEl && visible.find((x) => evKey(x) === evEl.dataset.ev);
+    const t: Target = e ? { kind: "ev", e } : dayEl ? { kind: "day", day: dayEl.dataset.day!, time: dayEl.dataset.time } : null;
+    setTarget(t);
+    if (!t && ev.type === "contextmenu") ev.preventDefault();
+  };
+  const ro = target?.kind === "ev" && !!calOf(target.e)?.google;
+  const menu = (children: React.ReactNode) => (
+    <ContextMenu modal={false}>
+      <ContextMenuTrigger asChild onContextMenu={pick} onPointerDown={pick}>
+        <div>{children}</div>
+      </ContextMenuTrigger>
+      {target && (
+        <ContextMenuContent className="w-52">
+          {target.kind === "day" ? (
+            <>
+              <ContextMenuLabel className="text-muted-foreground text-caption">
+                {dayTitle(target.day)}
+                {target.time && ` ${hmLabel(target.time)}`}
+              </ContextMenuLabel>
+              <ContextMenuItem onSelect={() => (setSelected(target.day), addAt(target.day, target.time))}>
+                <Plus /> 일정 추가
+              </ContextMenuItem>
+              <ContextMenuItem onSelect={() => (setSelected(target.day), setForm({ draft: { ...newDraft(defaultCal, target.day), allDay: true, startTime: null, endTime: null } }))}>
+                <CalendarDays /> 종일 일정 추가
+              </ContextMenuItem>
+              {view !== "day" && (
+                <ContextMenuItem onSelect={() => go("day", target.day)}>
+                  <Eye /> 이 날 보기
+                </ContextMenuItem>
+              )}
+            </>
+          ) : (
+            <>
+              <ContextMenuLabel className="truncate">{target.e.title}</ContextMenuLabel>
+              <ContextMenuItem onSelect={() => setDetail(target.e)}>
+                <Eye /> 자세히 보기
+              </ContextMenuItem>
+              <ContextMenuItem disabled={ro} onSelect={() => editOf(target.e)}>
+                <Pencil /> 수정
+              </ContextMenuItem>
+              <ContextMenuItem onSelect={() => copyOf(target.e)}>
+                <Copy /> {ro ? "내 캘린더로 복제" : "복제"}
+              </ContextMenuItem>
+              <ContextMenuSub>
+                <ContextMenuSubTrigger>
+                  <Palette className="text-muted-foreground size-4" /> 배경색
+                </ContextMenuSubTrigger>
+                <ContextMenuSubContent className="w-48 p-2">
+                  <div className="grid grid-cols-6 gap-1.5" role="group" aria-label="배경색">
+                    {GOAL_PALETTE.map((c) => (
+                      <ContextMenuItem key={c.hex} aria-label={c.name} title={c.name} className="flex size-6 items-center justify-center rounded-full p-0 focus:ring-2 focus:ring-ring" style={{ background: c.hex }} onSelect={() => setColor(target.e, c.hex)}>
+                        {target.e.colorHex === c.hex && <Check className="size-3.5 text-white" />}
+                      </ContextMenuItem>
+                    ))}
+                  </div>
+                  <ContextMenuSeparator className="my-2" />
+                  <ContextMenuItem disabled={!target.e.colorHex} onSelect={() => setColor(target.e, null)}>
+                    <span className="size-3 rounded-full" style={{ background: calOf(target.e)?.colorHex }} /> 캘린더 색으로
+                  </ContextMenuItem>
+                  {target.e.rrule && <p className="text-muted-foreground px-2 pt-1 text-caption">반복 일정은 모든 회차가 바뀌어요</p>}
+                </ContextMenuSubContent>
+              </ContextMenuSub>
+              <ContextMenuSeparator />
+              <ContextMenuItem variant="destructive" disabled={ro} onSelect={() => askRemove(target.e)}>
+                <Trash2 /> 삭제
+              </ContextMenuItem>
+              {ro && <p className="text-muted-foreground px-2 py-1 text-caption">구글 일정은 구글에서 고쳐 주세요</p>}
+            </>
+          )}
+        </ContextMenuContent>
+      )}
+    </ContextMenu>
+  );
 
   const label =
     view === "year"
@@ -872,106 +919,94 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
   const goalLabel = view === "year" ? `${date.slice(0, 4)}년` : view === "month" ? `${+date.slice(5, 7)}월` : view === "week" ? label : md(date);
   const goalPanel = <PeriodGoals key={`goals-${view}-${note.key}`} scope={view} periodKey={note.key} label={goalLabel} goals={goals} />;
   const noteTitle = view === "year" ? `${date.slice(0, 4)}년 메모` : view === "month" ? `${+date.slice(5, 7)}월 메모` : view === "week" ? `${label} 메모` : `${md(date)} 메모`;
+  const list = <CalendarList calendars={calendars} hidden={hidden} toggle={toggleCal} google={google} />;
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center">
-          <Button variant="outline" size="icon" className="max-md:size-11" aria-label="이전" onClick={() => step(-1)}>
-            <ChevronLeft />
-          </Button>
-          <span className="min-w-28 px-2 text-center font-semibold tabular-nums">{label}</span>
-          <Button variant="outline" size="icon" className="max-md:size-11" aria-label="다음" onClick={() => step(1)}>
-            <ChevronRight />
-          </Button>
-        </div>
-        <Button variant="outline" size="sm" className="max-md:h-11" onClick={() => go(view, today)}>
-          오늘
-        </Button>
-        {/* 모바일: 보기 전환은 둘째 줄에 꽉 차게 */}
-        <ToggleGroup type="single" variant="outline" size="sm" value={view} onValueChange={(v) => v && go(v as View, selected)} aria-label="보기" className="max-md:order-last max-md:w-full md:ml-auto">
-          {[["year", "연"], ["month", "월"], ["week", "주"], ["day", "일"]].map(([k, t]) => (
-            <ToggleGroupItem key={k} value={k} className="max-md:h-10 max-md:flex-1">
-              {t}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
-        <Popover>
-          <PopoverTrigger asChild>
-            <Button variant="ghost" size="icon" className="max-md:ml-auto max-md:size-11" aria-label="캘린더 보기 설정">
-              <Settings2 />
+    // 넓은 화면(xl)은 왼쪽에 캘린더 목록이 늘 보이고, 좁으면 "캘린더" 버튼으로 엶
+    <div className="xl:grid xl:grid-cols-[13rem_minmax(0,1fr)] xl:gap-6">
+      <aside className="max-xl:hidden" aria-label="캘린더 목록">
+        <div className="sticky top-4">{list}</div>
+      </aside>
+      <div className="min-w-0 space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center">
+            <Button variant="outline" size="icon" className="max-md:size-11" aria-label="이전" onClick={() => step(-1)}>
+              <ChevronLeft />
             </Button>
-          </PopoverTrigger>
-          <PopoverContent align="end" className="w-60 space-y-2">
-            <p className="text-sm font-semibold">보이는 캘린더</p>
-            {calendars.map((c) => (
-              <label key={c.id} className="flex items-center gap-2 text-sm">
-                <Checkbox checked={!hidden.has(c.id)} onCheckedChange={(on) => toggleCal(c, on === true)} />
-                <span className="size-2.5 rounded-full" style={{ background: c.colorHex }} /> {c.name}
-              </label>
+            <span className="min-w-28 px-2 text-center font-semibold tabular-nums">{label}</span>
+            <Button variant="outline" size="icon" className="max-md:size-11" aria-label="다음" onClick={() => step(1)}>
+              <ChevronRight />
+            </Button>
+          </div>
+          <Button variant="outline" size="sm" className="max-md:h-11" onClick={() => go(view, today)}>
+            오늘
+          </Button>
+          {/* 모바일: 보기 전환은 둘째 줄에 꽉 차게 */}
+          <ToggleGroup type="single" variant="outline" size="sm" value={view} onValueChange={(v) => v && go(v as View, selected)} aria-label="보기" className="max-md:order-last max-md:w-full md:ml-auto">
+            {[["year", "연"], ["month", "월"], ["week", "주"], ["day", "일"]].map(([k, t]) => (
+              <ToggleGroupItem key={k} value={k} className="max-md:h-10 max-md:flex-1">
+                {t}
+              </ToggleGroupItem>
             ))}
-            <Button variant="outline" size="sm" className="w-full" onClick={() => setManage(true)}>
-              내 캘린더 관리
-            </Button>
-          </PopoverContent>
-        </Popover>
-        <Button className="max-md:hidden" onClick={() => addAt(selected)}>
-          <Plus /> 일정
-        </Button>
-      </div>
-
-      {(view === "week" || view === "day") && (
-        <div className="grid gap-4 lg:grid-cols-2">
-          <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
-          {goalPanel}
+          </ToggleGroup>
+          <Button variant="outline" size="sm" className="max-md:ml-auto max-md:h-11 xl:hidden" onClick={() => setListOpen(true)}>
+            <Layers /> 캘린더
+          </Button>
+          <Button className="max-md:hidden" onClick={() => addAt(selected)}>
+            <Plus /> 일정
+          </Button>
         </div>
-      )}
-      {view === "year" ? (
-        <>
-          {/* 다른 보기처럼 메모·목표를 맨 위에(연 메모 옆, 모바일은 아래에 올해 목표) */}
+
+        {(view === "week" || view === "day") && (
           <div className="grid gap-4 lg:grid-cols-2">
             <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
             {goalPanel}
           </div>
-          <YearPlanner key={date} year={date.slice(0, 4)} focus={date} today={today} items={visible} color={colorOf} open={setDetail} add={(d) => (setSelected(d), addAt(d))} month={(d) => go("month", d)} />
-        </>
-      ) : view === "month" ? (
-        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-          <MonthGrid from={from} month={date.slice(0, 7)} selected={selected} today={today} items={visible} color={colorOf} select={setSelected} open={setDetail} add={addAt} mobile={mobile} />
-          {/* 모바일은 고른 날 일정 → 메모 순 */}
-          <div className="flex flex-col gap-4">
-            <div className="flex flex-col gap-4 max-lg:order-last">
-              {goalPanel}
+        )}
+        {view === "year" ? (
+          <>
+            {/* 다른 보기처럼 메모·목표를 맨 위에(연 메모 옆, 모바일은 아래에 올해 목표) */}
+            <div className="grid gap-4 lg:grid-cols-2">
               <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
+              {goalPanel}
             </div>
-            <DayList day={selected} items={dayItems(selected)} color={colorOf} open={setDetail} add={() => addAt(selected)} today={today} />
+            {menu(<YearPlanner key={date} year={date.slice(0, 4)} focus={date} today={today} items={visible} color={colorOf} open={setDetail} add={(d) => (setSelected(d), addAt(d))} month={(d) => go("month", d)} />)}
+          </>
+        ) : view === "month" ? (
+          <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+            {menu(<MonthGrid from={from} month={date.slice(0, 7)} selected={selected} today={today} items={visible} color={colorOf} select={setSelected} open={setDetail} add={addAt} mobile={mobile} />)}
+            {/* 모바일은 고른 날 일정 → 메모 순 */}
+            <div className="flex flex-col gap-4">
+              <div className="flex flex-col gap-4 max-lg:order-last">
+                {goalPanel}
+                <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
+              </div>
+              {menu(<DayList day={selected} items={dayItems(selected)} color={colorOf} open={setDetail} add={() => addAt(selected)} today={today} />)}
+            </div>
           </div>
-        </div>
-      ) : view === "week" && mobile ? (
-        <div className="divide-y">
-          {Array.from({ length: 7 }, (_, i) => addDays(from, i)).map((d) => (
-            <div key={d} className="py-2">
-              <DayList day={d} items={dayItems(d)} color={colorOf} open={setDetail} add={() => addAt(d)} today={today} compact />
-            </div>
-          ))}
-        </div>
-      ) : (
-        <TimeGrid days={view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(from, i)) : [date]} today={today} items={visible} color={colorOf} open={setDetail} add={addAt} />
-      )}
+        ) : view === "week" && mobile ? (
+          menu(
+            <div className="divide-y">
+              {Array.from({ length: 7 }, (_, i) => addDays(from, i)).map((d) => (
+                <div key={d} className="py-2">
+                  <DayList day={d} items={dayItems(d)} color={colorOf} open={setDetail} add={() => addAt(d)} today={today} compact />
+                </div>
+              ))}
+            </div>,
+          )
+        ) : (
+          menu(<TimeGrid days={view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(from, i)) : [date]} today={today} items={visible} color={colorOf} open={setDetail} add={addAt} />)
+        )}
+      </div>
 
-      {detail && (
-        <Detail
-          e={detail}
-          cal={calendars.find((c) => c.id === detail.calendarId)}
-          close={() => setDetail(null)}
-          edit={() => (setForm({ draft: draftOf(detail), edit: detail }), setDetail(null))}
-          copy={() => (setForm({ draft: { ...draftOf(detail), title: `${detail.title} (복제)`, rrule: null } }), setDetail(null))}
-          remove={() => (detail.rrule ? (setScopeFor(detail), setDetail(null)) : remove(detail))}
-        />
-      )}
+      {detail && <Detail e={detail} cal={calOf(detail)} close={() => setDetail(null)} edit={() => editOf(detail)} copy={() => copyOf(detail)} remove={() => askRemove(detail)} />}
       {scopeFor && <ScopeDialog title="반복 일정을 어떻게 지울까요?" close={() => setScopeFor(null)} pick={(s) => remove(scopeFor, s)} />}
       {form && <EventForm key={form.edit?.id ?? "new"} draft={form.draft} edit={form.edit} calendars={calendars} close={() => setForm(null)} done={done} />}
-      {manage && <CalendarManager calendars={calendars} close={() => setManage(false)} refresh={() => router.refresh()} />}
+      {listOpen && (
+        <ResponsiveModal open onOpenChange={(o) => !o && setListOpen(false)} title="캘린더" size="sm">
+          {list}
+        </ResponsiveModal>
+      )}
     </div>
   );
 }
