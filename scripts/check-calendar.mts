@@ -49,4 +49,11 @@ assert.equal(ruleLabel("FREQ=WEEKLY;BYDAY=MO,WE", "2026-11-02"), "매주 월·�
 assert.equal(ruleLabel("FREQ=WEEKLY;INTERVAL=2", "2026-11-03"), "2주마다 화");
 assert.equal(ruleLabel("FREQ=MONTHLY;COUNT=6", "2026-11-15"), "매월 15일 · 6회");
 assert.equal(ruleLabel("FREQ=YEARLY;UNTIL=20301102", "2026-11-02"), "매년 11월 2일 · 2030년 11월 2일까지");
+// 메모 서식(src/lib/rich-note.ts): 허용 태그만·속성 지움·지운 뒤 생긴 태그도 지움, 예전 일반 글자 메모는 이스케이프
+const { cleanNote, noteHtml, noteText } = await import("../src/lib/rich-note.ts");
+assert.equal(cleanNote('<b onclick="x()">굵게</b><strong>강</strong><em>기</em><strike>취</strike><p>줄</p><br/>'), "<b>굵게</b><b>강</b><i>기</i><s>취</s><div>줄</div><br>");
+assert.equal(cleanNote('<img src=x onerror="alert(1)"><script>alert(1)</script><a href="javascript:1">링크</a>'), "alert(1)링크");
+assert.ok(!/<script/i.test(cleanNote("<scr<script>ipt>alert(1)</script>")), "지운 뒤 생긴 태그도 지움");
+assert.equal(noteHtml("a < b\n둘째 줄"), "a &lt; b<br>둘째 줄");
+assert.equal(noteText("<div><b>할 일</b> &amp; 메모</div><div>둘째</div>"), "할 일 & 메모\n둘째\n");
 console.log("일정 반복 계산 확인 통과");

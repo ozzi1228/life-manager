@@ -9,6 +9,7 @@ import { uuidv7 } from "../db/id.ts";
 import { calendars, eventExceptions, events, periodNotes } from "../db/schema.ts";
 import { addDays, countBefore, dayOfWeek, daysBetween, expand, parseRule, ruleString, sortKey, type Exception } from "../lib/calendar.ts";
 import { GOAL_PALETTE } from "../lib/palette.ts";
+import { cleanNote } from "../lib/rich-note.ts";
 import { AppError } from "./errors.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
 import { parse } from "./validate.ts";
@@ -240,7 +241,7 @@ export async function getNote(ctx: Ctx, scope: NoteScope, key: string) {
 /** 저장(처음이면 만듦). version은 화면이 가진 값 — 다른 기기에서 먼저 고쳤으면 409 */
 export async function saveNote(ctx: Ctx, scope: NoteScope, key: string, body: unknown, version: number | null) {
   checkKey(scope, key);
-  const text = parse(z.string().max(10_000, "메모는 1만 자까지 쓸 수 있어요"), body);
+  const text = cleanNote(parse(z.string().max(20_000, "메모가 너무 길어요"), body)); // 서식 태그만 남김(src/lib/rich-note.ts)
   const cur = await getNote(ctx, scope, key);
   if (!cur) {
     if (version !== null) throw new AppError("VERSION_CONFLICT", "다른 기기에서 먼저 지웠어요");

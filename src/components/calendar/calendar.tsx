@@ -12,6 +12,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { addEvent, colorEvent, editEvent, removeEvent, saveCalendarNote, showCalendar, undoRemoveEvent } from "@/app/actions/calendar";
 import { CalendarList } from "@/components/calendar/calendar-list";
+import { RichNote } from "@/components/calendar/rich-note";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
 import { toastUndo } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
@@ -22,6 +23,7 @@ import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { GOAL_PALETTE } from "@/lib/palette";
+import { noteText } from "@/lib/rich-note";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
@@ -617,9 +619,9 @@ function EventForm({ draft, edit, calendars, close, done }: { draft: Draft; edit
 export type Note = { scope: NoteScope; key: string; id: string | null; version: number | null; body: string };
 const NOTE_HINT: Record<NoteScope, string> = { year: "올해 이루고 싶은 것, 큰 계획", month: "이번 달 안에 해야 할 일", week: "이번 주에 할 일", day: "오늘 메모" };
 
-/** 쓰는 동안 잠깐 멈추면 저장(0.8초). 다른 기기에서 먼저 고쳤으면 알려 줌 */
+/** 쓰는 동안 잠깐 멈추면 저장(0.8초). 다른 기기에서 먼저 고쳤으면 알려 줌. 서식(굵게 등)은 RichNote */
 function NotePanel({ note, title }: { note: Note; title: string }) {
-  const [text, setText] = useState(note.body);
+  const text = useRef(note.body);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "conflict">("idle");
   const version = useRef(note.version);
   const saved = useRef(note.body);
@@ -635,7 +637,7 @@ function NotePanel({ note, title }: { note: Note; title: string }) {
     setState("saved");
   }
   const change = (v: string) => {
-    setText(v);
+    text.current = v;
     clearTimeout(timer.current);
     timer.current = setTimeout(() => save(v), 800);
   };
@@ -649,15 +651,7 @@ function NotePanel({ note, title }: { note: Note; title: string }) {
           {state === "saving" ? "저장 중" : state === "saved" ? "저장됨" : state === "conflict" ? "다른 기기에서 먼저 고쳤어요. 새로 고침해 주세요" : ""}
         </span>
       </div>
-      <Textarea
-        aria-label={title}
-        placeholder={NOTE_HINT[note.scope]}
-        maxLength={10_000}
-        className="field-sizing-content min-h-16 resize-none border-0 bg-transparent p-0 shadow-none focus-visible:ring-0 dark:bg-transparent"
-        value={text}
-        onChange={(e) => change(e.target.value)}
-        onBlur={() => (clearTimeout(timer.current), save(text))}
-      />
+      <RichNote initial={note.body} label={title} placeholder={NOTE_HINT[note.scope]} onChange={change} onBlur={() => (clearTimeout(timer.current), save(text.current))} />
     </section>
   );
 }
@@ -673,7 +667,7 @@ function TopPanels({ label, goals, note, children }: { label: string; goals: Per
         <button type="button" className="bg-card flex h-11 w-full items-center gap-2 rounded-lg border px-3 text-left text-sm [&[data-state=open]>svg]:rotate-180">
           <span className="font-semibold">{label} 목표·메모</span>
           <span className="text-muted-foreground min-w-0 flex-1 truncate text-caption">
-            {[goals.length ? `목표 ${done}/${goals.length}` : "목표 없음", note.body.trim() ? `메모: ${note.body.trim().split("\n")[0]}` : ""].filter(Boolean).join(" · ")}
+            {[goals.length ? `목표 ${done}/${goals.length}` : "목표 없음", noteText(note.body).trim() ? `메모: ${noteText(note.body).trim().split("\n")[0]}` : ""].filter(Boolean).join(" · ")}
           </span>
           <ChevronDown className="text-muted-foreground size-4 shrink-0 transition-transform" />
         </button>
