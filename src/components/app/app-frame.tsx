@@ -228,7 +228,7 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
 
         {/* 모바일 하단 탭 */}
         <nav data-pet-avoid aria-label="주 메뉴" className="bg-background/95 fixed inset-x-0 bottom-0 z-10 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-          <ul className="grid h-16 grid-cols-6">
+          <ul className="grid h-16 grid-cols-7">
             {tabs.items.map((n) => {
               const on = active?.href === n.href;
               return (

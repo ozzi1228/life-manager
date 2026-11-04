@@ -71,7 +71,7 @@ export default async function Home() {
     ...entries.map((e) => ({ key: e.id, icon: NotebookPen, title: e.title || e.bodyMd.split("\n")[0].slice(0, 40) || "일기", sub: `일기 · ${dayLabel(e.date, d)}`, date: e.date, href: `/records/journal/${e.id}` })),
     ...media.slice(0, 3).map((m) => {
       const date = m.endDate ?? m.startDate ?? today;
-      return { key: m.id, icon: { book: BookOpen, movie: Film, drama: Tv }[m.kind], title: m.title, sub: `${statusLabel(m.kind, m.status)} · ${dayLabel(date, d)}`, date, href: "/records/media" };
+      return { key: m.id, icon: { book: BookOpen, movie: Film, drama: Tv }[m.kind], title: m.title, sub: `${statusLabel(m.kind, m.status)} · ${dayLabel(date, d)}`, date, href: "/wish/media" };
     }),
   ]
     .sort((a, b) => b.date.localeCompare(a.date))

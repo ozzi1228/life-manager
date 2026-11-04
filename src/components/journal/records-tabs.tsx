@@ -1,4 +1,4 @@
-// 기록 영역 탭(02 §6): 일기·작품·위시·건강
+// 기록 영역 탭(02 §6): 일기·건강 (작품·위시는 위시 메뉴로)
 import { AreaTabs } from "@/components/app/area-tabs";
 
 export const RecordsTabs = () => (
@@ -6,8 +6,6 @@ export const RecordsTabs = () => (
     label="기록"
     tabs={[
       { href: "/records", label: "일기" },
-      { href: "/records/media", label: "작품", match: "/records/media" },
-      { href: "/records/wish", label: "위시", match: "/records/wish" },
       { href: "/records/health", label: "건강", match: "/records/health" },
     ]}
   />

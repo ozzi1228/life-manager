@@ -1,5 +1,5 @@
-// 메뉴 구성 (docs/planning/02 §2·§3): 최상위 6개 = 모바일 하단 탭 6개(커리어 추가)
-import { BriefcaseBusiness, CalendarDays, House, NotebookPen, Target, Wallet, type LucideIcon } from "lucide-react";
+// 메뉴 구성 (docs/planning/02 §2·§3): 최상위 7개 = 모바일 하단 탭 7개(커리어·위시 추가)
+import { BriefcaseBusiness, CalendarDays, Heart, House, NotebookPen, Target, Wallet, type LucideIcon } from "lucide-react";
 
 export type NavItem = { href: string; label: string; icon: LucideIcon };
 
@@ -9,6 +9,7 @@ export const MAIN_NAV: NavItem[] = [
   { href: "/goals", label: "목표", icon: Target },
   { href: "/money", label: "자산", icon: Wallet },
   { href: "/records", label: "기록", icon: NotebookPen },
+  { href: "/wish", label: "위시", icon: Heart },
   { href: "/career", label: "커리어", icon: BriefcaseBusiness },
 ];
 
@@ -26,6 +27,7 @@ const TITLES: [string, string][] = [
   ["/goals", "목표"],
   ["/money", "자산"],
   ["/records", "기록"],
+  ["/wish", "위시"],
   ["/career", "커리어"],
 ];
 

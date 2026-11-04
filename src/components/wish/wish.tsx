@@ -524,7 +524,7 @@ function MediaWishes({ items, today, add, edit }: { items: WishItem[]; today: st
     const start = START_LABEL[k];
     return (
       <li key={w.id} className="flex items-center gap-3 px-3 py-2">
-        <button type="button" onClick={() => (w.status === "saved" ? edit(w) : router.push("/records/media"))} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+        <button type="button" onClick={() => (w.status === "saved" ? edit(w) : router.push("/wish/media"))} className="flex min-w-0 flex-1 items-center gap-3 text-left">
           <Cover coverId={w.photos[0]?.id ?? null} kind={k} className="w-10" />
           <span className="min-w-0 flex-1">
             <span className={cn("block truncate", w.status !== "saved" && "text-muted-foreground")}>{w.name}</span>
@@ -588,7 +588,7 @@ function MediaWishes({ items, today, add, edit }: { items: WishItem[]; today: st
           done={() => {
             setForm(null);
             router.refresh();
-            toast("작품 기록으로 옮겼어요", { action: { label: form.start ? "기록 보기" : "감상 보기", onClick: () => router.push("/records/media") } });
+            toast("작품 기록으로 옮겼어요", { action: { label: form.start ? "기록 보기" : "감상 보기", onClick: () => router.push("/wish/media") } });
           }}
         />
       )}
@@ -625,7 +625,7 @@ export function WishView({ items, today, initialTab }: { items: WishItem[]; toda
               aria-pressed={tab === x}
               onClick={() => {
                 setTab(x);
-                router.replace(x === "media" ? "/records/wish?tab=media" : "/records/wish", { scroll: false });
+                router.replace(x === "media" ? "/wish?tab=media" : "/wish", { scroll: false });
               }}
               className={cn("rounded-full border px-3 py-1 text-sm max-md:min-h-10", tab === x ? "border-primary bg-primary text-primary-foreground" : "text-muted-foreground hover:bg-accent")}
             >

@@ -341,7 +341,7 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
             <div className="text-muted-foreground space-y-2 rounded-lg border border-dashed p-4 text-center text-sm">
               <p>이번 달 말에 들어갈 위시가 없어요</p>
               <Button variant="outline" size="sm" asChild>
-                <Link href="/records/wish">위시 보기</Link>
+                <Link href="/wish">위시 보기</Link>
               </Button>
             </div>
           )}
