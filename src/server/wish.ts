@@ -10,6 +10,7 @@ import { AppError } from "./errors.ts";
 import { imagesOf, linkImages } from "./files.ts";
 import { autoEligible } from "../lib/restraint.ts";
 import { createTransaction, txRepo } from "./finance.ts";
+import { resolveCategory } from "./item-categories.ts";
 import { markLaterBought, recordDropped, restrainedOf } from "./restraint.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
 import { todayIn } from "./time.ts";
@@ -32,6 +33,7 @@ export const wishInput = z
     mediaKind: z.enum(["book", "movie", "drama"]).nullable().default(null),
     name: z.string().trim().min(1, "이름을 입력해 주세요").max(100, "이름은 100자까지 쓸 수 있어요"),
     level: z.enum(["need", "want", "like"]).nullable().default(null),
+    categoryId: z.uuid().nullable().default(null), // 쇼핑: 분류(level은 분류의 기록 방식을 따름)
     price: z.number().int().min(1, "가격을 입력해 주세요").max(10_000_000_000, "100억 원까지 입력할 수 있어요").nullable().default(null),
     seenWhere: z.string().trim().max(1000).nullable().default(null),
     links: z.array(url).max(10, "링크는 10개까지 넣을 수 있어요").default([]),
@@ -44,12 +46,20 @@ export const wishInput = z
     level: v.kind === "shopping" ? (v.level ?? "like") : null,
     price: v.kind === "shopping" ? v.price : null,
     mediaKind: v.kind === "media" ? v.mediaKind : null,
+    categoryId: v.kind === "shopping" ? v.categoryId : null,
     seenWhere: v.seenWhere || null,
   }));
 export type WishInput = z.input<typeof wishInput>;
 
+/** 쇼핑 위시: 고른 분류로 level을 맞춤(안 골랐으면 level이 같은 첫 분류) */
+async function withCategory(ctx: Ctx, v: z.infer<typeof wishInput>) {
+  if (v.kind !== "shopping") return v;
+  const c = await resolveCategory(ctx, "wish", v.categoryId, v.level!);
+  return { ...v, categoryId: c.categoryId, level: c.type as "need" };
+}
+
 export async function createWish(ctx: Ctx, input: unknown) {
-  const { photoIds, ...v } = parse(wishInput, input);
+  const { photoIds, ...v } = await withCategory(ctx, parse(wishInput, input));
   return db.transaction(async (tx) => {
     const row = await wishRepo.create(ctx, v, { tx });
     await linkImages(tx, ctx, OWNER, row.id, photoIds);
@@ -58,7 +68,7 @@ export async function createWish(ctx: Ctx, input: unknown) {
 }
 
 export async function updateWish(ctx: Ctx, id: string, version: number, input: unknown) {
-  const { photoIds, ...v } = parse(wishInput, input);
+  const { photoIds, ...v } = await withCategory(ctx, parse(wishInput, input));
   const cur = await wishRepo.get(ctx, id);
   if (cur.kind !== v.kind) throw new AppError("VALIDATION_FAILED", "종류는 바꿀 수 없어요");
   return db.transaction(async (tx) => {
@@ -92,6 +102,7 @@ export async function wishList(ctx: Ctx) {
     mediaKind: r.mediaKind,
     name: r.name,
     level: r.level,
+    categoryId: r.categoryId,
     price: r.price,
     seenWhere: r.seenWhere,
     links: r.links,

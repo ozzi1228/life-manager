@@ -5,6 +5,7 @@ import { action } from "@/server/api";
 import { budgetEffect } from "@/server/budget";
 import type { TxInput } from "@/server/finance";
 import { once } from "@/server/idempotency";
+import { addItemCategory, removeItemCategory, renameItemCategory, reorderItemCategories, setItemCategoryType, type Scope } from "@/server/item-categories";
 import { restore } from "@/server/repo";
 import { createWish, dropWish, purchaseWish, reopenWish, updateWish, wishRepo, type WishInput } from "@/server/wish";
 
@@ -48,4 +49,21 @@ export async function deleteWish(id: string) {
 }
 export async function restoreWish(id: string) {
   return action((ctx) => restore(ctx, "wish_item", id));
+}
+
+// ── 위시·작품 분류(분류 편집 창) ──
+export async function addItemCat(scope: Scope, name: string) {
+  return action(async (ctx) => void (await addItemCategory(ctx, scope, name)));
+}
+export async function renameItemCat(id: string, name: string) {
+  return action(async (ctx) => void (await renameItemCategory(ctx, id, name)));
+}
+export async function setItemCatType(id: string, type: string) {
+  return action((ctx) => setItemCategoryType(ctx, id, type));
+}
+export async function removeItemCat(id: string) {
+  return action((ctx) => removeItemCategory(ctx, id));
+}
+export async function reorderItemCats(ids: string[]) {
+  return action((ctx) => reorderItemCategories(ctx, ids));
 }

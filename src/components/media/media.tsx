@@ -4,7 +4,7 @@
 // ponytail: 작품 정보 검색(C-09)은 아직 — 직접 입력. 검색이 붙으면 폼 앞에 검색 단계
 import { BookOpen, ChevronDown, Film, Plus, Star, StarHalf, Tv } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { addMedia, deleteMedia, editMedia, restoreMedia } from "@/app/actions/media";
 import { PhotoPicker } from "@/components/app/photo-picker";
@@ -21,11 +21,17 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { CategoryChips } from "@/components/wish/category-chips";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { fromYmd, ymd } from "@/lib/format";
 import { calendarDay, KIND_LABEL, monthSummary, STATUS_OPTIONS, statusLabel, type MediaKind, type MediaStatus } from "@/lib/media";
 import { cn } from "@/lib/utils";
+import type { ItemCategory } from "@/server/item-categories";
 import type { MediaInput, MediaItem } from "@/server/media";
+
+// 분류 이름(작품 화면이 넣어 줌). 분류가 없으면(지웠거나 위시에서 옮김) 종류 이름
+const CatNames = createContext(new Map<string, string>());
+const useCatName = (i: { kind: MediaKind; categoryId: string | null }) => useContext(CatNames).get(i.categoryId ?? "") ?? KIND_LABEL[i.kind];
 
 const KIND_ICON = { book: BookOpen, movie: Film, drama: Tv } as const;
 const WHERE: Record<MediaKind, string[]> = {
@@ -119,11 +125,13 @@ function DateField({ id, value, onChange, optional }: { id: string; value: strin
   );
 }
 
-type Draft = { kind: MediaKind; title: string; creator: string; coverId: string | null; status: MediaStatus; startDate: string | null; endDate: string | null; rating: number | null; oneLiner: string; review: string; whereText: string };
+type Draft = { kind: MediaKind; categoryId: string | null; title: string; creator: string; coverId: string | null; status: MediaStatus; startDate: string | null; endDate: string | null; rating: number | null; oneLiner: string; review: string; whereText: string };
 
 /** 작품 추가·수정. fromWish: 위시에서 시작·완료 처리(09 §7) — focusReview면 감상 칸에 바로 */
 export function MediaForm({
   edit,
+  categories,
+  initialCat,
   preset,
   fromWish,
   focusReview,
@@ -132,6 +140,9 @@ export function MediaForm({
   done,
 }: {
   edit?: MediaItem;
+  /** 주면 분류로 고름(종류는 분류를 따름). 없으면(위시에서 옮길 때) 종류로 고르고 서버가 같은 종류의 첫 분류에 넣음 */
+  categories?: ItemCategory[];
+  initialCat?: ItemCategory;
   preset?: Partial<Draft>;
   fromWish?: { id: string; version: number };
   focusReview?: boolean;
@@ -139,8 +150,10 @@ export function MediaForm({
   close: () => void;
   done: (id: string) => void;
 }) {
+  const startCat = initialCat ?? categories?.[0];
   const [v, setV] = useState<Draft>(() => ({
-    kind: edit?.kind ?? "book",
+    kind: edit?.kind ?? (startCat?.type as MediaKind | undefined) ?? "book",
+    categoryId: edit ? edit.categoryId : (startCat?.id ?? null),
     title: edit?.title ?? "",
     creator: edit?.creator ?? "",
     coverId: edit?.coverId ?? null,
@@ -199,13 +212,35 @@ export function MediaForm({
       }
     >
       <FieldGroup className="gap-5">
-        <ToggleGroup type="single" variant="outline" value={v.kind} onValueChange={(k) => k && setKind(k as MediaKind)} aria-label="종류" className="w-full">
-          {(["book", "movie", "drama"] as const).map((k) => (
-            <ToggleGroupItem key={k} value={k} className="flex-1">
-              {KIND_LABEL[k]}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        {categories ? (
+          <ToggleGroup
+            type="single"
+            variant="outline"
+            value={v.categoryId ?? ""}
+            onValueChange={(id) => {
+              const c = categories.find((x) => x.id === id);
+              if (!c) return;
+              setKind(c.type as MediaKind);
+              set("categoryId", c.id);
+            }}
+            aria-label="분류"
+            className="w-full flex-wrap"
+          >
+            {categories.map((c) => (
+              <ToggleGroupItem key={c.id} value={c.id} className="min-w-0 flex-1">
+                <span className="truncate">{c.name}</span>
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        ) : (
+          <ToggleGroup type="single" variant="outline" value={v.kind} onValueChange={(k) => k && setKind(k as MediaKind)} aria-label="종류" className="w-full">
+            {(["book", "movie", "drama"] as const).map((k) => (
+              <ToggleGroupItem key={k} value={k} className="flex-1">
+                {KIND_LABEL[k]}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        )}
         <div className="flex gap-3">
           <PhotoPicker value={v.coverId ? [{ id: v.coverId, width: 0, height: 0 }] : []} onChange={(fn) => set("coverId", fn(v.coverId ? [{ id: v.coverId, width: 0, height: 0 }] : [])[0]?.id ?? null)} onBusy={setUploading} max={1} purpose="media_cover" label={movie || v.kind === "drama" ? "포스터" : "표지"} tall />
           <div className="min-w-0 flex-1 space-y-3">
@@ -300,6 +335,7 @@ export function period(i: Pick<MediaItem, "kind" | "status" | "startDate" | "end
 }
 
 function Detail({ item, today, close, edit, removed }: { item: MediaItem; today: string; close: () => void; edit: () => void; removed: () => void }) {
+  const catName = useCatName(item);
   return (
     <ResponsiveDetail
       open
@@ -322,7 +358,7 @@ function Detail({ item, today, close, edit, removed }: { item: MediaItem; today:
           <Cover coverId={item.coverId} kind={item.kind} title={item.title} className="w-28 md:w-36" />
           <div className="min-w-0 space-y-1.5">
             <div className="flex flex-wrap gap-1.5">
-              <Badge variant="secondary">{KIND_LABEL[item.kind]}</Badge>
+              <Badge variant="secondary">{catName}</Badge>
               <Badge variant="outline">{statusLabel(item.kind, item.status)}</Badge>
             </div>
             {item.creator && <p className="text-muted-foreground text-sm">{item.creator}</p>}
@@ -345,13 +381,14 @@ function Detail({ item, today, close, edit, removed }: { item: MediaItem; today:
 }
 
 function Row({ i, today, open }: { i: MediaItem; today: string; open: () => void }) {
+  const catName = useCatName(i);
   return (
     <li>
       <button type="button" onClick={open} className="hover:bg-accent/50 flex w-full items-center gap-3 px-3 py-2 text-left">
         <Cover coverId={i.coverId} kind={i.kind} className="w-10" />
         <span className="min-w-0 flex-1">
           <span className="block truncate">{i.title}</span>
-          <span className="text-muted-foreground block truncate text-caption">{[KIND_LABEL[i.kind], i.creator, period(i, today)].filter(Boolean).join(" · ")}</span>
+          <span className="text-muted-foreground block truncate text-caption">{[catName, i.creator, period(i, today)].filter(Boolean).join(" · ")}</span>
           {i.oneLiner && <span className="text-muted-foreground block truncate text-caption">“{i.oneLiner}”</span>}
         </span>
         <Stars value={i.rating} className="shrink-0" />
@@ -427,15 +464,17 @@ const GROUPS: { status: MediaStatus; label: string }[] = [
   { status: "dropped", label: "중도 포기" },
 ];
 
-export function MediaView({ items, today }: { items: MediaItem[]; today: string }) {
+export function MediaView({ items, categories, today }: { items: MediaItem[]; categories: ItemCategory[]; today: string }) {
   const router = useRouter();
   const mobile = useIsMobile();
   const [view, setView] = useState<"calendar" | "list">("calendar");
-  const [kind, setKind] = useState<"all" | MediaKind>("all");
+  const [cat, setCat] = useState("all");
+  const picked = categories.find((c) => c.id === cat);
+  const kind = (picked?.type ?? "all") as "all" | MediaKind; // 읽는 중·보는 중 같은 말은 분류의 기록 방식으로
   const [month, setMonth] = useState(today.slice(0, 7));
   const [detail, setDetail] = useState<MediaItem | null>(null);
   const [form, setForm] = useState<{ edit?: MediaItem } | null>(null);
-  const shown = items.filter((i) => kind === "all" || i.kind === kind);
+  const shown = items.filter((i) => cat === "all" || i.categoryId === cat);
   const ongoing = shown.filter((i) => i.status === "ongoing");
   const inMonth = shown.filter((i) => calendarDay(i.kind, i)?.date.startsWith(month)).sort((a, b) => (calendarDay(b.kind, b)!.date > calendarDay(a.kind, a)!.date ? 1 : -1));
   const summary = monthSummary(shown, month);
@@ -457,16 +496,10 @@ export function MediaView({ items, today }: { items: MediaItem[]; today: string 
     </Button>
   );
   return (
+    <CatNames value={new Map(categories.map((c) => [c.id, c.name]))}>
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <ToggleGroup type="single" variant="outline" size="sm" value={kind} onValueChange={(x) => x && setKind(x as typeof kind)} aria-label="종류">
-          <ToggleGroupItem value="all">전체</ToggleGroupItem>
-          {(["book", "movie", "drama"] as const).map((k) => (
-            <ToggleGroupItem key={k} value={k}>
-              {KIND_LABEL[k]}
-            </ToggleGroupItem>
-          ))}
-        </ToggleGroup>
+        <CategoryChips scope="media" categories={categories} value={cat} onChange={setCat} />
         <span className="ml-auto">{add}</span>
       </div>
 
@@ -540,6 +573,8 @@ export function MediaView({ items, today }: { items: MediaItem[]; today: string 
       {form && (
         <MediaForm
           edit={form.edit}
+          categories={categories}
+          initialCat={picked}
           today={today}
           close={() => setForm(null)}
           done={() => {
@@ -550,5 +585,6 @@ export function MediaView({ items, today }: { items: MediaItem[]; today: string 
         />
       )}
     </div>
+    </CatNames>
   );
 }

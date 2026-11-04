@@ -6,6 +6,7 @@ import { db, type Tx } from "../db/index.ts";
 import { mediaLogs, mediaWorks } from "../db/schema.ts";
 import { uuidv7 } from "../db/id.ts";
 import { attachmentRepo } from "./files.ts";
+import { resolveCategory } from "./item-categories.ts";
 import { AppError } from "./errors.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
 import { todayIn } from "./time.ts";
@@ -19,6 +20,7 @@ const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜를 다시 선택해 
 export const mediaInput = z
   .object({
     kind: z.enum(["book", "movie", "drama"]),
+    categoryId: z.uuid().nullable().default(null), // 분류(종류는 분류의 기록 방식과 같아야 함)
     title: z.string().trim().min(1, "제목을 입력해 주세요").max(100, "제목은 100자까지 쓸 수 있어요"),
     creator: z.string().trim().max(100).nullable().default(null),
     coverId: z.uuid().nullable().default(null),
@@ -50,16 +52,19 @@ async function checkCover(ctx: Ctx, id: string | null) {
   if (id && !(await attachmentRepo.get(ctx, id).catch(() => null))) throw new AppError("VALIDATION_FAILED", "표지를 다시 올려 주세요");
 }
 
-const split = (v: z.infer<typeof mediaInput>) => {
-  const { kind, title, creator, coverId, ...log } = v;
-  return { work: { kind, title, creator, coverAttachmentId: coverId }, log };
-};
+/** 분류를 확인하고 작품·기록으로 나눔. 안 골랐으면(위시에서 옮길 때 등) 종류가 같은 첫 분류 */
+async function split(ctx: Ctx, v: z.infer<typeof mediaInput>) {
+  const { kind, categoryId, title, creator, coverId, ...log } = v;
+  const c = await resolveCategory(ctx, "media", categoryId, kind);
+  if (c.type !== kind) throw new AppError("VALIDATION_FAILED", "분류를 다시 골라 주세요");
+  return { work: { kind, categoryId: c.categoryId, title, creator, coverAttachmentId: coverId }, log };
+}
 
 /** 작품 + 첫 기록. 위시에서 왔으면 위시를 시작함·다 봄으로(09 §7) */
 export async function createMedia(ctx: Ctx, input: unknown, fromWish?: { id: string; version: number }) {
   const v = parse(mediaInput, input);
   await checkCover(ctx, v.coverId);
-  const { work, log } = split(v);
+  const { work, log } = await split(ctx, v);
   return db.transaction(async (tx) => {
     const w = await workRepo.create(ctx, work, { tx });
     const row = await logRepo.create(ctx, { ...log, workId: w.id, fromWishId: fromWish?.id ?? null }, { tx });
@@ -72,7 +77,7 @@ export async function createMedia(ctx: Ctx, input: unknown, fromWish?: { id: str
 export async function updateMedia(ctx: Ctx, logId: string, version: number, input: unknown) {
   const v = parse(mediaInput, input);
   await checkCover(ctx, v.coverId);
-  const { work, log } = split(v);
+  const { work, log } = await split(ctx, v);
   const cur = await logRepo.get(ctx, logId);
   const w = await workRepo.get(ctx, cur.workId);
   return db.transaction(async (tx) => {
@@ -105,6 +110,7 @@ export async function mediaList(ctx: Ctx) {
         id: l.id,
         version: l.version,
         kind: w.kind,
+        categoryId: w.categoryId,
         title: w.title,
         creator: w.creator,
         coverId: w.coverAttachmentId,

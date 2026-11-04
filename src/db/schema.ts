@@ -375,6 +375,7 @@ export const mediaWorks = pgTable("media_works", {
   title: text("title").notNull(),
   creator: text("creator"), // 저자 / 감독·출연
   coverAttachmentId: uuid("cover_attachment_id"),
+  categoryId: uuid("category_id"), // item_categories(scope media). kind는 그 분류의 type
 });
 
 // 상태는 종류와 상관없이 3가지(화면 이름은 종류별: 읽는 중·보는 중 / 완독·봤어요·다 봄 / 중도 포기). 영화는 done만
@@ -420,11 +421,26 @@ export const wishItems = pgTable(
     droppedReason: text("dropped_reason"),
     transactionId: uuid("transaction_id"),
     mediaLogId: uuid("media_log_id"),
+    categoryId: uuid("category_id"), // 쇼핑: item_categories(scope wish). level은 그 분류의 type
   },
   (t) => [
     index("wish_items_user_kind").on(t.userId, t.kind, t.status).where(sql`${t.deletedAt} is null`),
     check("wish_items_shopping_price", sql`${t.kind} <> 'shopping' or ${t.price} > 0`),
   ],
+);
+
+// 위시(쇼핑)·작품 분류: 사용자가 추가·이름·순서·지우기. type = 기록 방식
+// wish: need|want|like(참은 소비 후보 규칙이 씀) · media: book|movie|drama(입력 칸·상태 이름이 씀)
+export const itemCategories = pgTable(
+  "item_categories",
+  {
+    ...userData(),
+    scope: text("scope", { enum: ["wish", "media"] }).notNull(),
+    name: text("name").notNull(),
+    type: text("type").notNull(),
+    sort: integer("sort").notNull().default(0),
+  },
+  (t) => [uniqueIndex("item_categories_name").on(t.userId, t.scope, t.name).where(sql`${t.deletedAt} is null`)],
 );
 
 // ── 참은 소비 (20, 14 §4.4) ──

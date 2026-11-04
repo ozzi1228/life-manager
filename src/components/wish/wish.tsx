@@ -5,7 +5,7 @@
 // ponytail: 링크 미리보기·같은 링크 경고·구분 변경 이력 표시(P1)
 import { Check, ChevronDown, CircleAlert, ExternalLink, Eye, Heart, Link2, MoreHorizontal, Plus, X } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useRef, useState } from "react";
+import { createContext, useContext, useRef, useState } from "react";
 import { toast } from "sonner";
 import { addWish, deleteWish, dropWishAction, editWish, reopenWishAction, restoreWish } from "@/app/actions/wish";
 import { InfoTip } from "@/components/app/help";
@@ -14,6 +14,7 @@ import { PhotoPicker, type Photo } from "@/components/app/photo-picker";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
 import { EmptyState, toastUndo } from "@/components/app/states";
 import { Cover, MediaForm } from "@/components/media/media";
+import { CategoryChips } from "@/components/wish/category-chips";
 import { useExpenseDialog } from "@/components/money/expense-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { dateLabel, fromYmd, money, monthLabel, ymd } from "@/lib/format";
 import { FINISH_LABEL, KIND_LABEL, START_LABEL, type MediaKind } from "@/lib/media";
 import { cn } from "@/lib/utils";
+import type { ItemCategory } from "@/server/item-categories";
 import type { WishInput, WishItem } from "@/server/wish";
 
 type Level = "need" | "want" | "like";
@@ -76,24 +78,31 @@ function RestraintNote({ w, today }: { w: WishItem; today: string }) {
   return null;
 }
 
-function LevelBadge({ level }: { level: string | null }) {
-  const l = levelOf(level);
+// 분류 이름(위시 화면이 넣어 줌). 분류를 지웠으면 구분 이름
+const CatNames = createContext(new Map<string, string>());
+
+function LevelBadge({ w }: { w: WishItem }) {
+  const l = levelOf(w.level);
   const Icon = l.icon;
+  const name = useContext(CatNames).get(w.categoryId ?? "") ?? l.label;
   return (
     <Badge variant={l.value === "need" ? "default" : "secondary"} className="gap-1">
-      <Icon className="size-3" /> {l.label}
+      <Icon className="size-3" /> {name}
     </Badge>
   );
 }
 
-type Draft = { kind: "shopping" | "media"; mediaKind: MediaKind | null; name: string; level: Level; price: number | null; seenWhere: string; links: string[]; photos: Photo[] };
+type Draft = { kind: "shopping" | "media"; mediaKind: MediaKind | null; name: string; level: Level; categoryId: string | null; price: number | null; seenWhere: string; links: string[]; photos: Photo[] };
 
-function WishForm({ kind, edit, close, done }: { kind: "shopping" | "media"; edit?: WishItem; close: () => void; done: () => void }) {
+function WishForm({ kind, edit, categories, initialCat, close, done }: { kind: "shopping" | "media"; edit?: WishItem; categories: ItemCategory[]; initialCat?: ItemCategory; close: () => void; done: () => void }) {
+  // 새로 담을 때 분류: 보고 있던 분류, 아니면 '관심' 방식의 첫 분류
+  const startCat = initialCat ?? categories.find((c) => c.type === "like") ?? categories[0];
   const [v, setV] = useState<Draft>({
     kind,
     mediaKind: (edit?.mediaKind as MediaKind | null) ?? (kind === "media" ? "movie" : null),
     name: edit?.name ?? "",
-    level: (edit?.level as Level | null) ?? "like",
+    level: (edit?.level as Level | null) ?? (startCat?.type as Level | undefined) ?? "like",
+    categoryId: edit ? edit.categoryId : (startCat?.id ?? null),
     price: edit?.price ?? null,
     seenWhere: edit?.seenWhere ?? "",
     links: edit?.links.length ? edit.links : [""],
@@ -177,14 +186,27 @@ function WishForm({ kind, edit, close, done }: { kind: "shopping" | "media"; edi
           <>
             <Field>
               <FieldLabel>
-                구분 <LevelTip />
+                분류 <LevelTip />
               </FieldLabel>
-              <ToggleGroup type="single" variant="outline" value={v.level} onValueChange={(l) => l && set("level", l as Level)} aria-label="구분" className="w-full">
-                {LEVELS.map((l) => (
-                  <ToggleGroupItem key={l.value} value={l.value} className="flex-1">
-                    <l.icon /> {l.label}
-                  </ToggleGroupItem>
-                ))}
+              <ToggleGroup
+                type="single"
+                variant="outline"
+                value={v.categoryId ?? ""}
+                onValueChange={(id) => {
+                  const c = categories.find((x) => x.id === id);
+                  if (c) setV((s) => ({ ...s, categoryId: c.id, level: c.type as Level }));
+                }}
+                aria-label="분류"
+                className="w-full flex-wrap"
+              >
+                {categories.map((c) => {
+                  const Icon = levelOf(c.type).icon;
+                  return (
+                    <ToggleGroupItem key={c.id} value={c.id} className="min-w-0 flex-1">
+                      <Icon /> <span className="truncate">{c.name}</span>
+                    </ToggleGroupItem>
+                  );
+                })}
               </ToggleGroup>
             </Field>
             <Field data-invalid={error?.field === "price" || undefined}>
@@ -320,7 +342,7 @@ function ShopDetail({ w, today, close, edit, refresh }: { w: WishItem; today: st
           </div>
         )}
         <div className="flex flex-wrap items-center gap-2">
-          <LevelBadge level={w.level} />
+          <LevelBadge w={w} />
           {w.status === "bought" && <Badge variant="outline">구매함</Badge>}
           {w.status === "dropped" && <Badge variant="outline">그만둠</Badge>}
           <span className="ml-auto text-title font-semibold tabular-nums">{w.price ? money(w.price) : "가격 없음"}</span>
@@ -377,7 +399,7 @@ function ShopCard({ w, today, open }: { w: WishItem; today: string; open: () => 
           )}
         </span>
         <span className="block space-y-1 p-2.5">
-          <LevelBadge level={w.level} />
+          <LevelBadge w={w} />
           <span className="line-clamp-2 block text-sm">{w.name}</span>
           <span className="block font-semibold tabular-nums">{w.price ? money(w.price) : <span className="text-warning-text">가격 없음</span>}</span>
           <span className="text-muted-foreground flex items-center gap-1 text-caption">
@@ -435,14 +457,13 @@ function Folded({ label, children, count }: { label: string; count: number; chil
 }
 
 type Sort = "new" | "old" | "price" | "level";
-function Shopping({ items, today, add, edit, sort }: { items: WishItem[]; today: string; add: React.ReactNode; edit: (w: WishItem) => void; sort: Sort }) {
+function Shopping({ items, categories, cat, setCat, today, add, edit, sort }: { items: WishItem[]; categories: ItemCategory[]; cat: string; setCat: (c: string) => void; today: string; add: React.ReactNode; edit: (w: WishItem) => void; sort: Sort }) {
   const router = useRouter();
-  const [level, setLevel] = useState<"all" | Level>("all");
   const [detail, setDetail] = useState<WishItem | null>(null);
-  const order = (l: string | null) => LEVELS.findIndex((x) => x.value === l);
+  const order = (id: string | null) => (id ? categories.findIndex((c) => c.id === id) : -1) >>> 0; // 분류 없는 건 맨 뒤
   const saved = items
-    .filter((w) => w.status === "saved" && (level === "all" || w.level === level))
-    .sort((a, b) => (sort === "old" ? a.createdAt.localeCompare(b.createdAt) : sort === "price" ? (b.price ?? 0) - (a.price ?? 0) : sort === "level" ? order(a.level) - order(b.level) : b.createdAt.localeCompare(a.createdAt)));
+    .filter((w) => w.status === "saved" && (cat === "all" || w.categoryId === cat))
+    .sort((a, b) => (sort === "old" ? a.createdAt.localeCompare(b.createdAt) : sort === "price" ? (b.price ?? 0) - (a.price ?? 0) : sort === "level" ? order(a.categoryId) - order(b.categoryId) : b.createdAt.localeCompare(a.createdAt)));
   const bought = items.filter((w) => w.status === "bought");
   const dropped = items.filter((w) => w.status === "dropped");
   const sum = saved.reduce((a, w) => a + (w.price ?? 0), 0);
@@ -452,15 +473,7 @@ function Shopping({ items, today, add, edit, sort }: { items: WishItem[]; today:
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         <div className="-mx-4 flex items-center gap-1 overflow-x-auto px-4 md:mx-0 md:px-0">
-          <ToggleGroup type="single" variant="outline" size="sm" value={level} onValueChange={(x) => x && setLevel(x as typeof level)} aria-label="구분">
-            <ToggleGroupItem value="all">전체</ToggleGroupItem>
-            {LEVELS.map((l) => (
-              <ToggleGroupItem key={l.value} value={l.value} className="whitespace-nowrap">
-                {l.label}
-              </ToggleGroupItem>
-            ))}
-          </ToggleGroup>
-          <LevelTip />
+          <CategoryChips scope="wish" categories={categories} value={cat} onChange={setCat} />
         </div>
       </div>
       {saved.length > 0 ? (
@@ -474,11 +487,11 @@ function Shopping({ items, today, add, edit, sort }: { items: WishItem[]; today:
             ))}
           </ul>
         </>
-      ) : level === "all" ? (
+      ) : cat === "all" ? (
         // 담기 버튼은 위 줄에 있어 빈 상태엔 안 둠
         <EmptyState pet="pomong" title="지금 담아 둔 위시가 없어요" description="산 것·그만둔 것은 아래에 모여 있어요." />
       ) : (
-        <p className="text-muted-foreground py-8 text-center text-sm">{levelOf(level).label}으로 담은 위시가 없어요</p>
+        <p className="text-muted-foreground py-8 text-center text-sm">‘{categories.find((c) => c.id === cat)?.name}’ 분류에 담은 위시가 없어요</p>
       )}
       <Folded label="구매함" count={bought.length}>
         {bought.map((w) => (
@@ -596,12 +609,14 @@ function MediaWishes({ items, today, add, edit }: { items: WishItem[]; today: st
   );
 }
 
-export function WishView({ items, today, initialTab }: { items: WishItem[]; today: string; initialTab: "shopping" | "media" }) {
+export function WishView({ items, categories, today, initialTab }: { items: WishItem[]; categories: ItemCategory[]; today: string; initialTab: "shopping" | "media" }) {
   const router = useRouter();
   const mobile = useIsMobile();
   const [tab, setTab] = useState(initialTab);
   const [form, setForm] = useState<{ edit?: WishItem } | null>(null);
   const [sort, setSort] = useState<Sort>("new");
+  const [cat, setCat] = useState("all");
+  const names = new Map(categories.map((c) => [c.id, c.name]));
   const mine = items.filter((w) => w.kind === tab);
   const add = (
     <Button variant={mobile ? "outline" : "default"} onClick={() => setForm({})}>
@@ -609,6 +624,7 @@ export function WishView({ items, today, initialTab }: { items: WishItem[]; toda
     </Button>
   );
   return (
+    <CatNames value={names}>
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
         {/* 쇼핑/작품 전환은 아래 필터와 구분되게 알약 모양(SubTabs와 같은 모양) */}
@@ -642,18 +658,20 @@ export function WishView({ items, today, initialTab }: { items: WishItem[]; toda
               <SelectItem value="new">담은 날</SelectItem>
               <SelectItem value="old">오래 담아둔 순</SelectItem>
               <SelectItem value="price">가격 높은 순</SelectItem>
-              <SelectItem value="level">구분 순</SelectItem>
+              <SelectItem value="level">분류 순</SelectItem>
             </SelectContent>
           </Select>
         )}
         {mine.length > 0 && <span className={cn(tab !== "shopping" && "ml-auto")}>{add}</span>}
       </div>
-      {tab === "shopping" ? <Shopping items={mine} today={today} add={add} edit={(w) => setForm({ edit: w })} sort={sort} /> : <MediaWishes items={mine} today={today} add={add} edit={(w) => setForm({ edit: w })} />}
+      {tab === "shopping" ? <Shopping items={mine} categories={categories} cat={cat} setCat={setCat} today={today} add={add} edit={(w) => setForm({ edit: w })} sort={sort} /> : <MediaWishes items={mine} today={today} add={add} edit={(w) => setForm({ edit: w })} />}
       {form && (
         <WishForm
           key={form.edit?.id ?? tab}
           kind={form.edit?.kind ?? tab}
           edit={form.edit}
+          categories={categories}
+          initialCat={categories.find((c) => c.id === cat)}
           close={() => setForm(null)}
           done={() => {
             setForm(null);
@@ -662,5 +680,6 @@ export function WishView({ items, today, initialTab }: { items: WishItem[]; toda
         />
       )}
     </div>
+    </CatNames>
   );
 }
