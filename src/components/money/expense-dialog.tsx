@@ -466,16 +466,10 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
           </Field>
         )}
 
-        <Collapsible defaultOpen={!!edit?.memo}>
-          <CollapsibleTrigger asChild>
-            <Button type="button" variant="ghost" size="sm" className="-ml-2">
-              <ChevronDown /> 메모
-            </Button>
-          </CollapsibleTrigger>
-          <CollapsibleContent className="pt-2">
-            <Textarea aria-label="메모" maxLength={1000} value={memo} onChange={(e) => setMemo(e.target.value)} />
-          </CollapsibleContent>
-        </Collapsible>
+        <Field>
+          <FieldLabel htmlFor="tx-memo">메모</FieldLabel>
+          <Textarea id="tx-memo" maxLength={1000} className="min-h-16" value={memo} onChange={(e) => setMemo(e.target.value)} />
+        </Field>
         {edit && <History id={edit.id} />}
       </FieldGroup>
 
