@@ -1,12 +1,15 @@
 "use client";
 
 // 캘린더 목록(일정 화면 왼쪽, 좁은 화면은 "캘린더" 창): 체크로 보이기, 내 캘린더 추가·고치기, 구글 캘린더 연동(07 §4 G1)
+// 내 캘린더는 끌어 순서 바꾸기(휴대폰은 길게 누른 뒤 끌기). 맨 위가 기본 캘린더 — 우클릭(길게 누르고 있기) "기본 캘린더로 지정"은 맨 위로 올림
 // 구글: 제목 옆 + → 연결 창(앱 키 만드는 법 → 키 넣고 연결 테스트 → 구글 계정 연결)
-import { Check, Copy, ExternalLink, Pencil, Plus, RefreshCw } from "lucide-react";
+import { Check, Copy, ExternalLink, Pencil, Plus, RefreshCw, Star } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { addCalendar, checkGoogleKeys, editCalendar, removeCalendar, restoreCalendar, setGoogleKeys, syncGoogleNow, unlinkGoogle } from "@/app/actions/calendar";
+import { addCalendar, checkGoogleKeys, editCalendar, removeCalendar, reorderCalendar, restoreCalendar, setGoogleKeys, syncGoogleNow, unlinkGoogle } from "@/app/actions/calendar";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
+import { useDragSort } from "@/hooks/use-drag-sort";
 import { ColorPalettePicker } from "@/components/app/color-picker";
 import { ResponsiveModal } from "@/components/app/responsive";
 import { toastUndo } from "@/components/app/states";
@@ -78,9 +81,9 @@ function CalendarEditor({ edit, calendars, close }: { edit: Edit; calendars: Cal
   );
 }
 
-function Item({ c, on, toggle, edit }: { c: CalendarItem; on: boolean; toggle: (on: boolean) => void; edit: () => void }) {
+function Item({ c, on, toggle, edit, isDefault, ...rest }: { c: CalendarItem; on: boolean; toggle: (on: boolean) => void; edit: () => void; isDefault?: boolean } & React.ComponentProps<"li">) {
   return (
-    <li className="group hover:bg-accent/50 flex items-center gap-1 rounded-md pr-1">
+    <li {...rest} className="group hover:bg-accent/50 data-[dragging=true]:bg-card flex items-center gap-1 rounded-md pr-1 data-[dragging=true]:shadow-md">
       <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5 px-2 py-1.5 text-sm max-md:py-2.5">
         <Checkbox
           checked={on}
@@ -89,6 +92,7 @@ function Item({ c, on, toggle, edit }: { c: CalendarItem; on: boolean; toggle: (
           style={{ "--c": c.colorHex, "--t": textOn(c.colorHex) } as React.CSSProperties}
         />
         <span className="truncate">{c.name}</span>
+        {isDefault && <span className="text-muted-foreground shrink-0 text-caption">기본</span>}
       </label>
       <Button variant="ghost" size="icon" className="size-7 shrink-0 opacity-0 group-hover:opacity-100 focus-visible:opacity-100 max-md:size-9 max-md:opacity-100" aria-label={`${c.name} 캘린더 수정`} onClick={edit}>
         <Pencil className="size-3.5" />
@@ -250,6 +254,22 @@ export function CalendarList({ calendars, hidden, toggle, google }: { calendars:
   const mine = calendars.filter((c) => !c.google);
   const gcals = calendars.filter((c) => c.google);
   const link = google.link;
+  const saveOrder = async (ids: string[]) => {
+    const r = await reorderCalendar(ids);
+    if (!r.ok) toast(r.error.message);
+    router.refresh();
+  };
+  const drag = useDragSort(
+    mine.map((c) => c.id),
+    saveOrder,
+  );
+  // 새 일정의 기본 캘린더 = 보이는 내 캘린더 중 맨 위(calendar.tsx defaultCal과 같은 규칙)
+  const defaultId = drag.order.find((id) => !hidden.has(id)) ?? drag.order[0];
+  function makeDefault(c: CalendarItem) {
+    if (hidden.has(c.id)) toggle(c, true);
+    saveOrder([c.id, ...drag.order.filter((id) => id !== c.id)]);
+    toast(`기본 캘린더: ${c.name}`);
+  }
 
   async function sync(quiet = false) {
     setSyncing(true);
@@ -286,9 +306,25 @@ export function CalendarList({ calendars, hidden, toggle, google }: { calendars:
           </Button>
         </div>
         <ul>
-          {mine.map((c) => (
-            <Item key={c.id} c={c} on={!hidden.has(c.id)} toggle={(on) => toggle(c, on)} edit={() => setEdit({ ...c })} />
-          ))}
+          {drag.order.map((id) => {
+            const c = mine.find((m) => m.id === id);
+            if (!c) return null;
+            return (
+              <ContextMenu key={id} modal={false}>
+                <ContextMenuTrigger asChild>
+                  <Item ref={drag.rowRef(id)} {...drag.item(id)} data-dragging={drag.dragging === id} c={c} on={!hidden.has(id)} toggle={(on) => toggle(c, on)} edit={() => setEdit({ ...c })} isDefault={id === defaultId} />
+                </ContextMenuTrigger>
+                <ContextMenuContent className="w-48">
+                  <ContextMenuItem disabled={id === defaultId} onSelect={() => makeDefault(c)}>
+                    <Star /> 기본 캘린더로 지정
+                  </ContextMenuItem>
+                  <ContextMenuItem onSelect={() => setEdit({ ...c })}>
+                    <Pencil /> 수정
+                  </ContextMenuItem>
+                </ContextMenuContent>
+              </ContextMenu>
+            );
+          })}
         </ul>
       </section>
 

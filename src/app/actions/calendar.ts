@@ -7,6 +7,7 @@ import {
   createEvent,
   deleteCalendar,
   deleteEvent,
+  reorderCalendars,
   exceptionRepo,
   saveNote,
   setCalendarVisible,
@@ -89,4 +90,8 @@ export async function restoreCalendar(id: string) {
 /** 기간 메모 저장(연·월·주·일) */
 export async function saveCalendarNote(scope: NoteScope, key: string, body: string, version: number | null) {
   return action((ctx) => saveNote(ctx, scope, key, body, version));
+}
+/** 내 캘린더 순서(맨 위 = 기본 캘린더) */
+export async function reorderCalendar(ids: string[]) {
+  return action((ctx) => reorderCalendars(ctx, ids));
 }

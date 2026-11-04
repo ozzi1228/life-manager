@@ -39,7 +39,14 @@ export async function createCalendar(ctx: Ctx, input: unknown) {
   return calendarRepo.create(ctx, { ...v, sort: list.length });
 }
 export const updateCalendar = async (ctx: Ctx, id: string, version: number, input: unknown) => calendarRepo.update(ctx, id, version, parse(calendarInput, input));
-export const setCalendarVisible = (ctx: Ctx, id: string, version: number, visible: boolean) => calendarRepo.update(ctx, id, version, { isVisible: visible });
+/** 내 캘린더 순서 바꾸기(받은 순서대로 sort 0부터). 맨 위(보이는 것 중 첫째)가 새 일정의 기본 캘린더 */
+export async function reorderCalendars(ctx: Ctx, ids: string[]) {
+  if (ids.length > 200) throw new AppError("VALIDATION_FAILED", "순서를 저장할 수 없어요");
+  await db.transaction(async (tx) => {
+    for (const [i, id] of ids.entries()) await tx.update(calendars).set({ sort: i, updatedAt: new Date() }).where(and(eq(calendars.id, id), eq(calendars.userId, ctx.userId), ne(calendars.source, "google")));
+  });
+}
+export const setCalendarVisible =(ctx: Ctx, id: string, version: number, visible: boolean) => calendarRepo.update(ctx, id, version, { isVisible: visible });
 
 /** 캘린더 지우기: 그 캘린더의 일정도 한 묶음으로 휴지통에(함께 복구). 마지막 하나는 못 지움 */
 export async function deleteCalendar(ctx: Ctx, id: string) {
