@@ -43,10 +43,10 @@ export function RichNote({ initial, label, placeholder, onChange, onBlur }: { in
       const el = ref.current;
       if (!sel || !el || sel.isCollapsed || !sel.rangeCount || !el.contains(sel.anchorNode) || !el.contains(sel.focusNode)) return setBar(null);
       const r = sel.getRangeAt(0).getBoundingClientRect();
-      const W = 4 * 40 + 8;
+      const W = 4 * 36 + 6;
       const x = Math.min(Math.max(8, r.left + r.width / 2 - W / 2), window.innerWidth - W - 8);
       const below = mobile || r.top < 56;
-      setBar({ x, y: below ? r.bottom + 10 : r.top - 48, active: Object.fromEntries(TOOLS.map((t) => [t.cmd, document.queryCommandState(t.cmd)])) as Record<Cmd, boolean> });
+      setBar({ x, y: below ? r.bottom + 10 : r.top - 42, active: Object.fromEntries(TOOLS.map((t) => [t.cmd, document.queryCommandState(t.cmd)])) as Record<Cmd, boolean> });
     };
     document.addEventListener("selectionchange", place);
     window.addEventListener("scroll", place, true);
@@ -100,7 +100,7 @@ export function RichNote({ initial, label, placeholder, onChange, onBlur }: { in
           <div
             role="toolbar"
             aria-label="글자 서식"
-            className="bg-popover text-popover-foreground animate-in fade-in-0 zoom-in-95 fixed z-50 flex gap-0.5 rounded-lg border p-1 shadow-md"
+            className="bg-popover text-popover-foreground animate-in fade-in-0 zoom-in-95 fixed z-50 flex gap-0.5 rounded-lg border p-0.5 shadow-md"
             style={{ left: bar.x, top: bar.y }}
             // 누르는 순간 고른 글자가 풀리지 않게
             onPointerDown={(e) => e.preventDefault()}
@@ -114,9 +114,9 @@ export function RichNote({ initial, label, placeholder, onChange, onBlur }: { in
                 aria-pressed={bar.active[t.cmd]}
                 title={mobile ? t.label : `${t.label} (Ctrl+${t.key})`}
                 onClick={() => run(t.cmd)}
-                className={cn("hover:bg-accent flex size-10 items-center justify-center rounded-md md:size-9", bar.active[t.cmd] && "bg-accent text-primary")}
+                className={cn("hover:bg-accent flex size-9 items-center justify-center rounded-md md:size-8", bar.active[t.cmd] && "bg-accent text-primary")}
               >
-                <t.icon className="size-4" />
+                <t.icon className="size-4 md:size-3.5" />
               </button>
             ))}
           </div>,
