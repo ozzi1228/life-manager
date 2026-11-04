@@ -25,7 +25,7 @@ export function AreaTabs({ label, tabs }: { label: string; tabs: Tab[] }) {
             {...sort.item(t.href)}
             aria-current={on ? "page" : undefined}
             className={cn(
-              "border-b-2 px-3 py-2 text-sm whitespace-nowrap select-none",
+              "border-b-2 px-3 py-2 text-sm whitespace-nowrap select-none max-md:py-3",
               on ? "border-primary text-foreground font-semibold" : "text-muted-foreground border-transparent",
               sort.dragging === t.href && "bg-accent rounded-t-md",
             )}
