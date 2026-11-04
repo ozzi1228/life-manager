@@ -17,7 +17,7 @@ const DESC: Record<string, string> = {
   "/career": "경험·이력",
 };
 
-export function HomeMenu({ date, greet }: { date: string; greet: string }) {
+export function HomeMenu({ date, greet, name }: { date: string; greet: string; name: string | null }) {
   const { items } = useNavOrder("main", MAIN_NAV, "y");
   const { prefs, loaded } = usePetPrefs();
   return (
@@ -25,11 +25,20 @@ export function HomeMenu({ date, greet }: { date: string; greet: string }) {
       <section className="bg-card flex items-center gap-3 rounded-2xl border p-5 shadow-sm">
         <div className="min-w-0 flex-1">
           <p className="text-muted-foreground text-sm">{date}</p>
-          <h1 className="text-title-lg mt-1 font-semibold break-keep">{greet}</h1>
+          {/* 이름은 길어도 두 줄까지, "님"은 이름 끝 글자와 붙여 혼자 떨어지지 않게. 큰 글씨에서도 카드가 화면을 덮지 않게 text-title */}
+          <h1 className="text-title mt-1 font-semibold">
+            <span className="break-keep">{greet}</span>
+            {name && (
+              <span className="line-clamp-2 break-all">
+                {name.slice(0, -1)}
+                <span className="whitespace-nowrap">{name.slice(-1)}님</span>
+              </span>
+            )}
+          </h1>
         </div>
         {loaded && (
           // eslint-disable-next-line @next/next/no-img-element -- 작은 장식 그림(정적 파일·올린 펫)
-          <img src={petSrc(prefs.petId, "happy")} alt="" width={76} height={76} className="size-[76px] shrink-0 object-contain" />
+          <img src={petSrc(prefs.petId, "happy")} alt="" width={72} height={72} className="size-[72px] shrink-0 object-contain" />
         )}
       </section>
 

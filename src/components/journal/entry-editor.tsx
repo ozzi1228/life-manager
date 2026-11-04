@@ -77,7 +77,21 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
     const input = { date, topicId, title: title.trim() || null, bodyMd: body, photoIds: photos.map((p) => p.id) };
     const r = entry ? await editEntry(entry.id, entry.version, input) : await addEntry(key.current, input);
     setBusy(false);
-    if (!r.ok) return setError(r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 수정했어요. 지금 쓴 내용은 이 기기에 임시 저장돼 있어요" : (r.error.fields?.[0]?.message ?? r.error.message));
+    if (!r.ok) {
+      // 5초마다 하는 임시 저장을 기다리지 않고 지금 쓴 내용을 바로 남김(아래 안내가 "임시 저장돼 있어요"라고 말하므로)
+      try {
+        localStorage.setItem(draftKey(entry?.id), JSON.stringify({ ...latest.current, at: Date.now() }));
+      } catch {
+        // 저장 공간을 쓸 수 없으면 건너뜀
+      }
+      return setError(
+        r.error.code === "VERSION_CONFLICT"
+          ? "다른 기기에서 먼저 수정했어요. 지금 쓴 내용은 이 기기에 임시 저장돼 있어요"
+          : r.error.code === "NOT_FOUND" && entry
+            ? "다른 기기에서 지운 일기예요. 휴지통에서 되살린 뒤 다시 저장해 주세요. 지금 쓴 내용은 이 기기에 임시 저장돼 있어요"
+            : (r.error.fields?.[0]?.message ?? r.error.message),
+      );
+    }
     localStorage.removeItem(draftKey(entry?.id));
     toast(entry ? "고쳤어요" : "기록했어요");
     router.push(`/records?month=${date.slice(0, 7)}`);

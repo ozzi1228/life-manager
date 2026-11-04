@@ -22,7 +22,8 @@ const url = z
   .string()
   .trim()
   .max(2000)
-  .transform((s) => (/^https?:\/\//i.test(s) ? s : `https://${s}`))
+  // 주소 앞에 https://만 붙여 줌. ftp:// 같은 다른 방식은 그대로 둬서 아래에서 거절(https://ftp://… 로 깨지지 않게)
+  .transform((s) => (/^[a-z][a-z\d+.-]*:\/\//i.test(s) ? s : `https://${s}`))
   .pipe(z.url({ protocol: /^https?$/, error: "링크를 다시 확인해 주세요" }));
 
 export const wishInput = z

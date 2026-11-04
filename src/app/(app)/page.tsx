@@ -190,7 +190,7 @@ export default async function Home() {
   return (
     <Page>
       <div className="md:hidden">
-        <HomeMenu date={dateLabel} greet={`${greet}${name ? `, ${name}님` : ""}`} />
+        <HomeMenu date={dateLabel} greet={name ? `${greet},` : greet} name={name || null} />
       </div>
 
       {/* PC·태블릿: 대시보드 */}
@@ -221,7 +221,7 @@ export default async function Home() {
                 <Link href={w.href} className="hover:text-link shrink-0 font-semibold">
                   {w.title}
                 </Link>
-                <span className="text-muted-foreground min-w-0 flex-1 truncate">{w.empty}</span>
+                <span className="text-muted-foreground min-w-0 flex-1 break-keep">{w.empty}</span>
                 {w.action && (
                   <Button asChild size="sm" variant="ghost" className="text-link shrink-0">
                     <Link href={w.action.href}>{w.action.label}</Link>
