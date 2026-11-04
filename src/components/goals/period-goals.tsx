@@ -2,7 +2,8 @@
 
 // 기간 목표(D-072): 일정 화면의 "{기간} 목표" 카드(PeriodGoals)와 목표 > 기간별 > 월별·주간·일간 목록(PeriodGoalList)
 // 체크(달성↔진행 중)는 바로 화면에 반영(낙관적)하고 저장 뒤 새로 고침. 달성한 목표는 아래로, 흐리게
-import { Circle, CircleCheck, Ellipsis, Plus } from "lucide-react";
+import { Ellipsis, Plus } from "lucide-react";
+import { GoalCheck } from "@/components/goals/goal-list";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useOptimistic, useState, useTransition } from "react";
@@ -55,9 +56,9 @@ function Row<G extends PeriodGoal>({ g, toggle, remove, edit, className }: { g: 
         aria-label={done ? `${g.title} 달성 취소` : `${g.title} 달성`}
         aria-pressed={done}
         onClick={() => toggle(g)}
-        className="text-muted-foreground hover:text-foreground -my-1 -ml-2 flex size-10 shrink-0 items-center justify-center rounded-full"
+        className="group -my-1 -ml-2 flex size-10 shrink-0 items-center justify-center rounded-md"
       >
-        {done ? <CircleCheck className="text-success-text size-5" /> : <Circle className="size-5" />}
+        <GoalCheck done={done} />
       </button>
       {edit ? (
         <button type="button" onClick={() => edit(g)} className="min-w-0 flex-1 text-left">

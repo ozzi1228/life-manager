@@ -2,7 +2,7 @@
 
 // 전체 목표 (SCR-GOAL-05) · 연도별 (SCR-GOAL-08) · 달성 모아 보기 · 목표 추가·수정 (SCR-GOAL-07)
 // 연도별은 따로 저장하지 않고, 기간에 그 해가 든 목표를 모아 봄(05 §3.2). 모든 해를 한 줄로 이어 붙이고 올해로 스크롤(D-069)
-import { ChevronDown, Circle, CircleCheck, Ellipsis, Plus } from "lucide-react";
+import { Check, ChevronDown, Ellipsis, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
@@ -22,6 +22,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { periodLabel } from "@/lib/period";
+import { cn } from "@/lib/utils";
 
 export type Goal = {
   id: string;
@@ -44,6 +45,15 @@ const STATUS = { paused: "보류", dropped: "포기", done: "달성", active: "�
 const period = (g: Goal, thisYear: number) => (g.periodScope && g.periodKey ? periodLabel(g.periodScope, g.periodKey, thisYear) : g.startYear === null ? "언젠가" : g.startYear === g.endYear ? `${g.startYear}` : `${g.startYear}~${g.endYear}`);
 
 /** view: 없으면 전체 목표, years = 연도별(모든 해를 위에서 아래로), done = 달성한 목표를 달성한 해별로 */
+/** 달성 체크(홈 습관 체크와 같은 모양): 20px 네모, 달성하면 채우고 ✓. 누르는 칸은 감싼 버튼(40px) */
+export function GoalCheck({ done }: { done: boolean }) {
+  return (
+    <span className={cn("flex size-5 items-center justify-center rounded-[5px] border-2 transition-colors duration-[120ms]", done ? "border-success bg-success text-success-foreground" : "border-input group-hover:border-muted-foreground")}>
+      {done && <Check className="size-3.5" strokeWidth={3} aria-hidden />}
+    </span>
+  );
+}
+
 export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[]; categories: Category[]; view?: "years" | "done"; thisYear: number }) {
   const router = useRouter();
   const mobile = useIsMobile();
@@ -97,9 +107,9 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
         aria-label={g.status === "done" ? `${g.title} 달성 취소` : `${g.title} 달성`}
         aria-pressed={g.status === "done"}
         onClick={() => setStatus(g, g.status === "done" ? "active" : "done")}
-        className="text-muted-foreground hover:text-foreground -m-1 flex size-10 shrink-0 items-center justify-center rounded-full"
+        className="group -m-1 flex size-10 shrink-0 items-center justify-center rounded-md"
       >
-        {g.status === "done" ? <CircleCheck className="text-success-text size-6" /> : <Circle className="size-6" />}
+        <GoalCheck done={g.status === "done"} />
       </button>
       <button type="button" onClick={() => setEditing(g)} className="min-w-0 flex-1 text-left">
         <span className={g.status === "done" && view !== "done" ? "text-muted-foreground line-through" : undefined}>{g.title}</span>
