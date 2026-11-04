@@ -612,7 +612,7 @@ function YearPlanner({ year, focus, today, items, color, open, add, month }: { y
             const list = byDay.get(d) ?? [];
             const max = list.length > 2 ? 1 : 2;
             return (
-              <div key={d} data-day={d} className={cn("relative flex gap-0.5 border-b border-l p-0.5", w === 6 && "bg-primary/10", w === 0 && "bg-destructive/10", d === today && "ring-primary ring-2 ring-inset")}>
+              <div key={d} data-day={d} className={cn("relative flex gap-0.5 border-b border-l p-0.5", d === today && "ring-primary ring-2 ring-inset")}>
                 <button
                   type="button"
                   aria-label={`${md(d)} ${WEEK[w]}요일${d === today ? ", 오늘" : ""}, ${list.length ? `일정 ${list.length}개` : "일정 없음"}`}
