@@ -1,4 +1,4 @@
-// 메뉴 구성 (docs/planning/02 §2·§3): 최상위 7개 = 모바일 하단 탭 7개(커리어·위시 추가)
+// 메뉴 구성 (docs/planning/02 §2·§3): 최상위 7개(커리어·위시 추가). 모바일은 상단바 메뉴 버튼으로 펼침
 import { BriefcaseBusiness, CalendarDays, Heart, House, NotebookPen, Target, Wallet, type LucideIcon } from "lucide-react";
 
 export type NavItem = { href: string; label: string; icon: LucideIcon };
@@ -31,6 +31,6 @@ const TITLES: [string, string][] = [
   ["/career", "커리어"],
 ];
 
-/** 현재 주소의 메뉴(하단 탭·사이드바 강조, 상단바 제목) */
+/** 현재 주소의 메뉴(사이드바 강조, 상단바 제목) */
 export const activeNav = (path: string) => (path === "/" ? MAIN_NAV[0] : MAIN_NAV.slice(1).find((n) => path.startsWith(n.href)));
 export const titleFor = (path: string) => (path === "/" ? "홈" : (TITLES.find(([p]) => path.startsWith(p))?.[1] ?? "우나"));

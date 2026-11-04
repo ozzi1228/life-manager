@@ -1,7 +1,7 @@
 "use client";
 
-// 앱 셸 (docs/planning/02 §5, 03 §3.6·§6): PC·태블릿 사이드바 / 모바일 상단바 + 하단 탭 + 빠른 추가(+), 오프라인 띠, 펫
-import { LogOut, PanelLeftClose, PanelLeftOpen, PawPrint, Plus, Settings, UserRound } from "lucide-react";
+// 앱 셸 (docs/planning/02 §5, 03 §3.6·§6): PC·태블릿 사이드바 / 모바일 상단바 + 펼치는 메뉴(같은 사이드바가 왼쪽 창으로) + 빠른 추가(+), 오프라인 띠, 펫
+import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, PawPrint, Plus, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -61,9 +61,8 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
   const [quickOpen, setQuickOpen] = useState(false); // PC는 추가 메뉴, 모바일은 아래 창
   const mobile = useIsMobile();
   const { prefs, loaded: petLoaded } = usePetPrefs();
-  // 주 메뉴 순서: 끌어서 바꿈(사이드바는 위아래, 하단 탭은 좌우). 둘은 같은 순서를 씀
+  // 주 메뉴 순서: 끌어서 바꿈(위아래)
   const side = useNavOrder("main", MAIN_NAV, "y");
-  const tabs = useNavOrder("main", MAIN_NAV, "x");
 
   // PC 단축키: N = 빠른 추가(입력 중이 아닐 때, 02 §5.3)
   useEffect(() => {
@@ -107,8 +106,9 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
   return (
     <HintsProvider seen={seenHints}>
       <SidebarProvider defaultOpen={menuOpen}>
-        {/* PC·태블릿 사이드바(모바일은 하단 탭) */}
-        <Sidebar collapsible="icon" className="max-md:hidden">
+        {/* PC·태블릿 사이드바. 모바일은 상단바 메뉴 버튼으로 펼치는 왼쪽 창 */}
+        <CloseOnNavigate path={path} />
+        <Sidebar collapsible="icon">
           <SidebarHeader>
             <Link href="/" className="flex h-10 items-center gap-2 px-2 font-bold">
               {/* eslint-disable-next-line @next/next/no-img-element -- 작은 로고(정적 파일) */}
@@ -123,7 +123,7 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
               <SidebarMenu>
                 {side.items.map((n) => (
                   <SidebarMenuItem key={n.href} ref={side.rowRef(n.href)} {...side.item(n.href)} className={cn("select-none", side.dragging === n.href && "bg-sidebar-accent rounded-md")}>
-                    <SidebarMenuButton asChild isActive={active?.href === n.href} tooltip={n.label}>
+                    <SidebarMenuButton asChild isActive={active?.href === n.href} tooltip={n.label} className="max-md:h-11 max-md:text-base max-md:[&>svg]:size-5">
                       <Link href={n.href}>
                         <n.icon />
                         <span>{n.label}</span>
@@ -161,7 +161,7 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
         <SidebarInset className="min-w-0">
           {/* 상단바 */}
           <header data-pet-avoid className="bg-background/95 sticky top-0 z-10 flex h-14 items-center gap-2 border-b px-4 backdrop-blur md:px-6">
-            <SidebarTrigger className="-ml-1 max-md:hidden" title="메뉴 접기·펼치기 (Ctrl+B)" />
+            <MenuButton />
             <h1 className="text-title flex-1 truncate font-semibold">{titleFor(path)}</h1>
             <DropdownMenu open={quickOpen && !mobile} onOpenChange={setQuickOpen}>
               <DropdownMenuTrigger asChild>
@@ -190,15 +190,15 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
 
           <ConnectionBanner />
 
-          <div className="flex-1 pb-[calc(8.5rem+env(safe-area-inset-bottom))] md:pb-0">{children}</div>
+          <div className="flex-1 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-0">{children}</div>
         </SidebarInset>
 
-        {/* 모바일 빠른 추가(+): 하단 탭 위 오른쪽. 글 쓰는 화면에서는 저장 버튼을 가리지 않게 숨김 */}
+        {/* 모바일 빠른 추가(+): 오른쪽 아래. 글 쓰는 화면에서는 저장 버튼을 가리지 않게 숨김 */}
         {!/^\/(records\/journal|career\/exp)\//.test(path) && <Button
           data-pet-avoid
           size="icon-lg"
           aria-label="빠른 추가"
-          className="fixed right-4 bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-20 size-14 rounded-full shadow-xl md:hidden"
+          className="fixed right-4 bottom-[calc(1rem+env(safe-area-inset-bottom))] z-20 size-14 rounded-full shadow-xl md:hidden"
           onClick={() => setQuickOpen(true)}
         >
           <Plus className="size-6" />
@@ -226,27 +226,6 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
           </DrawerContent>
         </Drawer>
 
-        {/* 모바일 하단 탭 */}
-        <nav data-pet-avoid aria-label="주 메뉴" className="bg-background/95 fixed inset-x-0 bottom-0 z-10 border-t pb-[env(safe-area-inset-bottom)] backdrop-blur md:hidden">
-          <ul className="grid h-16 grid-cols-7">
-            {tabs.items.map((n) => {
-              const on = active?.href === n.href;
-              return (
-                <li key={n.href} ref={tabs.rowRef(n.href)} {...tabs.item(n.href)} className={cn("select-none", tabs.dragging === n.href && "bg-accent rounded-lg")}>
-                  <Link
-                    href={n.href}
-                    aria-current={on ? "page" : undefined}
-                    className={cn("flex h-full flex-col items-center justify-center gap-0.5 text-xs", on ? "text-link font-semibold" : "text-muted-foreground")}
-                  >
-                    <n.icon className="size-6" strokeWidth={on ? 2.4 : 2} />
-                    {n.label}
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </nav>
-
         {petLoaded && prefs.visible && <PetLayer petId={prefs.petId} reducedMotion={prefs.motion === "off"} />}
       </SidebarProvider>
     </HintsProvider>
@@ -254,8 +233,27 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
 }
 
 /** PC 메뉴 접기·펼치기: 접으면 아이콘만 남고 내용이 넓어짐. 상태는 쿠키로 기억(새로 고침해도 그대로) */
+/** 상단바 메뉴 버튼: PC는 사이드바 접기·펼치기, 모바일은 ☰로 메뉴 창 열기 */
+function MenuButton() {
+  const { isMobile, setOpenMobile } = useSidebar();
+  if (!isMobile) return <SidebarTrigger className="-ml-1" title="메뉴 접기·펼치기 (Ctrl+B)" />;
+  return (
+    <Button variant="ghost" size="icon" className="-ml-2.5 size-11" aria-label="메뉴 열기" onClick={() => setOpenMobile(true)}>
+      <Menu className="size-5" />
+    </Button>
+  );
+}
+
+/** 모바일 메뉴 창: 메뉴를 고르면(주소가 바뀌면) 닫힘 */
+function CloseOnNavigate({ path }: { path: string }) {
+  const { setOpenMobile } = useSidebar();
+  useEffect(() => setOpenMobile(false), [path, setOpenMobile]);
+  return null;
+}
+
 function MenuFold() {
-  const { open, toggleSidebar } = useSidebar();
+  const { open, toggleSidebar, isMobile } = useSidebar();
+  if (isMobile) return null;
   return (
     <SidebarMenuItem>
       <SidebarMenuButton tooltip="메뉴 펼치기" onClick={toggleSidebar} className="text-muted-foreground">

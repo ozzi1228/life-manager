@@ -858,7 +858,7 @@ export function ExperienceEditor({
       {error && <FieldError>{error}</FieldError>}
       <div
         data-pet-avoid
-        className="bg-background/95 sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] flex gap-2 border-t py-3 backdrop-blur md:bottom-0"
+        className="bg-background/95 sticky bottom-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-2 border-t py-3 backdrop-blur"
       >
         {exp && (
           <Button

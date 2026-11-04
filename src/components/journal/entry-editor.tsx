@@ -169,7 +169,7 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
 
       {error && <p className="text-destructive-text text-sm">{error}</p>}
 
-      <div data-pet-avoid className="bg-background/95 sticky bottom-[calc(4rem+env(safe-area-inset-bottom))] flex gap-2 border-t py-3 backdrop-blur md:bottom-0">
+      <div data-pet-avoid className="bg-background/95 sticky bottom-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-2 border-t py-3 backdrop-blur">
         {entry && (
           <Button variant="ghost" className="text-destructive-text" onClick={remove}>
             삭제

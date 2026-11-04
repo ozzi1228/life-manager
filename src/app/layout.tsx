@@ -23,8 +23,8 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="flex min-h-full flex-col">
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
           <TooltipProvider>{children}</TooltipProvider>
-          {/* 알림은 오른쪽 아래(위 가운데는 화면 요소를 가림). 휴대폰은 하단 탭·빠른 추가(+) 위로 */}
-          <Toaster position="bottom-right" mobileOffset={{ bottom: "calc(8.5rem + env(safe-area-inset-bottom))" }} />
+          {/* 알림은 오른쪽 아래(위 가운데는 화면 요소를 가림). 휴대폰은 빠른 추가(+) 위로 */}
+          <Toaster position="bottom-right" mobileOffset={{ bottom: "calc(5.5rem + env(safe-area-inset-bottom))" }} />
           <PwaUpdate />
         </ThemeProvider>
       </body>
