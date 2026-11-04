@@ -435,7 +435,7 @@ function DateButton({ value, onChange, label }: { value: string; onChange: (d: s
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button type="button" variant="outline" aria-label={label} className="flex-1 justify-start font-normal">
-          {dayTitle(value)}
+          {value}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">

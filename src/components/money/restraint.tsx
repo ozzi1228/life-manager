@@ -24,7 +24,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { addMonths, dateLabel, fromYmd, money, monthLabel, ymd } from "@/lib/format";
+import { addMonths, fromYmd, money, monthLabel, ymd } from "@/lib/format";
 import { fillState } from "@/lib/restraint";
 import { cn } from "@/lib/utils";
 import type { RestraintView as View } from "@/server/restraint";
@@ -106,7 +106,7 @@ function EntryForm({ edit, pickable, today, close, done }: { edit?: Entry; picka
           <Popover open={dateOpen} onOpenChange={setDateOpen}>
             <PopoverTrigger asChild>
               <Button type="button" variant="outline">
-                {dateLabel(date, fromYmd(today))}
+                {date}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">

@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { dateLabel, dayLabel, fromYmd, ymd } from "@/lib/format";
+import { dayLabel, fromYmd, ymd } from "@/lib/format";
 import { CONTEXTS, contextLabel, dailyLast, glucoseOn, SITES, weekChange, type GlucoseContext, type HealthKind } from "@/lib/health";
 import type { HealthRecord } from "@/server/health";
 
@@ -196,7 +196,7 @@ function HealthForm({ edit, kind, today, last, names, close, done }: { edit?: He
           <Popover open={dateOpen} onOpenChange={setDateOpen}>
             <PopoverTrigger asChild>
               <Button type="button" variant="outline" className="flex-1 justify-start">
-                {dateLabel(v.date, fromYmd(today))}
+                {v.date}
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-auto p-0" align="start">

@@ -17,7 +17,7 @@ import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
-import { dateLabel, fromYmd, ymd } from "@/lib/format";
+import { fromYmd, ymd } from "@/lib/format";
 
 export type Entry = { id: string; version: number; date: string; topicId: string | null; title: string | null; bodyMd: string; photos: Photo[] };
 type Topic = { id: string; name: string; colorHex: string };
@@ -145,7 +145,7 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
       <div className="flex flex-wrap items-center gap-2">
         <Popover open={dateOpen} onOpenChange={setDateOpen}>
           <PopoverTrigger asChild>
-            <Button variant="outline">{dateLabel(date, fromYmd(today))}</Button>
+            <Button variant="outline" className="tabular-nums">{date}</Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
             <Calendar mode="single" selected={fromYmd(date)} onSelect={(d) => (d && setDate(ymd(d)), setDateOpen(false))} />

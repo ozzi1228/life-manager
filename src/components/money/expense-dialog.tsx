@@ -35,7 +35,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { dayLabel, fromYmd, money, timeLabel, ymd } from "@/lib/format";
+import { fromYmd, money, timeLabel, ymd } from "@/lib/format";
 import type { HistoryEntry } from "@/server/history";
 import { cn } from "@/lib/utils";
 
@@ -423,7 +423,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
           <Popover open={dateOpen} onOpenChange={setDateOpen}>
             <PopoverTrigger asChild>
               <Button type="button" variant="outline" className="justify-start">
-                {dayLabel(date)}
+                {date}
                 {future && <Badge variant="secondary">예정</Badge>}
               </Button>
             </PopoverTrigger>

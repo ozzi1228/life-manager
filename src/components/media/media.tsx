@@ -22,7 +22,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { dateLabel, fromYmd, ymd } from "@/lib/format";
+import { fromYmd, ymd } from "@/lib/format";
 import { calendarDay, KIND_LABEL, monthSummary, STATUS_OPTIONS, statusLabel, type MediaKind, type MediaStatus } from "@/lib/media";
 import { cn } from "@/lib/utils";
 import type { MediaInput, MediaItem } from "@/server/media";
@@ -96,13 +96,13 @@ function StarsInput({ value, onChange }: { value: number | null; onChange: (v: n
   );
 }
 
-function DateField({ id, value, onChange, today, optional }: { id: string; value: string | null; onChange: (v: string | null) => void; today: string; optional?: boolean }) {
+function DateField({ id, value, onChange, optional }: { id: string; value: string | null; onChange: (v: string | null) => void; optional?: boolean }) {
   const [open, setOpen] = useState(false);
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button id={id} type="button" variant="outline" className={cn("w-full justify-start", !value && "text-muted-foreground")}>
-          {value ? dateLabel(value, fromYmd(today)) : "날짜 고르기"}
+          {value ?? "날짜 고르기"}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-auto p-0" align="start">
@@ -235,20 +235,20 @@ export function MediaForm({
         {movie ? (
           <Field>
             <FieldLabel htmlFor="md-end">본 날</FieldLabel>
-            <DateField id="md-end" value={v.endDate} onChange={(d) => set("endDate", d)} today={today} />
+            <DateField id="md-end" value={v.endDate} onChange={(d) => set("endDate", d)} />
             {err("endDate")}
           </Field>
         ) : (
           <div className="grid grid-cols-2 gap-3">
             <Field>
               <FieldLabel htmlFor="md-start">시작한 날</FieldLabel>
-              <DateField id="md-start" value={v.startDate} onChange={(d) => set("startDate", d)} today={today} optional={v.status !== "ongoing"} />
+              <DateField id="md-start" value={v.startDate} onChange={(d) => set("startDate", d)} optional={v.status !== "ongoing"} />
               {err("startDate")}
             </Field>
             {v.status !== "ongoing" && (
               <Field>
                 <FieldLabel htmlFor="md-end">끝난 날</FieldLabel>
-                <DateField id="md-end" value={v.endDate} onChange={(d) => set("endDate", d)} today={today} />
+                <DateField id="md-end" value={v.endDate} onChange={(d) => set("endDate", d)} />
                 {err("endDate")}
               </Field>
             )}
