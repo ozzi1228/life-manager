@@ -1,7 +1,7 @@
 "use client";
 
 // 앱 셸 (docs/planning/02 §5, 03 §3.6·§6): PC·태블릿 사이드바 / 모바일 상단바 + 하단 탭 + 빠른 추가(+), 오프라인 띠, 펫
-import { LogOut, PawPrint, Plus, Settings, UserRound } from "lucide-react";
+import { LogOut, PanelLeftClose, PanelLeftOpen, PawPrint, Plus, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
@@ -35,12 +35,13 @@ import {
   SidebarProvider,
   SidebarRail,
   SidebarTrigger,
+  useSidebar,
 } from "@/components/ui/sidebar";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { authClient } from "@/lib/auth-client";
 import { cn } from "@/lib/utils";
 
-type Props = { name: string; seenHints: string[]; navOrder: Record<string, string[]>; children: ReactNode };
+type Props = { menuOpen: boolean; name: string; seenHints: string[]; navOrder: Record<string, string[]>; children: ReactNode };
 
 export function AppFrame(props: Props) {
   return (
@@ -52,7 +53,7 @@ export function AppFrame(props: Props) {
   );
 }
 
-function Frame({ name, seenHints, children }: Props) {
+function Frame({ menuOpen, name, seenHints, children }: Props) {
   const openExpense = useExpenseDialog();
   const path = usePathname();
   const router = useRouter();
@@ -105,7 +106,7 @@ function Frame({ name, seenHints, children }: Props) {
 
   return (
     <HintsProvider seen={seenHints}>
-      <SidebarProvider>
+      <SidebarProvider defaultOpen={menuOpen}>
         {/* PC·태블릿 사이드바(모바일은 하단 탭) */}
         <Sidebar collapsible="icon" className="max-md:hidden">
           <SidebarHeader>
@@ -151,6 +152,7 @@ function Frame({ name, seenHints, children }: Props) {
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
+              <MenuFold />
             </SidebarMenu>
           </SidebarFooter>
           <SidebarRail />
@@ -159,7 +161,7 @@ function Frame({ name, seenHints, children }: Props) {
         <SidebarInset className="min-w-0">
           {/* 상단바 */}
           <header data-pet-avoid className="bg-background/95 sticky top-0 z-10 flex h-14 items-center gap-2 border-b px-4 backdrop-blur md:px-6">
-            <SidebarTrigger className="-ml-1 max-md:hidden" />
+            <SidebarTrigger className="-ml-1 max-md:hidden" title="메뉴 접기·펼치기 (Ctrl+B)" />
             <h1 className="text-title flex-1 truncate font-semibold">{titleFor(path)}</h1>
             <DropdownMenu open={quickOpen && !mobile} onOpenChange={setQuickOpen}>
               <DropdownMenuTrigger asChild>
@@ -248,5 +250,18 @@ function Frame({ name, seenHints, children }: Props) {
         {petLoaded && prefs.visible && <PetLayer petId={prefs.petId} reducedMotion={prefs.motion === "off"} />}
       </SidebarProvider>
     </HintsProvider>
+  );
+}
+
+/** PC 메뉴 접기·펼치기: 접으면 아이콘만 남고 내용이 넓어짐. 상태는 쿠키로 기억(새로 고침해도 그대로) */
+function MenuFold() {
+  const { open, toggleSidebar } = useSidebar();
+  return (
+    <SidebarMenuItem>
+      <SidebarMenuButton tooltip="메뉴 펼치기" onClick={toggleSidebar} className="text-muted-foreground">
+        {open ? <PanelLeftClose /> : <PanelLeftOpen />}
+        <span>메뉴 접기</span>
+      </SidebarMenuButton>
+    </SidebarMenuItem>
   );
 }

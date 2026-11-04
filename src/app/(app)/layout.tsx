@@ -1,6 +1,6 @@
 // 로그인한 사람의 앱 화면 공통 틀. 세션·설정은 요청마다 읽으므로 Suspense 안에서(Cache Components)
 import { eq } from "drizzle-orm";
-import { headers } from "next/headers";
+import { cookies, headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Suspense } from "react";
 import { AppFrame } from "@/components/app/app-frame";
@@ -23,8 +23,9 @@ async function Gate({ children }: { children: React.ReactNode }) {
   const [settings] = await db.select().from(userSettings).where(eq(userSettings.userId, session.user.id));
   if (!settings?.onboardedAt) redirect("/onboarding");
   const user = session.user as { name: string; username?: string | null };
+  const menuOpen = (await cookies()).get("sidebar_state")?.value !== "false"; // PC 메뉴 접음 상태(sidebar.tsx가 씀)
   return (
-    <AppFrame name={user.name || user.username || "나"} seenHints={settings.seenHints} navOrder={settings.navOrder}>
+    <AppFrame menuOpen={menuOpen} name={user.name || user.username || "나"} seenHints={settings.seenHints} navOrder={settings.navOrder}>
       {children}
     </AppFrame>
   );
