@@ -1,7 +1,8 @@
 import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768
-const query = `(max-width: ${MOBILE_BREAKPOINT - 1}px)`
+// CSS(md: 768px 미만)와 같은 기준. max-width: 767px로 쓰면 767.2px 같은 소수점 폭에서 둘이 엇갈려 메뉴가 사라짐(2026-11-04)
+const query = `(width < ${MOBILE_BREAKPOINT}px)`
 
 const subscribe = (cb: () => void) => {
   const mql = window.matchMedia(query)

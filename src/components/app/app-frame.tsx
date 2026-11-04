@@ -4,8 +4,9 @@
 import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, PawPrint, Plus, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
 import { HintsProvider } from "@/components/app/help";
+import { useBackToClose } from "@/components/app/responsive";
 import { activeNav, MAIN_NAV, QUICK_ADD, titleFor } from "@/components/app/nav";
 import { NavOrderProvider, useNavOrder } from "@/components/app/nav-order";
 import { ConnectionBanner } from "@/components/app/pwa";
@@ -124,10 +125,10 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
                 {side.items.map((n) => (
                   <SidebarMenuItem key={n.href} ref={side.rowRef(n.href)} {...side.item(n.href)} className={cn("select-none", side.dragging === n.href && "bg-sidebar-accent rounded-md")}>
                     <SidebarMenuButton asChild isActive={active?.href === n.href} tooltip={n.label} className="max-md:h-11 max-md:text-base max-md:[&>svg]:size-5">
-                      <Link href={n.href}>
+                      <MenuLink href={n.href}>
                         <n.icon />
                         <span>{n.label}</span>
-                      </Link>
+                      </MenuLink>
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))}
@@ -138,18 +139,18 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="펫">
-                  <Link href="/settings#pet">
+                  <MenuLink href="/settings#pet">
                     <PawPrint />
                     <span>펫</span>
-                  </Link>
+                  </MenuLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild tooltip="설정" isActive={path.startsWith("/settings")}>
-                  <Link href="/settings">
+                  <MenuLink href="/settings">
                     <Settings />
                     <span>설정</span>
-                  </Link>
+                  </MenuLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>
               <MenuFold />
@@ -244,11 +245,18 @@ function MenuButton() {
   );
 }
 
-/** 모바일 메뉴 창: 메뉴를 고르면(주소가 바뀌면) 닫힘 */
+/** 모바일 메뉴 창: 메뉴를 고르면(주소가 바뀌면) 닫히고, 휴대폰 뒤로 가기로도 닫힘(다른 창들과 같게) */
 function CloseOnNavigate({ path }: { path: string }) {
-  const { setOpenMobile } = useSidebar();
+  const { isMobile, openMobile, setOpenMobile } = useSidebar();
   useEffect(() => setOpenMobile(false), [path, setOpenMobile]);
+  useBackToClose(isMobile && openMobile, setOpenMobile);
   return null;
+}
+
+/** 메뉴 링크: 모바일 메뉴 창이 열려 있으면 창이 쌓은 기록 칸을 이동할 곳으로 바꿈(뒤로 가기 한 번에 이전 화면) */
+function MenuLink(props: ComponentProps<typeof Link>) {
+  const { isMobile, openMobile } = useSidebar();
+  return <Link {...props} replace={isMobile && openMobile} />;
 }
 
 function MenuFold() {

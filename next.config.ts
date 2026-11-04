@@ -9,6 +9,13 @@ const nextConfig: NextConfig = {
   // 자식 프로세스로 Claude Code·Codex를 띄우는 패키지는 묶지 않고 node_modules에서 그대로 씀
   serverExternalPackages: ["@anthropic-ai/claude-agent-sdk", "@openai/codex"],
   partialPrefetching: true,
+  // 옛 주소(작품·위시가 기록 메뉴에 있던 때, 2026-11-04 위시 메뉴로 분리) — 열어 둔 탭·즐겨찾기용
+  async redirects() {
+    return [
+      { source: "/records/wish", destination: "/wish", permanent: false },
+      { source: "/records/media", destination: "/wish/media", permanent: false },
+    ];
+  },
   async headers() {
     return [
       {

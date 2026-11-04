@@ -24,7 +24,7 @@ type Props = {
  * 열리면 기록(history)에 한 칸을 쌓고, 뒤로가기가 오면 닫음. UI로 닫을 때는 쌓은 칸을 되돌림.
  * 정리(cleanup)에서는 기록을 건드리지 않음 — 개발 모드에서 효과가 두 번 실행되면 열자마자 닫히던 문제(2026-11-01)
  */
-function useBackToClose(open: boolean, onOpenChange: (open: boolean) => void) {
+export function useBackToClose(open: boolean, onOpenChange: (open: boolean) => void) {
   const id = useId();
   const latest = useRef({ open, onOpenChange });
   useEffect(() => {
