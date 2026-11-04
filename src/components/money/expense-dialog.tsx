@@ -45,6 +45,7 @@ export type TxEdit = {
   type: "expense" | "income";
   amount: number;
   isRefund: boolean;
+  restraint?: boolean;
   date: string;
   categoryId: string;
   paymentMethodId: string | null;
@@ -85,6 +86,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
   const [loadError, setLoadError] = useState("");
   const [type, setType] = useState<"expense" | "income">(edit?.type ?? "expense");
   const [refund, setRefund] = useState(edit?.isRefund ?? false);
+  const [restraint, setRestraint] = useState(edit?.restraint ?? false); // 참아서 갚기(20 §3)
   const [amount, setAmount] = useState<number | null>(edit?.amount ?? wish?.price ?? null);
   const [categoryId, setCategoryId] = useState<string | null>(edit?.categoryId ?? null); // 직전 선택 기억 안 함(오기록 방지, 04 §6.3)
   const [paymentId, setPaymentId] = useState<string | null>(edit?.paymentMethodId ?? null);
@@ -125,7 +127,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
     if (!categoryId) return setError({ field: "category", message: "분류를 골라 주세요" });
     setBusy(true);
     setError(null);
-    const input = { type, amount, isRefund: type === "expense" && refund, date, categoryId, paymentMethodId: paymentId, title: title.trim() || null, memo: memo.trim() || null, plannedExpenseId: linked };
+    const input = { type, amount, isRefund: type === "expense" && refund, restraint: type === "expense" && restraint, date, categoryId, paymentMethodId: paymentId, title: title.trim() || null, memo: memo.trim() || null, plannedExpenseId: linked };
     const r = edit ? await editTransaction(edit.id, edit.version, input) : wish ? await buyWish(key, wish.id, wish.version, input) : await addTransaction(key, input);
     setBusy(false);
     if (!r.ok) {
@@ -146,7 +148,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
     };
     const label = type === "income" ? "수입을 기록했어요" : refund ? "환불을 기록했어요" : "지출을 기록했어요";
     if ("budget" in r.data && r.data.budget) toast.warning(`${r.data.budget.category} 예산을 ${money(r.data.budget.over)} 넘었어요 · 그만큼 참아야 할 금액에 더해져요`, { duration: 5000, action: { label: "되돌리기", onClick: undo } });
-    else if ("restraint" in r.data && r.data.restraint) toast(`사치 지출을 기록했어요 · 이번 달 참아야 할 금액 +${money(amount)}`, { duration: 6000, action: { label: "되돌리기", onClick: undo } });
+    else if ("restraint" in r.data && r.data.restraint) toast(`참아서 갚을 지출을 기록했어요 · 이번 달 참아야 할 금액 +${money(amount)}`, { duration: 6000, action: { label: "되돌리기", onClick: undo } });
     else toastUndo(label, undo);
     if (repeat) {
       // 연속 입력: 비우고 다시 금액부터
@@ -154,6 +156,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
       setTitle("");
       setMemo("");
       setCategoryId(null);
+      setRestraint(false);
       setKey(newKey());
     } else close();
   }
@@ -354,9 +357,18 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
               }}
             />
           </div>
-          {picked?.restraint && <p className="text-muted-foreground text-caption">이 분류에 쓴 돈만큼 참은 소비를 채워야 해요</p>}
           {error?.field === "category" && <FieldError>{error.message}</FieldError>}
         </Field>
+
+        {type === "expense" && (
+          <label className="flex cursor-pointer items-start gap-2.5 text-sm max-md:py-1">
+            <Checkbox className="mt-0.5 max-md:size-5" checked={restraint} onCheckedChange={(v) => setRestraint(v === true)} />
+            <span>
+              참아서 갚기
+              <span className="text-muted-foreground block text-caption">{refund ? "체크하면 이 금액만큼 참아야 할 금액이 줄어요" : "괜히 썼다 싶은 돈이면 체크해요. 이만큼 참은 소비로 채워야 해요"}</span>
+            </span>
+          </label>
+        )}
 
         {type === "expense" && (
           <Field data-invalid={error?.field === "payment" || undefined}>

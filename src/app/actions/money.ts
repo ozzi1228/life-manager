@@ -45,7 +45,7 @@ export async function restoreTransaction(id: string) {
 export async function addCategory(kind: "expense" | "income", name: string) {
   return action(async (ctx) => {
     const c = await createCategory(ctx, { kind, name });
-    return { id: c.id, kind: c.kind, name: c.name, restraint: c.countsTowardRestraint };
+    return { id: c.id, kind: c.kind, name: c.name };
   });
 }
 

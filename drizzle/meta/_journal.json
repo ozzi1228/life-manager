@@ -169,6 +169,13 @@
       "when": 1793695833686,
       "tag": "0023_calendar_google",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1793751449502,
+      "tag": "0024_tx_restraint",
+      "breakpoints": true
     }
   ]
 }

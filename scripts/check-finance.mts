@@ -17,11 +17,9 @@ const users = ["check-fin-a", "check-fin-b"];
 try {
   const fa = await formData(A);
   const food = fa.categories.find((c) => c.name === "식비")!;
-  const luxury = fa.categories.find((c) => c.name === "사치")!;
   const salary = fa.categories.find((c) => c.name === "급여")!;
-  assert.ok(food && luxury && salary, "기본 분류가 만들어짐");
-  assert.equal(luxury.restraint, true, "사치만 참은 소비에 포함");
-  assert.equal(fa.categories.filter((c) => c.restraint).length, 1);
+  assert.ok(food && salary, "기본 분류가 만들어짐");
+  assert.ok(!fa.categories.some((c) => c.name === "사치"), "사치 분류는 만들지 않음(지출마다 체크)");
   assert.equal(fa.paymentMethods[0]?.name, "현금");
   await formData(A); // 두 번 불러도 기본 분류가 또 생기지 않음
   assert.equal((await formData(A)).categories.length, fa.categories.length);
@@ -34,8 +32,9 @@ try {
   assert.equal(await code(createTransaction(B, { ...base, amount: 1000 })), "VALIDATION_FAILED", "남의 분류 사용 불가");
 
   await createTransaction(A, { ...base, amount: 12000, title: "점심" });
-  const lux = await createTransaction(A, { ...base, amount: 50000, categoryId: luxury.id });
-  assert.equal(lux.restraint, true, "사치 지출은 참은 소비 안내");
+  const lux = await createTransaction(A, { ...base, amount: 50000, restraint: true });
+  assert.equal(lux.restraint, true, "갚기 체크한 지출은 참은 소비 안내");
+  assert.equal((await createTransaction(A, { type: "income", amount: 1, date: "2026-10-01", categoryId: salary.id, restraint: true })).restraint, false, "수입은 갚기 안 됨");
   await createTransaction(A, { ...base, amount: 2000, isRefund: true });
   await createTransaction(A, { type: "income", amount: 100000, date: "2026-11-30", categoryId: salary.id });
   await createTransaction(A, { ...base, date: "2026-12-01", amount: 999 });

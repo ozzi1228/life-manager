@@ -112,7 +112,7 @@ export const aiConnection = pgTable(
 );
 
 // ── 돈 (06 §3, 14 §4.4) ──
-// 분류: 지출·수입. 기본 분류는 처음 쓸 때 만들어짐(src/server/finance.ts). 사치만 참은 소비에 포함(20 §3)
+// 분류: 지출·수입. 기본 분류는 처음 쓸 때 만들어짐(src/server/finance.ts). 참은 소비 대상은 분류가 아니라 지출마다 체크(transactions.restraint)
 export const finCategories = pgTable(
   "fin_categories",
   {
@@ -122,7 +122,6 @@ export const finCategories = pgTable(
     colorHex: text("color_hex"),
     sort: integer("sort").notNull().default(0),
     isHidden: boolean("is_hidden").notNull().default(false),
-    countsTowardRestraint: boolean("counts_toward_restraint").notNull().default(false),
   },
   (t) => [uniqueIndex("fin_categories_name").on(t.userId, t.kind, t.name).where(sql`${t.deletedAt} is null`)],
 );
@@ -148,6 +147,7 @@ export const transactions = pgTable(
     type: text("type", { enum: ["expense", "income"] }).notNull(),
     amount: bigint("amount", { mode: "number" }).notNull(),
     isRefund: boolean("is_refund").notNull().default(false),
+    restraint: boolean("restraint").notNull().default(false), // "참아서 갚기": 이 지출만큼 참은 소비를 채워야 함(20 §3)
     date: date("date").notNull(),
     categoryId: uuid("category_id").notNull(),
     paymentMethodId: uuid("payment_method_id"),

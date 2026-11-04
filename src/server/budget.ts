@@ -72,7 +72,7 @@ export async function budgetView(ctx: Ctx, month: string) {
     planned: planned.map((p) => ({ id: p.id, version: p.version, name: p.name, amount: p.amount, manuallyDone: p.manuallyDone })),
     fixed,
     summary,
-    txs: txs.filter((t) => t.date <= today).map((t) => ({ id: t.id, title: t.title, amount: t.isRefund ? -t.amount : t.amount, date: t.date, categoryId: t.categoryId, plannedExpenseId: t.plannedExpenseId })),
+    txs: txs.filter((t) => t.date <= today).map((t) => ({ id: t.id, title: t.title, amount: t.isRefund ? -t.amount : t.amount, date: t.date, categoryId: t.categoryId, plannedExpenseId: t.plannedExpenseId, restraint: t.restraint })),
     prevLines: prev && Object.keys(prev.lines).length ? prev.lines : null,
   };
 }

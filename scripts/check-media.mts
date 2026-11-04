@@ -85,14 +85,14 @@ try {
   assert.equal(await code(createWish(B, { kind: "media", name: "x" })), "종류를 골라 주세요");
   console.log("작품 기록·위시 규칙 확인 통과");
 
-  // ── 참은 소비(20): 사치 + 예산 초과, 지난달 정산·위시 자동 포함, 직접 기록·위시에서 고르기, 그만둘 때 기록, 나중에 산 물건, 넘기기 ──
+  // ── 참은 소비(20): 갚기 체크 + 예산 초과, 지난달 정산·위시 자동 포함, 직접 기록·위시에서 고르기, 그만둘 때 기록, 나중에 산 물건, 넘기기 ──
   const R: Ctx = { userId: "check-med-r", actor: "user" };
   users.push(R.userId);
   const cur = todayIn().slice(0, 7);
   const prev = prevMonth(cur);
   const today = todayIn();
   const cats = (await formData(R)).categories;
-  const [lux, food, shopCat] = ["사치", "식비", "쇼핑"].map((n) => cats.find((c) => c.name === n)!);
+  const [lux, food, shopCat] = ["쇼핑", "식비", "쇼핑"].map((n) => cats.find((c) => c.name === n)!);
   const back = (id: string, day: string) => db.update(wishItems).set({ createdAt: new Date(`${day}T12:00:00+09:00`) }).where(eq(wishItems.id, id));
   const w1 = await createWish(R, { kind: "shopping", name: "무선 이어폰", level: "want", price: 89000 });
   await back(w1.id, `${prevMonth(prev)}-15`); // 지난달 1일 전부터 담아 둠 → 지난달 정산에 자동 포함
@@ -101,7 +101,7 @@ try {
   const wNeed = await createWish(R, { kind: "shopping", name: "청소기", level: "need", price: 200000 });
   await back(wNeed.id, `${prevMonth(prev)}-01`);
   await saveBudget(R, cur, null, { lines: { [food.id]: 10000 } });
-  await createTransaction(R, { type: "expense", amount: 50000, date: today, categoryId: lux.id });
+  await createTransaction(R, { type: "expense", amount: 50000, date: today, categoryId: lux.id, restraint: true });
   await createTransaction(R, { type: "expense", amount: 15000, date: today, categoryId: food.id });
 
   let rv = await restraintView(R, cur);
@@ -133,10 +133,10 @@ try {
   rv = await restraintView(R, cur);
   assert.equal(rv.target, 55000);
 
-  // 지난달: 자동 항목 빼기 → 다시 정산 필요, 사치 지출 추가 → 부족분이 이번 달로 넘어옴
+  // 지난달: 자동 항목 빼기 → 다시 정산 필요, 갚기 지출 추가 → 부족분이 이번 달로 넘어옴
   pv = await restraintView(R, prev);
   await setExcluded(R, pv.entries[0].id, pv.entries[0].version, true);
-  await createTransaction(R, { type: "expense", amount: 100000, date: `${prev}-20`, categoryId: lux.id });
+  await createTransaction(R, { type: "expense", amount: 100000, date: `${prev}-20`, categoryId: lux.id, restraint: true });
   pv = await restraintView(R, prev);
   assert.equal(pv.stale, true, "정산 뒤 바뀜");
   await resettle(R, prev);

@@ -12,8 +12,8 @@ export const paymentRepo = defineRepo(paymentMethods, "payment_method");
 export const txRepo = defineRepo(transactions, "transaction");
 export const plannedRepo = defineRepo(plannedExpenses, "planned_expense");
 
-// 기본 분류(04 §6.13). 사치만 참은 소비에 포함(20 §3)
-const DEFAULT_EXPENSE = ["식비", "카페·간식", "교통", "쇼핑", "사치", "생활", "문화·여가", "건강·의료", "교육", "경조사·선물", "여행", "구독·고정", "기타"];
+// 기본 분류(04 §6.13). 참은 소비 대상은 분류가 아니라 지출마다 체크(20 §3)
+const DEFAULT_EXPENSE = ["식비", "카페·간식", "교통", "쇼핑", "생활", "문화·여가", "건강·의료", "교육", "경조사·선물", "여행", "구독·고정", "기타"];
 const DEFAULT_INCOME = ["급여", "용돈", "부수입", "환급", "기타 수입"];
 
 /** 처음 쓸 때 기본 분류·결제수단(현금)을 만듦. 이미 있으면 아무것도 안 함 */
@@ -22,7 +22,7 @@ async function ensureDefaults(ctx: Ctx) {
   if (has) return;
   await db.transaction(async (tx) => {
     const rows = [
-      ...DEFAULT_EXPENSE.map((name, i) => ({ kind: "expense" as const, name, sort: i, countsTowardRestraint: name === "사치" })),
+      ...DEFAULT_EXPENSE.map((name, i) => ({ kind: "expense" as const, name, sort: i })),
       ...DEFAULT_INCOME.map((name, i) => ({ kind: "income" as const, name, sort: i })),
     ];
     for (const r of rows) await categoryRepo.create(ctx, r, { source: "default", tx });
@@ -52,7 +52,7 @@ export async function formData(ctx: Ctx) {
   const pmRecent = recent(pmUse);
   const orderedPm = byRecent(pms, pmRecent);
   return {
-    categories: cats.map((c) => ({ id: c.id, kind: c.kind, name: c.name, restraint: c.countsTowardRestraint })),
+    categories: cats.map((c) => ({ id: c.id, kind: c.kind, name: c.name })),
     paymentMethods: orderedPm.map((p) => ({ id: p.id, kind: p.kind, name: p.name })),
     lastPaymentMethodId: pmRecent.size ? orderedPm[0]?.id ?? null : null,
     planned: planned.map((p) => ({ id: p.id, month: p.month, name: p.name })),
@@ -64,6 +64,7 @@ export const txInput = z.object({
   type: z.enum(["expense", "income"]),
   amount: z.number({ error: "금액을 입력해 주세요" }).int().min(1, "1원 이상 입력해 주세요").max(10_000_000_000, "100억 원까지 입력할 수 있어요"),
   isRefund: z.boolean().default(false),
+  restraint: z.boolean().default(false),
   date: ymd,
   categoryId: z.uuid({ error: "분류를 골라 주세요" }),
   paymentMethodId: z.uuid().nullable().default(null),
@@ -83,13 +84,13 @@ async function checkRefs(ctx: Ctx, v: { type: string; categoryId: string; paymen
   return cat;
 }
 
-const clean = (v: z.infer<typeof txInput>) => ({ ...v, title: v.title || null, memo: v.memo || null, isRefund: v.type === "expense" && v.isRefund, plannedExpenseId: v.type === "expense" ? v.plannedExpenseId : null });
+const clean = (v: z.infer<typeof txInput>) => ({ ...v, title: v.title || null, memo: v.memo || null, isRefund: v.type === "expense" && v.isRefund, restraint: v.type === "expense" && v.restraint, plannedExpenseId: v.type === "expense" ? v.plannedExpenseId : null });
 
 export async function createTransaction(ctx: Ctx, input: unknown, tx?: Tx) {
   const v = clean(parse(txInput, input));
-  const cat = await checkRefs(ctx, v);
+  await checkRefs(ctx, v);
   const row = await txRepo.create(ctx, v, { tx });
-  return { row, restraint: v.type === "expense" && !v.isRefund && cat.countsTowardRestraint };
+  return { row, restraint: v.restraint && !v.isRefund };
 }
 
 export async function updateTransaction(ctx: Ctx, id: string, version: number, input: unknown) {
@@ -187,6 +188,7 @@ export const toRow = (r: typeof transactions.$inferSelect) => ({
   type: r.type,
   amount: r.amount,
   isRefund: r.isRefund,
+  restraint: r.restraint,
   date: r.date,
   categoryId: r.categoryId,
   paymentMethodId: r.paymentMethodId,

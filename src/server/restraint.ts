@@ -10,7 +10,7 @@ import { autoEligible, restraintTarget } from "../lib/restraint.ts";
 import { budgetView, monthEnd, nextMonth, prevMonth } from "./budget.ts";
 import { AppError } from "./errors.ts";
 import { imagesOf } from "./files.ts";
-import { categoryRepo, nameMaps } from "./finance.ts";
+import { nameMaps } from "./finance.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
 import { todayIn } from "./time.ts";
 import { parse } from "./validate.ts";
@@ -45,15 +45,13 @@ const shoppingWishes = (ctx: Ctx) =>
 
 /** 한 달 참아야 할 금액(내역)·참은 금액을 지금 데이터로 계산 */
 async function compute(ctx: Ctx, month: string, carriedIn: number) {
-  const [view, cats, entries, later] = await Promise.all([
+  const [view, entries, later] = await Promise.all([
     budgetView(ctx, month),
-    categoryRepo.list(ctx, { limit: 1000 }),
     entriesOf(ctx, month),
     restraintEntryRepo.list(ctx, { where: and(eq(restraintEntries.boughtMonth, month), eq(restraintEntries.status, "later_bought")), limit: 1000 }),
   ]);
   const d = restraintTarget({
-    txs: view.txs.map((t) => ({ amount: Math.abs(t.amount), isRefund: t.amount < 0, date: t.date, categoryId: t.categoryId })),
-    luxuryIds: cats.filter((c) => c.countsTowardRestraint).map((c) => c.id),
+    txs: view.txs.map((t) => ({ amount: Math.abs(t.amount), isRefund: t.amount < 0, date: t.date, categoryId: t.categoryId, restraint: t.restraint })),
     categories: view.summary.categories,
     carriedIn,
     laterBought: later.reduce((a, e) => a + e.amount, 0),

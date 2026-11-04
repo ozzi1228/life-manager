@@ -35,6 +35,7 @@ export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; c
                         <span className="truncate">{r.title || categories[r.categoryId] || "분류 없음"}</span>
                         {r.memo && <StickyNote className="text-muted-foreground size-3.5 shrink-0" aria-label="메모 있음" />}
                         {r.isRefund && <Badge variant="secondary">환불</Badge>}
+                        {r.restraint && <Badge variant="outline">갚기</Badge>}
                         {date > today && <Badge variant="outline">예정</Badge>}
                       </span>
                       <span className="text-muted-foreground block truncate text-caption">

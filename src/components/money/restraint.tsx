@@ -162,12 +162,12 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
   );
   const tip = (
     <InfoTip label="참은 소비 계산" title="참아야 할 금액">
-      <p>사치 분류에 쓴 돈과 분류별 예산을 넘은 금액을 더한 만큼 참아야 해요.</p>
+      <p>지출을 기록할 때 &quot;참아서 갚기&quot;를 체크한 돈과 분류별 예산을 넘은 금액을 더한 만큼 참아야 해요.</p>
       <p>진짜 사고 싶었는데 참은 것을 기록해 채워요. 부족하면 다음 달로 넘어가요.</p>
     </InfoTip>
   );
   const lines = [
-    { label: "사치 지출", value: v.detail.luxury },
+    { label: "참아서 갚을 지출", value: v.detail.luxury },
     ...v.detail.overage.map((o) => ({ label: `${o.name} 예산 초과`, value: o.over })),
     ...(v.detail.carriedIn ? [{ label: "지난달에서 넘어온 금액", value: v.detail.carriedIn }] : []),
     ...(v.detail.laterBought ? [{ label: "참았다가 산 물건", value: v.detail.laterBought }] : []),
