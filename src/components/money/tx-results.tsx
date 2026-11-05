@@ -1,10 +1,10 @@
 "use client";
 
-// 지출 내역 결과 (SCR-FIN-02): 요약 + 목록 / 통계. 모바일은 목록·통계를 탭으로, PC는 목록 오른쪽에 통계
+// 가계부 내역 결과 (SCR-FIN-02): 요약 + 목록 / 통계. 모바일은 목록·통계를 탭으로, PC는 목록 오른쪽에 통계
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { useExpenseDialog } from "@/components/money/expense-dialog";
-import { TxList, type TxRow } from "@/components/money/tx-list";
+import { signClass, signedMoney, TxList, type TxRow } from "@/components/money/tx-list";
 import { useFilterNav } from "@/components/money/tx-search";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
@@ -52,13 +52,28 @@ export function TxResults({ rows, stats, categories, payments, today, capped }: 
 }
 
 function Summary({ s, capped }: { s: Stats; capped: boolean }) {
-  const extra = [s.kind === "expense" && s.income > 0 && `수입 ${money(s.income)}`, s.refund > 0 && `환불 ${money(s.refund)}`, s.restraint !== 0 && `갚기 체크 ${money(s.restraint)}`].filter(Boolean);
+  const extra = [s.refund > 0 && `예전 환불 ${money(s.refund)}`, s.restraint !== 0 && `갚기 체크 ${money(s.restraint)}`].filter(Boolean);
+  const total = s.kind === "income" ? s.total : -s.total;
+  const net = s.income - s.total; // 수입 − 지출
   return (
     <section className={card} aria-label="요약">
       <div className="flex items-baseline justify-between gap-2">
         <span className="text-muted-foreground text-sm">{s.kind === "income" ? "수입 합계" : "지출 합계"}</span>
-        <span className="text-title font-bold tabular-nums">{money(s.total)}</span>
+        <span className={cn("text-title font-bold tabular-nums", signClass(total))}>{signedMoney(total)}</span>
       </div>
+      {/* 모두 보기: 수입과 남은 돈(수입 − 지출)도 */}
+      {s.kind === "expense" && s.income > 0 && (
+        <div className="flex flex-wrap justify-between gap-x-3 gap-y-1 border-t pt-2 text-sm tabular-nums">
+          <span>
+            <span className="text-muted-foreground">수입 </span>
+            <span className={signClass(s.income)}>{signedMoney(s.income)}</span>
+          </span>
+          <span>
+            <span className="text-muted-foreground">남은 돈 </span>
+            <span className={cn("font-semibold", signClass(net))}>{signedMoney(net)}</span>
+          </span>
+        </div>
+      )}
       <dl className="grid grid-cols-3 gap-2 text-sm">
         {(
           [

@@ -6,7 +6,7 @@ export const MoneyTabs = () => (
     label="금융"
     tabs={[
       { href: "/money", label: "한눈에" },
-      { href: "/money/expenses", label: "지출", match: ["/money/expenses", "/money/fixed"] },
+      { href: "/money/expenses", label: "가계부", match: ["/money/expenses", "/money/fixed"] },
       { href: "/money/budget", label: "예산" },
       { href: "/money/accounts", label: "자산", match: ["/money/accounts", "/money/cards", "/money/pays"] },
       { href: "/money/restraint", label: "참은 소비" },
@@ -14,12 +14,12 @@ export const MoneyTabs = () => (
   />
 );
 
-/** 지출 탭 안: 지출 내역 / 고정 지출 */
+/** 가계부 탭 안: 내역(수입·지출) / 고정 지출 */
 export const ExpenseTabs = () => (
   <SubTabs
-    label="지출"
+    label="가계부"
     tabs={[
-      { href: "/money/expenses", label: "지출 내역" },
+      { href: "/money/expenses", label: "내역" },
       { href: "/money/fixed", label: "고정 지출" },
     ]}
   />

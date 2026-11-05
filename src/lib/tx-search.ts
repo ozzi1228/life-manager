@@ -1,8 +1,8 @@
-// 지출 내역 검색·필터·통계 (SCR-FIN-02). 주소 → 필터, 결과 → 통계. 서버·화면·확인 스크립트 공용
+// 가계부 내역 검색·필터·통계 (SCR-FIN-02). 주소 → 필터, 결과 → 통계. 서버·화면·확인 스크립트 공용
 import { addMonths } from "./format.ts";
 import { addDays } from "./recurring.ts";
 
-export type TxType = "all" | "expense" | "refund" | "income";
+export type TxType = "all" | "expense" | "income"; // 환불은 따로 안 봄(돌려받은 돈은 수입으로 적음. 예전 환불은 '모두'에)
 export type Period = "month" | "3m" | "year" | "all" | "range";
 export type TxFilter = {
   q: string;
@@ -52,7 +52,7 @@ export function readFilter(sp: Raw, today: string): TxFilter {
     month,
     from,
     to,
-    type: t === "expense" || t === "refund" || t === "income" ? t : "all",
+    type: t === "expense" || t === "income" ? t : "all",
     cats: many(sp.cat).filter((x) => UUID.test(x)).slice(0, 50),
     pms: many(sp.pm).filter((x) => UUID.test(x)).slice(0, 50),
     tags: many(sp.tag).map((x) => x.trim()).filter(Boolean).slice(0, 20),

@@ -4,6 +4,7 @@
 import { Badge } from "@/components/ui/badge";
 import { useExpenseDialog, type TxEdit } from "@/components/money/expense-dialog";
 import { dayLabel, fromYmd, money } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export type TxRow = TxEdit;
 type Names = Record<string, string>;
@@ -16,6 +17,11 @@ export const payLabel = (r: Pick<TxRow, "paymentMethodId" | "payId">, payments: 
 };
 
 const signed = (r: TxRow) => (r.type === "income" || r.isRefund ? r.amount : -r.amount);
+/** 들어온 돈은 빨강 +, 나간 돈은 파랑 −(색만으로 전하지 않게 부호도) */
+export const IN = "text-red-600 dark:text-red-400";
+export const OUT = "text-blue-600 dark:text-blue-400";
+export const signedMoney = (n: number) => (n > 0 ? `+${money(n)}` : n < 0 ? `-${money(-n)}` : money(0));
+export const signClass = (n: number) => (n > 0 ? IN : n < 0 ? OUT : "text-muted-foreground");
 
 export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; categories: Names; payments: Names; today: string }) {
   const openExpense = useExpenseDialog();
@@ -30,7 +36,7 @@ export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; c
           <section key={date} aria-label={dayLabel(date, fromYmd(today))}>
             <h3 className="bg-background/95 text-muted-foreground sticky top-14 z-[1] flex justify-between py-1.5 text-sm backdrop-blur">
               <span>{dayLabel(date, fromYmd(today))}</span>
-              <span className="tabular-nums">{sum > 0 ? `+${money(sum)}` : money(Math.abs(sum))}</span>
+              <span className={cn("tabular-nums", signClass(sum))}>{signedMoney(sum)}</span>
             </h3>
             <ul className="divide-y rounded-lg border">
               {list.map((r) => (
@@ -50,8 +56,8 @@ export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; c
                       {/* 메모가 있으면 첫 줄을 함께 */}
                       {r.memo && <span className="text-muted-foreground block truncate text-caption">{r.memo.split("\n")[0]}</span>}
                     </span>
-                    <span className="shrink-0 text-right tabular-nums">
-                      {signed(r) > 0 ? `+${money(r.amount)}` : money(r.amount)}
+                    <span className={cn("shrink-0 text-right tabular-nums", signClass(signed(r)))}>
+                      {signedMoney(signed(r))}
                       {/* 외화로 쓴 돈: 원래 금액을 아래에 작게 */}
                       {r.foreignAmount && r.currency && <span className="text-muted-foreground block text-caption">{money(r.foreignAmount, { currency: r.currency })}</span>}
                     </span>

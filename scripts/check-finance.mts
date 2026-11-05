@@ -59,7 +59,7 @@ try {
   assert.equal((await find({ period: "all", q: "100%" })).length, 1, "검색어의 %는 글자 그대로");
   assert.equal((await find({ period: "all", q: "식비" })).length, 6, "검색: 분류 이름");
   assert.equal((await find({ period: "all", q: "제주" }).then((r) => r.length)) + (await searchTransactions(B, readFilter({ period: "all", q: "제주" }, now))).length, 2, "남의 것은 안 보임");
-  assert.equal((await find({ type: "refund" })).length, 1);
+  assert.equal((await find({ type: "refund" })).length, 4, "환불 보기는 없앰(모두와 같음)");
   assert.equal((await find({ type: "expense" })).length, 2, "지출 = 환불 뺀 지출");
   assert.equal((await find({ restraint: "1" })).length, 1);
   assert.equal((await find({ period: "all", min: "10000", max: "40000" })).length, 2, "금액 범위");

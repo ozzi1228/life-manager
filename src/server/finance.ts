@@ -188,7 +188,6 @@ export async function searchTransactions(ctx: Ctx, f: TxFilter) {
   }
   if (f.type === "income") w.push(eq(t.type, "income"));
   if (f.type === "expense") w.push(eq(t.type, "expense"), eq(t.isRefund, false));
-  if (f.type === "refund") w.push(eq(t.isRefund, true));
   if (f.cats.length) w.push(inArray(t.categoryId, f.cats));
   if (f.pms.length) w.push(or(inArray(t.paymentMethodId, f.pms), inArray(t.payId, f.pms))); // 페이를 고르면 그 페이로 쓴 것도
   if (f.tags.length) w.push(arrayOverlaps(t.tags, f.tags)); // 고른 태그 중 하나라도

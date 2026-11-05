@@ -1,4 +1,4 @@
-// 금융 · 한눈에 (SCR-FIN-01, 04 §6.1): 남은 예산(없으면 쓴 돈) → 7일 안 결제 예정 → 분류별 상위 5 → 최근 지출. 참은 소비는 M-22에서
+// 금융 · 한눈에 (SCR-FIN-01, 04 §6.1): 남은 예산(없으면 쓴 돈) → 7일 안 결제 예정 → 분류별 상위 5 → 최근 내역(수입·지출). 참은 소비는 M-22에서
 import { CircleAlert } from "lucide-react";
 import Link from "next/link";
 import { InfoTip } from "@/components/app/help";
@@ -133,7 +133,7 @@ export default async function MoneyHome() {
 
             <section className="space-y-3">
               <div className="flex items-center justify-between">
-                <h2 className="text-subtitle font-semibold">최근 지출</h2>
+                <h2 className="text-subtitle font-semibold">최근 내역</h2>
                 <Button asChild variant="link" size="sm">
                   <Link href="/money/expenses">전체 보기</Link>
                 </Button>

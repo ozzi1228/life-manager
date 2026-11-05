@@ -1,6 +1,6 @@
 "use client";
 
-// 지출 내역 검색·필터 (SCR-FIN-02): 검색창(최근 검색), 기간·종류, 필터 시트, 고른 조건 칩. 조건은 모두 주소(?q=&period=&cat=…)에
+// 가계부 내역 검색·필터 (SCR-FIN-02): 검색창(최근 검색), 기간·종류, 필터 시트, 고른 조건 칩. 조건은 모두 주소(?q=&period=&cat=…)에
 import { ChevronDown, Clock, ListFilter, Search, X } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
@@ -61,7 +61,7 @@ export function TxSearch({ f, options, today }: { f: TxFilter; options: FilterOp
 
   return (
     <div className="space-y-3">
-      {/* 모바일: 검색·필터 / 기간·종류 두 줄. PC: 한 줄(검색 · 기간 · 종류 · 필터 · 지출 추가) */}
+      {/* 모바일: 검색·필터 / 기간·종류 두 줄. PC: 한 줄(검색 · 기간 · 종류 · 필터 · 기록 추가) */}
       <div className="flex flex-wrap items-center gap-2">
         <SearchBox value={f.q} inMonth={f.period === "month"} />
         <Button variant="outline" className="h-11 md:order-3 md:h-9" onClick={() => setOpen(true)}>
@@ -78,7 +78,8 @@ export function TxSearch({ f, options, today }: { f: TxFilter; options: FilterOp
             </Button>
           )}
         </span>
-        <span className="max-md:w-full md:order-2">
+        {/* 모바일: 달 이동 옆에 같은 줄로 */}
+        <span className="max-md:ml-auto md:order-2">
           <TypeFilter value={f.type} />
         </span>
         <span className="ml-auto max-md:hidden md:order-4">
@@ -105,16 +106,15 @@ export function TxSearch({ f, options, today }: { f: TxFilter; options: FilterOp
 function TypeFilter({ value }: { value: TxType }) {
   const nav = useFilterNav();
   return (
-    <ToggleGroup type="single" variant="outline" spacing={0} className="max-md:w-full" value={value} onValueChange={(v) => v && nav({ type: v === "all" ? null : v })} aria-label="종류">
+    <ToggleGroup type="single" variant="outline" spacing={0} value={value} onValueChange={(v) => v && nav({ type: v === "all" ? null : v })} aria-label="종류">
       {(
         [
           ["all", "모두"],
           ["expense", "지출"],
-          ["refund", "환불"],
           ["income", "수입"],
         ] as const
       ).map(([v, label]) => (
-        <ToggleGroupItem key={v} value={v} className="px-2.5 max-md:h-11 max-md:flex-1">
+        <ToggleGroupItem key={v} value={v} className="px-3 max-md:h-11">
           {label}
         </ToggleGroupItem>
       ))}

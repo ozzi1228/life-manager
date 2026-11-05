@@ -1,6 +1,6 @@
 "use client";
 
-// 금융 화면의 작은 조작: 달 이동(주소 ?month=), 지출 추가 버튼
+// 금융 화면의 작은 조작: 달 이동(주소 ?month=), 기록 추가 버튼
 import { Plus } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { MonthSwitcher } from "@/components/app/pickers";
@@ -28,7 +28,7 @@ export function AddExpenseButton({ variant = "default" }: { variant?: "default" 
   const open = useExpenseDialog();
   return (
     <Button variant={variant} onClick={() => open()}>
-      <Plus /> 지출 추가
+      <Plus /> 기록 추가
     </Button>
   );
 }

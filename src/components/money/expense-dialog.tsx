@@ -71,7 +71,7 @@ export function ExpenseDialogProvider({ children }: { children: ReactNode }) {
       <ResponsiveModal
         open={state.open}
         onOpenChange={(open) => setState((s) => ({ ...s, open }))}
-        title={state.edit ? "지출 수정" : state.wish ? "구매 기록" : "지출 추가"}
+        title={state.edit ? (state.edit.type === "income" ? "수입 수정" : "지출 수정") : state.wish ? "구매 기록" : "기록 추가"}
         size="md"
       >
         {state.open && <ExpenseForm key={state.n} edit={state.edit} wish={state.wish} close={() => setState((s) => ({ ...s, open: false }))} />}
@@ -239,7 +239,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
           {wish.notice && <p className="bg-warning/15 rounded-md p-2 text-sm">{wish.notice}</p>}
         </div>
       )}
-      {/* 지출 · 환불 · 수입: 환불은 저장할 땐 "지출 + 환불 표시"(지출 합계에서 빠짐). 지출↔환불은 분류를 그대로 둠 */}
+      {/* 지출 · 수입. 돌려받은 돈(환불)도 수입으로 적음 — 예전에 적은 환불을 고칠 때만 환불 칸이 보임 */}
       <ToggleGroup
         type="single"
         variant="outline"
@@ -247,7 +247,12 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
         onValueChange={(v) => {
           if (!v) return;
           const next = v === "income" ? "income" : "expense";
-          if (next !== type) setCategoryId(null);
+          if (next !== type) {
+            setCategoryId(null);
+            // 수입은 결제수단을 미리 고르지 않음(받은 곳은 직접 고름), 지출로 돌아오면 마지막 쓴 결제수단
+            setPayId(null);
+            setPaymentId(next === "expense" && !edit ? (data?.lastPaymentMethodId ?? null) : null);
+          }
           setType(next);
           setRefund(v === "refund");
         }}
@@ -256,7 +261,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
         <ToggleGroupItem value="expense" className="flex-1">
           지출
         </ToggleGroupItem>
-        {(!edit || edit.type === "expense") && (
+        {edit?.isRefund && (
           <ToggleGroupItem value="refund" className="flex-1">
             환불
           </ToggleGroupItem>
@@ -427,6 +432,22 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
               </div>
             )}
             {error?.field === "payment" && <FieldError>{error.message}</FieldError>}
+          </Field>
+        )}
+
+        {/* 수입: 받은 곳(계좌·현금, 선택). 다시 누르면 빼기 */}
+        {type === "income" && (
+          <Field>
+            <FieldLabel>받은 곳</FieldLabel>
+            <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="받은 곳">
+              {data.paymentMethods
+                .filter((p) => p.kind === "account" || p.kind === "cash" || p.id === paymentId)
+                .map((p) => (
+                  <Button key={p.id} type="button" role="radio" aria-checked={paymentId === p.id} variant={paymentId === p.id ? "default" : "outline"} className={chip} onClick={() => setPaymentId(paymentId === p.id ? null : p.id)}>
+                    {p.name}
+                  </Button>
+                ))}
+            </div>
           </Field>
         )}
 
