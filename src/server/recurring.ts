@@ -5,7 +5,8 @@ import { z } from "zod";
 import { recurringPayments } from "../db/schema.ts";
 import { addDays, datesBetween, nextDate, perMonth, ruleLabel, type Rule } from "../lib/recurring.ts";
 import { AppError } from "./errors.ts";
-import { categoryRepo, paymentRepo } from "./finance.ts";
+import type { Currency } from "../lib/format.ts";
+import { categoryRepo, cleanForeign, foreignFields, paymentRepo } from "./finance.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
 import { todayIn } from "./time.ts";
 import { parse } from "./validate.ts";
@@ -19,6 +20,7 @@ export const recurringInput = z
   .object({
     name: z.string().trim().min(1, "이름을 입력해 주세요").max(40, "이름은 40자까지 쓸 수 있어요"),
     amount: z.number({ error: "금액을 입력해 주세요" }).int().min(1, "1원 이상 입력해 주세요").max(10_000_000_000),
+    ...foreignFields,
     variableAmount: z.boolean().default(false),
     cycle: z.enum(["monthly", "yearly", "every_n_months", "weekly"]),
     dayOfMonth: dayOfMonth.nullable().default(null),
@@ -38,7 +40,7 @@ export const recurringInput = z
     for (const k of need) if (v[k as keyof typeof v] === null) ctx.addIssue({ code: "custom", path: [k], message: "결제일을 골라 주세요" });
     const keep = (k: string) => (need.includes(k) ? v[k as keyof typeof v] : null);
     return {
-      ...v,
+      ...cleanForeign(v),
       dayOfMonth: keep("dayOfMonth") as number | null,
       monthOfYear: keep("monthOfYear") as number | null,
       intervalMonths: keep("intervalMonths") as number | null,
@@ -119,6 +121,8 @@ export async function recurringList(ctx: Ctx) {
         version: r.version,
         name: r.name,
         amount: r.amount,
+        currency: r.currency as Currency,
+        foreignAmount: r.foreignAmount,
         variableAmount: r.variableAmount,
         cycle: r.cycle,
         dayOfMonth: r.dayOfMonth,

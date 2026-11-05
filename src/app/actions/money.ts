@@ -3,9 +3,14 @@
 // 지출 입력·수정·삭제 (SCR-FIN-03). 규칙은 서비스 계층(src/server/finance.ts)에
 import { action } from "@/server/api";
 import { budgetEffect } from "@/server/budget";
-import { createCategory, createPaymentMethod, removeCategory, renameCategory, reorderCategories, createTransaction, formData, txRepo, updateTransaction, type TxInput } from "@/server/finance";
+import { createCategory, createPaymentMethod, lastRates, removeCategory, renameCategory, reorderCategories, createTransaction, formData, txRepo, updateTransaction, type TxInput } from "@/server/finance";
 import { historyOf } from "@/server/history";
 import { once } from "@/server/idempotency";
+
+/** 통화마다 마지막으로 쓴 환율(금액 입력에서 외화를 고르면 불러옴) */
+export async function currencyRates() {
+  return action((ctx) => lastRates(ctx));
+}
 
 export async function expenseFormData() {
   return action((ctx) => formData(ctx));

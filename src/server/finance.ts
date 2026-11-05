@@ -42,7 +42,7 @@ export async function formData(ctx: Ctx) {
       .from(transactions)
       .where(and(eq(transactions.userId, ctx.userId), isNull(transactions.deletedAt), gte(transactions.date, since)))
       .groupBy(col);
-  const [cats, pms, pmUse, planned, tags, payRows, paySrc, rateRows] = await Promise.all([
+  const [cats, pms, pmUse, planned, tags, payRows, paySrc] = await Promise.all([
     categoryRepo.list(ctx, { where: eq(finCategories.isHidden, false), orderBy: [asc(finCategories.sort)] }),
     paymentRepo.list(ctx, { where: eq(paymentMethods.isHidden, false), orderBy: [asc(paymentMethods.sort), asc(paymentMethods.createdAt)] }),
     lastUse(transactions.paymentMethodId),
@@ -54,13 +54,7 @@ export async function formData(ctx: Ctx) {
       select distinct on (pay_id) pay_id, payment_method_id from ${transactions}
       where user_id = ${ctx.userId} and deleted_at is null and pay_id is not null and payment_method_id is not null
       order by pay_id, created_at desc`),
-    db.execute<{ currency: Currency; amount: string; foreign_amount: string }>(sql`
-      select distinct on (currency) currency, amount, foreign_amount from ${transactions}
-      where user_id = ${ctx.userId} and deleted_at is null and foreign_amount is not null
-      order by currency, date desc, created_at desc`),
   ]);
-  // 통화마다 마지막으로 쓴 환율(1단위당 원) — 외화 입력 때 원화 금액을 미리 채움
-  const rates = Object.fromEntries(rateRows.rows.map((r) => [r.currency, rateOf(Number(r.amount), Number(r.foreign_amount), r.currency)])) as Partial<Record<Currency, number>>;
   const recent = (uses: { id: string | null; last: Date | null }[]) => new Map(uses.map((u) => [u.id, u.last?.getTime() ?? 0]));
   const byRecent = <T extends { id: string; sort: number }>(list: T[], use: Map<string | null, number>) =>
     [...list].sort((a, b) => (use.get(b.id) ?? 0) - (use.get(a.id) ?? 0) || a.sort - b.sort);
@@ -76,7 +70,6 @@ export async function formData(ctx: Ctx) {
     lastPaymentMethodId: pmRecent.size ? orderedPm[0]?.id ?? null : null,
     planned: planned.map((p) => ({ id: p.id, month: p.month, name: p.name })),
     tags,
-    rates,
   };
 }
 
@@ -91,12 +84,34 @@ export async function tagList(ctx: Ctx) {
   return r.rows.map((x) => x.tag);
 }
 
+/** 통화마다 마지막으로 쓴 환율(1단위당 원): 지출·고정 지출·큰 지출·위시 중 가장 최근에 저장한 것. 외화 입력 때 원화 금액을 미리 채움 */
+export async function lastRates(ctx: Ctx) {
+  const r = await db.execute<{ currency: Currency; amount: string; foreign_amount: string }>(sql`
+    select distinct on (currency) currency, amount, foreign_amount from (
+      select currency, amount, foreign_amount, updated_at from transactions where user_id = ${ctx.userId} and deleted_at is null and foreign_amount is not null
+      union all select currency, amount, foreign_amount, updated_at from recurring_payments where user_id = ${ctx.userId} and deleted_at is null and foreign_amount is not null
+      union all select currency, amount, foreign_amount, updated_at from planned_expenses where user_id = ${ctx.userId} and deleted_at is null and foreign_amount is not null
+      union all select currency, price, foreign_amount, updated_at from wish_items where user_id = ${ctx.userId} and deleted_at is null and foreign_amount is not null
+    ) t order by currency, updated_at desc`);
+  return Object.fromEntries(r.rows.map((x) => [x.currency, rateOf(Number(x.amount), Number(x.foreign_amount), x.currency)])) as Partial<Record<Currency, number>>;
+}
+
+/** 다른 통화(지출·고정 지출·큰 지출·위시 공통): 금액 칸은 언제나 원(환산액), 옆에 통화와 원래 금액 */
+export const foreignFields = {
+  currency: z.enum(CURRENCY_CODES).default("KRW"),
+  foreignAmount: z.number().int().min(1, "금액을 입력해 주세요").max(1_000_000_000_000, "금액을 다시 확인해 주세요").nullable().default(null),
+};
+/** 원이면 원래 금액을 비우고, 다른 통화인데 원래 금액이 없으면 거절 */
+export function cleanForeign<T extends { currency: Currency; foreignAmount: number | null }>(v: T) {
+  if (v.currency !== "KRW" && !v.foreignAmount) throw new AppError("VALIDATION_FAILED", "금액을 입력해 주세요", { fields: [{ path: "foreignAmount", rule: "required", message: "금액을 입력해 주세요" }] });
+  return { ...v, foreignAmount: v.currency === "KRW" ? null : v.foreignAmount };
+}
+
 const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜를 다시 선택해 주세요");
 export const txInput = z.object({
   type: z.enum(["expense", "income"]),
   amount: z.number({ error: "금액을 입력해 주세요" }).int().min(1, "1원 이상 입력해 주세요").max(10_000_000_000, "100억 원까지 입력할 수 있어요"),
-  currency: z.enum(CURRENCY_CODES).default("KRW"),
-  foreignAmount: z.number().int().min(1, "금액을 입력해 주세요").max(1_000_000_000_000, "금액을 다시 확인해 주세요").nullable().default(null), // 외화일 때 그 통화 금액(가장 작은 단위). amount는 원화 환산액
+  ...foreignFields,
   isRefund: z.boolean().default(false),
   restraint: z.boolean().default(false),
   date: ymd,
@@ -121,10 +136,7 @@ async function checkRefs(ctx: Ctx, v: { type: string; categoryId: string; paymen
   return cat;
 }
 
-const clean = (v: z.infer<typeof txInput>) => {
-  if (v.currency !== "KRW" && !v.foreignAmount) throw new AppError("VALIDATION_FAILED", "금액을 입력해 주세요", { fields: [{ path: "foreignAmount", rule: "required", message: "금액을 입력해 주세요" }] });
-  return { ...v, foreignAmount: v.currency === "KRW" ? null : v.foreignAmount, title: v.title || null, memo: v.memo || null, isRefund: v.type === "expense" && v.isRefund, restraint: v.type === "expense" && v.restraint, plannedExpenseId: v.type === "expense" ? v.plannedExpenseId : null, payId: v.type === "expense" ? v.payId : null };
-};
+const clean = (v: z.infer<typeof txInput>) => ({ ...cleanForeign(v), title: v.title || null, memo: v.memo || null, isRefund: v.type === "expense" && v.isRefund, restraint: v.type === "expense" && v.restraint, plannedExpenseId: v.type === "expense" ? v.plannedExpenseId : null, payId: v.type === "expense" ? v.payId : null });
 
 export async function createTransaction(ctx: Ctx, input: unknown, tx?: Tx) {
   const v = clean(parse(txInput, input));

@@ -1,10 +1,11 @@
 "use client";
 
 // 금액 표시·입력·예산 막대 (docs/planning/03 §11, §3.1.3, §9.4)
-import { CircleAlert } from "lucide-react";
-import { useState } from "react";
+import { ChevronDown, CircleAlert } from "lucide-react";
+import { useEffect, useState } from "react";
+import { currencyRates } from "@/app/actions/money";
 import { InputGroup, InputGroupAddon, InputGroupInput, InputGroupText } from "@/components/ui/input-group";
-import { CURRENCIES, CURRENCY_CODES, decimals, money, parseMoney, toMajor, type Currency } from "@/lib/format";
+import { CURRENCIES, CURRENCY_CODES, decimals, money, parseMoney, rateOf, rescale, toKrw, toMajor, type Currency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 /** 금액 글자. over면 초과 표시(빨간 글자 + 아이콘, 색만으로 전달하지 않음) */
@@ -74,19 +75,18 @@ export function AmountInput({
       />
       <InputGroupAddon align="inline-end">
         {onCurrency ? (
-          // 통화 고르기: 휴대폰에서는 시스템 선택 창이 떠서 고르기 쉬움(네이티브 select)
-          <select
-            aria-label="통화"
-            className="text-muted-foreground hover:text-foreground -mr-1 h-8 cursor-pointer rounded-md bg-transparent pr-1 text-sm outline-none focus-visible:ring-2"
-            value={currency}
-            onChange={(e) => onCurrency(e.target.value as Currency)}
-          >
-            {CURRENCY_CODES.map((c) => (
-              <option key={c} value={c}>
-                {c === "KRW" ? "원" : `${c} ${CURRENCIES[c]}`}
-              </option>
-            ))}
-          </select>
+          // 통화 고르기: 닫혀 있을 땐 "원"·"USD"만 짧게, 누르면 이름까지(네이티브 select를 위에 투명하게 — 휴대폰은 시스템 선택 창)
+          <span className="text-muted-foreground hover:text-foreground focus-within:ring-ring/50 relative -mr-1 inline-flex h-8 items-center gap-0.5 rounded-md pr-0.5 text-sm focus-within:ring-2">
+            {currency === "KRW" ? "원" : currency}
+            <ChevronDown className="size-3.5" aria-hidden />
+            <select aria-label="통화" className="absolute inset-0 cursor-pointer opacity-0" value={currency} onChange={(e) => onCurrency(e.target.value as Currency)}>
+              {CURRENCY_CODES.map((c) => (
+                <option key={c} value={c}>
+                  {c === "KRW" ? "원" : `${c} ${CURRENCIES[c]}`}
+                </option>
+              ))}
+            </select>
+          </span>
         ) : (
           <InputGroupText>{currency === "KRW" ? "원" : currency}</InputGroupText>
         )}
@@ -94,6 +94,68 @@ export function AmountInput({
     </InputGroup>
   );
 }
+
+/** 금액 + 통화. amount는 언제나 원(합계·예산은 이것으로 셈), 다른 통화면 foreignAmount에 그 통화 금액 */
+export type MoneyValue = { amount: number | null; currency: Currency; foreignAmount: number | null };
+type Rates = Partial<Record<Currency, number>>;
+let ratesCache: Promise<Rates> | null = null;
+/** 마지막에 쓴 환율(화면을 새로 열 때까지 한 번만 불러옴) */
+const loadRates = () =>
+  (ratesCache ??= currencyRates()
+    .then((r): Rates => (r.ok ? r.data : {}))
+    .catch((): Rates => ((ratesCache = null), {})));
+
+/** 금액 입력 + 통화 고르기. 다른 통화면 "원화로" 칸이 붙고 마지막에 쓴 환율로 채움(명세서 금액으로 고칠 수 있음) */
+export function MoneyInput({ value, onChange, id, invalid, autoFocus, placeholder }: { value: MoneyValue; onChange: (v: MoneyValue) => void; id?: string; invalid?: boolean; autoFocus?: boolean; placeholder?: string }) {
+  const [rates, setRates] = useState<Rates>({});
+  const fx = value.currency !== "KRW";
+  useEffect(() => {
+    if (fx) loadRates().then(setRates);
+  }, [fx]);
+  const rate = rates[value.currency];
+  const toWon = (n: number | null, c: Currency, r = rate) => (n && r ? toKrw(n, c, r) : null);
+  return (
+    <div className="space-y-2">
+      <AmountInput
+        id={id}
+        invalid={invalid}
+        autoFocus={autoFocus}
+        placeholder={placeholder}
+        currency={value.currency}
+        value={fx ? value.foreignAmount : value.amount}
+        onChange={(n) => onChange(fx ? { ...value, foreignAmount: n, amount: rate ? toWon(n, value.currency) : value.amount } : { ...value, amount: n })}
+        onCurrency={async (c) => {
+          // 통화를 바꿔도 친 숫자는 그대로(12,000원 → 12,000엔)
+          const n = rescale(fx ? value.foreignAmount : value.amount, value.currency, c);
+          if (c === "KRW") return onChange({ currency: c, amount: n, foreignAmount: null });
+          onChange({ currency: c, foreignAmount: n, amount: null });
+          const r = await loadRates();
+          setRates(r);
+          if (r[c]) onChange({ currency: c, foreignAmount: n, amount: toWon(n, c, r[c]) });
+        }}
+      />
+      {fx && (
+        <>
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground shrink-0 text-sm">원화로</span>
+            <div className="flex-1">
+              <AmountInput id={id && `${id}-krw`} value={value.amount} onChange={(n) => onChange({ ...value, amount: n })} invalid={invalid && !value.amount} />
+            </div>
+          </div>
+          <p className="text-muted-foreground text-caption">
+            {value.amount && value.foreignAmount
+              ? `1 ${value.currency} ≈ ${rateOf(value.amount, value.foreignAmount, value.currency).toLocaleString("ko-KR")}원${rate ? " · 마지막에 쓴 환율로 계산해요. 고칠 수 있어요" : ""}`
+              : "원화로 얼마인지 적어 주세요. 다음부터 그 환율로 계산해요"}
+          </p>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** 원화 금액 + (다른 통화면) 원래 금액 */
+export const moneyWithForeign = (v: { amount: number; currency?: Currency; foreignAmount?: number | null }) =>
+  v.currency && v.currency !== "KRW" && v.foreignAmount ? `${money(v.foreignAmount, { currency: v.currency })} (${money(v.amount)})` : money(v.amount);
 
 /** 예산 막대: 쓴 돈(+계획된 돈) / 예산. 80% 이상 주의, 100% 넘으면 초과 */
 /** compact: 막대만(남음·초과 문구는 바깥에서 보여 줄 때) */

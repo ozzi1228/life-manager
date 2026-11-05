@@ -225,6 +225,13 @@
       "when": 1793848720764,
       "tag": "0031_currency",
       "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1793849520530,
+      "tag": "0032_currency_more",
+      "breakpoints": true
     }
   ]
 }

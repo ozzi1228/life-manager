@@ -16,7 +16,7 @@ import {
   type RecurringIn,
 } from "@/app/actions/recurring";
 import { InfoTip } from "@/components/app/help";
-import { AmountInput } from "@/components/app/money";
+import { MoneyInput, moneyWithForeign } from "@/components/app/money";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
 import { EmptyState, toastDone } from "@/components/app/states";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -81,6 +81,8 @@ export function RecurringList({ items, categories, payments, today }: { items: R
         <span className={i.status === "ended" ? "text-muted-foreground shrink-0 tabular-nums" : "shrink-0 tabular-nums"}>
           {i.variableAmount && "약 "}
           {money(i.amount)}
+          {/* 다른 통화 구독: 원래 금액을 아래에 작게 */}
+          {i.foreignAmount && <span className="text-muted-foreground block text-right text-caption">{money(i.foreignAmount, { currency: i.currency })}</span>}
         </span>
       </button>
     </li>
@@ -194,7 +196,7 @@ function Detail({ item, today, payment, category, close, edit, done }: { item: R
           {item.status === "ended" && <Badge variant="secondary">해지됨</Badge>}
         </span>
       }
-      description={`${item.variableAmount ? "약 " : ""}${money(item.amount)} · ${item.label}`}
+      description={`${item.variableAmount ? "약 " : ""}${moneyWithForeign(item)} · ${item.label}`}
       footer={
         <div className="flex w-full flex-wrap gap-2">
           <Button variant="outline" onClick={edit}>
@@ -265,6 +267,8 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
     item ?? {
       name: preset ?? "",
       amount: 0,
+      currency: "KRW",
+      foreignAmount: null,
       variableAmount: false,
       cycle: "monthly",
       dayOfMonth: Number(today.slice(8)),
@@ -346,7 +350,11 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
         </Field>
         <Field>
           <FieldLabel htmlFor="rc-amount">금액</FieldLabel>
-          <AmountInput id="rc-amount" value={v.amount || null} onChange={(a) => set("amount", a ?? 0)} />
+          <MoneyInput
+            id="rc-amount"
+            value={{ amount: v.amount || null, currency: v.currency, foreignAmount: v.foreignAmount }}
+            onChange={(m) => setV((s) => ({ ...s, amount: m.amount ?? 0, currency: m.currency, foreignAmount: m.foreignAmount }))}
+          />
           <label className="flex items-center gap-2 text-sm">
             <Checkbox checked={v.variableAmount} onCheckedChange={(c) => set("variableAmount", c === true)} /> 금액이 매번 달라요
           </label>

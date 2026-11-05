@@ -1,12 +1,15 @@
 "use server";
 
 // 고정 지출 추가·수정·해지 (SCR-FIN-06·07). 규칙은 src/server/recurring.ts
+import type { Currency } from "@/lib/format";
 import { action } from "@/server/api";
 import { cancelEnd, createRecurring, endNow, reactivate, recurringRepo, scheduleEnd, updateRecurring } from "@/server/recurring";
 
 export type RecurringIn = {
   name: string;
-  amount: number;
+  amount: number; // 원
+  currency: Currency;
+  foreignAmount: number | null; // 다른 통화면 그 통화 금액
   variableAmount: boolean;
   cycle: "monthly" | "yearly" | "every_n_months" | "weekly";
   dayOfMonth: number | null;

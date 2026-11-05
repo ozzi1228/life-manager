@@ -1,7 +1,7 @@
 // 지출 규칙(src/server/finance.ts) 확인: node --env-file=.env scripts/check-finance.mts (개발 DB)
 // 기본 분류 생성, 금액 검증, 남의 분류 사용 막기, 환불 차감, 달 경계
 import assert from "node:assert/strict";
-import { inArray } from "drizzle-orm";
+import { eq, inArray } from "drizzle-orm";
 import { db } from "../src/db/index.ts";
 import { accounts, budgets, cards, finCategories, paymentMethods, pays, plannedExpenses, recurringPayments, revisions, transactions } from "../src/db/schema.ts";
 import { AppError } from "../src/server/errors.ts";
@@ -221,9 +221,42 @@ try {
   assert.deepEqual([won.row.currency, won.row.foreignAmount], ["KRW", null], "원이면 원래 금액은 비움");
   await createTransaction(A, { ...fx, date: "2024-06-01", amount: 9000, currency: "JPY", foreignAmount: 1000 });
   await createTransaction(A, { ...fx, date: "2024-06-12", amount: 9300, currency: "JPY", foreignAmount: 1000 });
-  assert.deepEqual((await formData(A)).rates, { USD: 1380, JPY: 9.3 }, "통화마다 가장 최근 날짜의 환율");
+  const { lastRates } = await import("../src/server/finance.ts");
+  assert.deepEqual(await lastRates(A), { USD: 1380, JPY: 9.3 }, "통화마다 가장 최근에 저장한 환율");
   assert.equal(totals(await monthTransactions(A, "2024-06")).expense, 17250 + 5000 + 9000 + 9300, "합계는 원으로");
+  // 고정 지출·큰 지출·분류 예산도 같은 방식(amount는 원, 원래 금액 따로)
+  const gpt = await createRecurring(A, { name: "ChatGPT", amount: 27600, currency: "USD", foreignAmount: 2000, cycle: "monthly", dayOfMonth: 3, startedAt: "2024-01-01" });
+  assert.deepEqual([gpt.amount, gpt.currency, gpt.foreignAmount], [27600, "USD", 2000]);
+  assert.equal(await code(createRecurring(A, { name: "x", amount: 1000, currency: "CAD", cycle: "monthly", dayOfMonth: 1, startedAt: "2024-01-01" })), "VALIDATION_FAILED", "고정 지출도 외화면 원래 금액 필요");
+  assert.equal((await lastRates(A)).USD, 1380, "고정 지출 환율도 마지막 환율 후보(최근 저장 순)");
+  await saveBudget(A, "2024-06", null, {
+    lines: { [food.id]: 690000 },
+    foreignLines: { [food.id]: { currency: "USD", amount: 50000 } },
+    planned: [{ name: "뉴욕 여행", amount: 2760000, currency: "USD", foreignAmount: 200000 }, { name: "국내", amount: 100000, currency: "KRW", foreignAmount: 5 }],
+  });
+  const bv = await budgetView(A, "2024-06");
+  assert.deepEqual(bv.budget?.foreignLines, { [food.id]: { currency: "USD", amount: 50000 } });
+  assert.deepEqual(bv.planned.map((p) => [p.name, p.amount, p.currency, p.foreignAmount]), [["뉴욕 여행", 2760000, "USD", 200000], ["국내", 100000, "KRW", null]], "원이면 원래 금액 비움");
+  assert.equal(bv.summary.total, bv.summary.fixed + 2760000 + 100000 + 690000, "예산 합계는 원으로");
   console.log("다른 통화 확인 통과");
+
+  // 카드 정보: 암호화해 저장, 목록엔 뒤 4자리만, 보기는 revealCard로
+  const { revealCard, cardList: cl, updateCard: uc } = await import("../src/server/cards.ts");
+  const sc = await createCard(A, { name: "비밀카드", annualFee: 9900, currency: "USD", secret: { number: "1234-5678-9012-3456", expiry: "12/28", cvc: "123" } });
+  const [raw] = await db.select().from(cards).where(eq(cards.paymentMethodId, sc.id));
+  assert.ok(raw.secret && !raw.secret.includes("3456") && !raw.secret.includes("12/28"), "DB에는 암호문만");
+  const item = (await cl(A)).find((c) => c.id === sc.id)!;
+  assert.deepEqual([item.card?.last4, item.card?.hasSecret, item.card?.currency, "secret" in item.card!], ["3456", true, "USD", false], "목록엔 뒤 4자리만");
+  assert.deepEqual(await revealCard(A, sc.id), { number: "1234567890123456", expiry: "12/28", cvc: "123" });
+  assert.equal(await revealCard(B, sc.id), null, "남의 카드는 못 봄");
+  await uc(A, sc.id, 1, { name: "비밀카드", memo: "메모만 고침" });
+  assert.equal((await revealCard(A, sc.id))?.cvc, "123", "secret 없이 고치면 그대로");
+  assert.equal(await code(uc(A, sc.id, 1, { name: "비밀카드", secret: { number: "12", expiry: "", cvc: "" } })), "VALIDATION_FAILED");
+  assert.equal(await code(uc(A, sc.id, 1, { name: "비밀카드", secret: { number: "", expiry: "13/28", cvc: "" } })), "VALIDATION_FAILED", "유효기간 MM/YY");
+  await uc(A, sc.id, 1, { name: "비밀카드", secret: { number: "", expiry: "", cvc: "" } });
+  assert.equal(await revealCard(A, sc.id), null, "다 비우면 지움");
+  assert.equal((await cl(A)).find((c) => c.id === sc.id)!.card?.last4, null);
+  console.log("카드 정보 확인 통과");
 } catch (e) {
   // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄
   console.error(e);

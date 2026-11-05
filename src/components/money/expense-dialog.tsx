@@ -19,7 +19,7 @@ import {
 } from "@/app/actions/money";
 import { buyWish } from "@/app/actions/wish";
 import { CategoryEditor } from "@/components/app/category-editor";
-import { AmountInput } from "@/components/app/money";
+import { MoneyInput } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
 import { toastDone } from "@/components/app/states";
 import { Badge } from "@/components/ui/badge";
@@ -34,7 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { fromYmd, money, rateOf, rescale, timeLabel, toKrw, ymd, type Currency } from "@/lib/format";
+import { fromYmd, money, timeLabel, ymd, type Currency } from "@/lib/format";
 import type { HistoryEntry } from "@/server/history";
 import { cn } from "@/lib/utils";
 
@@ -57,7 +57,7 @@ export type TxEdit = {
   payId?: string | null;
 };
 /** 위시 구매(09 §6, 04 §7.8): 가격·이름·쇼핑 분류로 채워 열고, 저장하면 지출 + 위시 구매함을 한 번에 */
-export type WishBuy = { id: string; version: number; name: string; price: number | null; notice?: string; done?: () => void };
+export type WishBuy = { id: string; version: number; name: string; price: number | null; currency?: Currency; foreignAmount?: number | null; notice?: string; done?: () => void };
 type FormData = Extract<Awaited<ReturnType<typeof expenseFormData>>, { ok: true }>["data"];
 
 const Ctx = createContext<(edit?: TxEdit, wish?: WishBuy) => void>(() => {});
@@ -93,8 +93,8 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
   const [refund, setRefund] = useState(edit?.isRefund ?? false);
   const [restraint, setRestraint] = useState(edit?.restraint ?? false); // 참아서 갚기(20 §3)
   const [amount, setAmount] = useState<number | null>(edit?.amount ?? wish?.price ?? null); // 언제나 원
-  const [currency, setCurrency] = useState<Currency>(edit?.currency ?? "KRW");
-  const [foreign, setForeign] = useState<number | null>(edit?.foreignAmount ?? null); // 외화면 그 통화 금액
+  const [currency, setCurrency] = useState<Currency>(edit?.currency ?? wish?.currency ?? "KRW");
+  const [foreign, setForeign] = useState<number | null>(edit?.foreignAmount ?? wish?.foreignAmount ?? null); // 외화면 그 통화 금액
   const [categoryId, setCategoryId] = useState<string | null>(edit?.categoryId ?? null); // 직전 선택 기억 안 함(오기록 방지, 04 §6.3)
   const [paymentId, setPaymentId] = useState<string | null>(edit?.paymentMethodId ?? null); // 돈이 실제로 나간 곳
   const [payId, setPayId] = useState<string | null>(edit?.payId ?? null); // 거친 페이(06 §6.7)
@@ -130,21 +130,6 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
   const future = date > ymd(new Date());
   const fx = currency !== "KRW";
   const canSave = !!amount && (!fx || !!foreign) && !busy;
-  const rate = data?.rates[currency];
-  /** 외화 금액을 바꾸면 마지막에 쓴 환율로 원화 금액을 채움(고칠 수 있음) */
-  const setForeignAmount = (v: number | null) => {
-    setForeign(v);
-    if (rate) setAmount(v ? toKrw(v, currency, rate) : null);
-  };
-  /** 통화를 바꿔도 친 숫자는 그대로(12,000원 → 12,000엔) */
-  const changeCurrency = (c: Currency) => {
-    const n = rescale(fx ? foreign : amount, currency, c);
-    setCurrency(c);
-    if (c === "KRW") return setForeign(null), setAmount(n);
-    setForeign(n);
-    const r = data?.rates[c];
-    setAmount(n && r ? toKrw(n, c, r) : null);
-  };
   // 큰 지출 연결: 고른 날짜가 든 달의 큰 지출만(06 §3.1)
   const plannedOpts = type === "expense" ? (data?.planned.filter((p) => p.month === date.slice(0, 7)) ?? []) : [];
   const linked = plannedOpts.some((p) => p.id === plannedId) ? plannedId : null;
@@ -293,31 +278,16 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
             </span>
           )}
           <div className="flex-1">
-            <AmountInput
-              value={fx ? foreign : amount}
-              onChange={fx ? setForeignAmount : setAmount}
-              currency={currency}
-              onCurrency={changeCurrency}
+            {/* 외화: 합계·예산·통계는 원으로 셈 → 그때 원화로 얼마였는지(카드 명세서 금액)도 적음 */}
+            <MoneyInput
+              id="tx-amount"
+              value={{ amount, currency, foreignAmount: foreign }}
+              onChange={(v) => (setAmount(v.amount), setCurrency(v.currency), setForeign(v.foreignAmount))}
               autoFocus={!edit}
               invalid={error?.field === "amount"}
             />
           </div>
         </div>
-        {/* 외화: 합계·예산·통계는 원으로 셈 → 그때 원화로 얼마였는지(카드 명세서 금액)를 적음 */}
-        {fx && (
-          <div className="flex items-center gap-2">
-            <span className="text-muted-foreground shrink-0 text-sm">원화로</span>
-            <div className="flex-1">
-              <AmountInput id="tx-krw" value={amount} onChange={setAmount} />
-            </div>
-          </div>
-        )}
-        {fx && (
-          <p className="text-muted-foreground text-caption">
-            {amount && foreign ? `1 ${currency} ≈ ${rateOf(amount, foreign, currency).toLocaleString("ko-KR")}원 · ` : ""}
-            {rate ? "마지막에 쓴 환율로 계산해요. 명세서 금액으로 고칠 수 있어요" : "원화 금액을 적어 주세요. 다음부터 그 환율로 계산해요"}
-          </p>
-        )}
         {type === "expense" && refund && <p className="text-muted-foreground text-caption">돌려받은 금액이에요. 이 달 지출 합계에서 빠져요</p>}
         {error?.field === "amount" && <FieldError>{error.message}</FieldError>}
       </Field>

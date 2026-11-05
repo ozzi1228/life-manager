@@ -9,7 +9,8 @@ import { budgets, plannedExpenses } from "../db/schema.ts";
 import { fromActual, summarize } from "../lib/budget.ts";
 import { addDays } from "../lib/recurring.ts";
 import { AppError } from "./errors.ts";
-import { categoryRepo, monthTransactions, plannedRepo } from "./finance.ts";
+import { CURRENCY_CODES, type Currency } from "../lib/format.ts";
+import { categoryRepo, cleanForeign, foreignFields, monthTransactions, plannedRepo } from "./finance.ts";
 import { paysBetween, recurringRepo } from "./recurring.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
 import { todayIn } from "./time.ts";
@@ -32,11 +33,15 @@ export const nextMonth = (m: string) => {
 export const monthEnd = (m: string) => addDays(`${nextMonth(m)}-01`, -1);
 
 const amount = z.number().int().min(1, "1원 이상 입력해 주세요").max(10_000_000_000, "100억 원까지 입력할 수 있어요");
-export const budgetInput = z.object({
-  lines: z.record(z.uuid(), amount).default({}),
-  planned: z.array(z.object({ id: z.uuid().optional(), name: z.string().trim().min(1, "큰 지출 이름을 입력해 주세요").max(30, "이름은 30자까지 쓸 수 있어요"), amount })).max(30).default([]),
-  copyNext: z.boolean().default(true),
-});
+export const budgetInput = z
+  .object({
+    lines: z.record(z.uuid(), amount).default({}), // 원
+    // 다른 통화로 정한 분류 예산의 원래 금액(lines에는 원화 환산액)
+    foreignLines: z.record(z.uuid(), z.object({ currency: z.enum(CURRENCY_CODES), amount: foreignFields.foreignAmount.unwrap().unwrap() })).default({}),
+    planned: z.array(z.object({ id: z.uuid().optional(), name: z.string().trim().min(1, "큰 지출 이름을 입력해 주세요").max(30, "이름은 30자까지 쓸 수 있어요"), amount, ...foreignFields })).max(30).default([]),
+    copyNext: z.boolean().default(true),
+  })
+  .transform((v) => ({ ...v, foreignLines: Object.fromEntries(Object.entries(v.foreignLines).filter(([id, f]) => id in v.lines && f.currency !== "KRW")), planned: v.planned.map(cleanForeign) }));
 export type BudgetInput = z.input<typeof budgetInput>;
 
 const findBudget = async (ctx: Ctx, month: string) => (await budgetRepo.list(ctx, { where: eq(budgets.month, month), limit: 1 }))[0] ?? null;
@@ -56,7 +61,7 @@ async function autoCopy(ctx: Ctx, month: string) {
   const prev = await findBudget(ctx, prevMonth(month));
   if (!prev?.copyNext || !Object.keys(prev.lines).length) return null;
   // 동시에 두 번 들어와도 한 번만(부분 고유 인덱스) — 실패하면 먼저 만든 것을 읽음
-  return budgetRepo.create(ctx, { month, lines: prev.lines, copyNext: true }, { source: "copy" }).catch(() => findBudget(ctx, month));
+  return budgetRepo.create(ctx, { month, lines: prev.lines, foreignLines: prev.foreignLines, copyNext: true }, { source: "copy" }).catch(() => findBudget(ctx, month));
 }
 
 /** 예산 화면·한눈에: 저장된 예산 + 계산 결과 + 빠른 채우기 재료 */
@@ -68,8 +73,8 @@ export async function budgetView(ctx: Ctx, month: string) {
   const summary = summarize({ lines: budget?.lines ?? {}, planned, fixed: fixed.reduce((a, f) => a + f.amount, 0), txs, today });
   return {
     month,
-    budget: budget && { id: budget.id, version: budget.version, lines: budget.lines, copyNext: budget.copyNext, copied: budget.source === "copy" },
-    planned: planned.map((p) => ({ id: p.id, version: p.version, name: p.name, amount: p.amount, manuallyDone: p.manuallyDone })),
+    budget: budget && { id: budget.id, version: budget.version, lines: budget.lines, foreignLines: budget.foreignLines as Record<string, { currency: Currency; amount: number }>, copyNext: budget.copyNext, copied: budget.source === "copy" },
+    planned: planned.map((p) => ({ id: p.id, version: p.version, name: p.name, amount: p.amount, currency: p.currency as Currency, foreignAmount: p.foreignAmount, manuallyDone: p.manuallyDone })),
     fixed,
     summary,
     txs: txs.filter((t) => t.date <= today).map((t) => ({ id: t.id, title: t.title, amount: t.isRefund ? -t.amount : t.amount, date: t.date, categoryId: t.categoryId, plannedExpenseId: t.plannedExpenseId, restraint: t.restraint })),
@@ -96,10 +101,10 @@ export async function saveBudget(ctx: Ctx, month: string, version: number | null
   return db.transaction(async (tx) => {
     const row =
       version === null
-        ? await budgetRepo.create(ctx, { month, lines: v.lines, copyNext: v.copyNext }, { tx }).catch(() => {
+        ? await budgetRepo.create(ctx, { month, lines: v.lines, foreignLines: v.foreignLines, copyNext: v.copyNext }, { tx }).catch(() => {
             throw new AppError("VERSION_CONFLICT", "다른 기기에서 먼저 저장했어요. 닫고 다시 열어 주세요");
           })
-        : await budgetRepo.update(ctx, (await findBudget(ctx, month))?.id ?? "", version, { lines: v.lines, copyNext: v.copyNext }, { tx });
+        : await budgetRepo.update(ctx, (await findBudget(ctx, month))?.id ?? "", version, { lines: v.lines, foreignLines: v.foreignLines, copyNext: v.copyNext }, { tx });
     // 큰 지출: 있는 것은 고치고, 새것은 만들고, 빠진 것은 휴지통으로(연결된 지출은 분류 사용으로 돌아감)
     const current = await plannedOf(ctx, month);
     const keep = new Set(v.planned.flatMap((p) => (p.id ? [p.id] : [])));
@@ -107,8 +112,9 @@ export async function saveBudget(ctx: Ctx, month: string, version: number | null
     for (const p of v.planned) {
       const old = p.id && current.find((c) => c.id === p.id);
       if (old) {
-        if (old.name !== p.name || old.amount !== p.amount) await plannedRepo.update(ctx, old.id, old.version, { name: p.name, amount: p.amount }, { tx });
-      } else await plannedRepo.create(ctx, { month, name: p.name, amount: p.amount }, { tx });
+        const next = { name: p.name, amount: p.amount, currency: p.currency, foreignAmount: p.foreignAmount };
+        if (Object.entries(next).some(([k, x]) => old[k as keyof typeof next] !== x)) await plannedRepo.update(ctx, old.id, old.version, next, { tx });
+      } else await plannedRepo.create(ctx, { month, name: p.name, amount: p.amount, currency: p.currency, foreignAmount: p.foreignAmount }, { tx });
     }
     return row;
   });
@@ -120,7 +126,7 @@ export async function copyPrevious(ctx: Ctx, month: string) {
   const prev = await findBudget(ctx, prevMonth(month));
   if (!prev) throw new AppError("NOT_FOUND", "지난달 예산이 없어요");
   if (await findBudget(ctx, month)) throw new AppError("VERSION_CONFLICT", "이번 달 예산이 이미 있어요");
-  return budgetRepo.create(ctx, { month, lines: prev.lines, copyNext: prev.copyNext }, { source: "copy" });
+  return budgetRepo.create(ctx, { month, lines: prev.lines, foreignLines: prev.foreignLines, copyNext: prev.copyNext }, { source: "copy" });
 }
 
 /** 큰 지출 "다 썼어요" 직접 표시 */

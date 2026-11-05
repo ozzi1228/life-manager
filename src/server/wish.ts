@@ -9,7 +9,8 @@ import { transactions, wishItems } from "../db/schema.ts";
 import { AppError } from "./errors.ts";
 import { imagesOf, linkImages } from "./files.ts";
 import { autoEligible } from "../lib/restraint.ts";
-import { createTransaction, txRepo } from "./finance.ts";
+import type { Currency } from "../lib/format.ts";
+import { cleanForeign, createTransaction, foreignFields, txRepo } from "./finance.ts";
 import { resolveCategory } from "./item-categories.ts";
 import { markLaterBought, recordDropped, restrainedOf } from "./restraint.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
@@ -34,7 +35,8 @@ export const wishInput = z
     name: z.string().trim().min(1, "이름을 입력해 주세요").max(100, "이름은 100자까지 쓸 수 있어요"),
     level: z.enum(["need", "want", "like"]).nullable().default(null),
     categoryId: z.uuid().nullable().default(null), // 쇼핑: 분류(level은 분류의 기록 방식을 따름)
-    price: z.number().int().min(1, "가격을 입력해 주세요").max(10_000_000_000, "100억 원까지 입력할 수 있어요").nullable().default(null),
+    price: z.number().int().min(1, "가격을 입력해 주세요").max(10_000_000_000, "100억 원까지 입력할 수 있어요").nullable().default(null), // 원
+    ...foreignFields, // 다른 통화면 그 통화 가격(price는 원화 환산액)
     seenWhere: z.string().trim().max(1000).nullable().default(null),
     links: z.array(url).max(10, "링크는 10개까지 넣을 수 있어요").default([]),
     photoIds: z.array(z.uuid()).max(10, "사진은 10장까지 넣을 수 있어요").default([]),
@@ -42,7 +44,7 @@ export const wishInput = z
   .refine((v) => v.kind !== "shopping" || v.price, { path: ["price"], message: "가격을 입력해 주세요" })
   .refine((v) => v.kind !== "media" || v.mediaKind, { path: ["mediaKind"], message: "종류를 골라 주세요" })
   .transform((v) => ({
-    ...v,
+    ...(v.kind === "shopping" ? cleanForeign(v) : { ...v, currency: "KRW" as const, foreignAmount: null }),
     level: v.kind === "shopping" ? (v.level ?? "like") : null,
     price: v.kind === "shopping" ? v.price : null,
     mediaKind: v.kind === "media" ? v.mediaKind : null,
@@ -104,6 +106,8 @@ export async function wishList(ctx: Ctx) {
     level: r.level,
     categoryId: r.categoryId,
     price: r.price,
+    currency: r.currency as Currency,
+    foreignAmount: r.foreignAmount,
     seenWhere: r.seenWhere,
     links: r.links,
     status: r.status,

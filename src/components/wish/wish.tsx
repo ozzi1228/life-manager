@@ -9,7 +9,7 @@ import { createContext, useContext, useRef, useState } from "react";
 import { toast } from "sonner";
 import { addWish, deleteWish, dropWishAction, editWish, reopenWishAction } from "@/app/actions/wish";
 import { InfoTip } from "@/components/app/help";
-import { AmountInput } from "@/components/app/money";
+import { MoneyInput, moneyWithForeign } from "@/components/app/money";
 import { PhotoPicker, type Photo } from "@/components/app/photo-picker";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
 import { EmptyState, toastDone } from "@/components/app/states";
@@ -28,7 +28,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { dateLabel, fromYmd, money, monthLabel, ymd } from "@/lib/format";
+import { dateLabel, fromYmd, money, monthLabel, ymd, type Currency } from "@/lib/format";
 import { FINISH_LABEL, KIND_LABEL, START_LABEL, type MediaKind } from "@/lib/media";
 import { cn } from "@/lib/utils";
 import type { ItemCategory } from "@/server/item-categories";
@@ -67,6 +67,8 @@ const buyOf = (w: WishItem, today: string, done: () => void) => ({
   version: w.version,
   name: w.name,
   price: w.price,
+  currency: w.currency,
+  foreignAmount: w.foreignAmount,
   done,
   notice: w.restrained?.status === "counted" && w.price ? `${monthLabel(w.restrained.month, fromYmd(today))}에 참은 물건이에요. 사면 이번 달 참아야 할 금액에 ${money(w.price)}이 더해져요.` : undefined,
 });
@@ -92,7 +94,7 @@ function LevelBadge({ w }: { w: WishItem }) {
   );
 }
 
-type Draft = { kind: "shopping" | "media"; mediaKind: MediaKind | null; name: string; level: Level; categoryId: string | null; price: number | null; seenWhere: string; links: string[]; photos: Photo[] };
+type Draft = { kind: "shopping" | "media"; mediaKind: MediaKind | null; name: string; level: Level; categoryId: string | null; price: number | null; currency: Currency; foreignAmount: number | null; seenWhere: string; links: string[]; photos: Photo[] };
 
 function WishForm({ kind, edit, categories, initialCat, close, done }: { kind: "shopping" | "media"; edit?: WishItem; categories: ItemCategory[]; initialCat?: ItemCategory; close: () => void; done: () => void }) {
   // 새로 담을 때 분류: 보고 있던 분류, 아니면 '관심' 방식의 첫 분류
@@ -104,6 +106,8 @@ function WishForm({ kind, edit, categories, initialCat, close, done }: { kind: "
     level: (edit?.level as Level | null) ?? (startCat?.type as Level | undefined) ?? "like",
     categoryId: edit ? edit.categoryId : (startCat?.id ?? null),
     price: edit?.price ?? null,
+    currency: edit?.currency ?? "KRW",
+    foreignAmount: edit?.foreignAmount ?? null,
     seenWhere: edit?.seenWhere ?? "",
     links: edit?.links.length ? edit.links : [""],
     photos: edit?.photos ?? [],
@@ -210,9 +214,15 @@ function WishForm({ kind, edit, categories, initialCat, close, done }: { kind: "
             </Field>
             <Field data-invalid={error?.field === "price" || undefined}>
               <FieldLabel htmlFor="wi-price">가격</FieldLabel>
-              <AmountInput id="wi-price" value={v.price} onChange={(p) => set("price", p)} invalid={error?.field === "price"} />
+              <MoneyInput
+                id="wi-price"
+                value={{ amount: v.price, currency: v.currency, foreignAmount: v.foreignAmount }}
+                onChange={(m) => setV((s) => ({ ...s, price: m.amount, currency: m.currency, foreignAmount: m.foreignAmount }))}
+                invalid={error?.field === "price" || error?.field === "foreignAmount"}
+              />
               <FieldDescription>대략적인 금액도 괜찮아요</FieldDescription>
               {err("price")}
+              {err("foreignAmount")}
             </Field>
           </>
         )}
@@ -225,7 +235,7 @@ function WishForm({ kind, edit, categories, initialCat, close, done }: { kind: "
           <Textarea id="wi-seen" maxLength={1000} placeholder={shop ? "어디서 봤는지 입력하세요" : "메모를 입력하세요"} value={v.seenWhere} onChange={(e) => set("seenWhere", e.target.value)} />
         </Field>
         {!shop && linkInputs}
-        {error && !["name", "price", "links"].includes(error.field ?? "") && <FieldError>{error.message}</FieldError>}
+        {error && !["name", "price", "foreignAmount", "links"].includes(error.field ?? "") && <FieldError>{error.message}</FieldError>}
       </FieldGroup>
     </ResponsiveModal>
   );
@@ -341,7 +351,7 @@ function ShopDetail({ w, today, close, edit, refresh }: { w: WishItem; today: st
           <LevelBadge w={w} />
           {w.status === "bought" && <Badge variant="outline">구매함</Badge>}
           {w.status === "dropped" && <Badge variant="outline">그만둠</Badge>}
-          <span className="ml-auto text-title font-semibold tabular-nums">{w.price ? money(w.price) : "가격 없음"}</span>
+          <span className="ml-auto text-title font-semibold tabular-nums">{w.price ? moneyWithForeign({ ...w, amount: w.price }) : "가격 없음"}</span>
         </div>
         <p className="text-muted-foreground text-sm">
           {dateLabel(ymd(new Date(w.createdAt)), fromYmd(today))}에 담음
@@ -398,6 +408,7 @@ function ShopCard({ w, today, open }: { w: WishItem; today: string; open: () => 
           <LevelBadge w={w} />
           <span className="line-clamp-2 block text-sm">{w.name}</span>
           <span className="block font-semibold tabular-nums">{w.price ? money(w.price) : <span className="text-warning-text">가격 없음</span>}</span>
+          {w.foreignAmount && <span className="text-muted-foreground block text-caption tabular-nums">{money(w.foreignAmount, { currency: w.currency })}</span>}
           <span className="text-muted-foreground flex items-center gap-1 text-caption">
             {daysSince(w.createdAt, today) ? `${daysSince(w.createdAt, today)}일째` : "오늘 담음"} {w.links.length > 0 && <Link2 className="size-3.5" aria-label="링크 있음" />}
           </span>

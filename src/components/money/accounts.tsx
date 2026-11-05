@@ -2,7 +2,7 @@
 
 // 계좌 목록(06 §7): 종류마다 다른 칸 — 입출금(잔액), 예금·적금(시작·만기·이율·예상 이자), 주식(원금·평가 금액·수익)
 // 모든 계좌에 연결된 카드(카드의 결제 계좌, 이번 달 쓴 돈)와 자동 결제(이 계좌·연결 카드로 나가는 고정 지출)
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { addAccount, editAccount, removePaymentAction } from "@/app/actions/cards";
@@ -19,10 +19,10 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ACCOUNT_CATEGORY, TAX, daysUntil, expectedInterest, stockProfit, type AccountCategory, type Tax } from "@/lib/accounts";
 import { money, rescale, type Currency } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import type { AccountInput, AccountItem } from "@/server/cards";
 
 const BANKS = ["KB국민", "신한", "우리", "하나", "NH농협", "IBK기업", "카카오뱅크", "토스뱅크", "케이뱅크", "SC제일", "새마을금고", "우체국", "키움증권", "미래에셋증권", "삼성증권", "한국투자증권", "토스증권"];
-const md = (s: string) => `${Number(s.slice(5, 7))}월 ${Number(s.slice(8))}일`;
 const input = "h-11 text-base md:h-9 md:text-sm";
 
 export function AccountGrid({ accounts, today }: { accounts: AccountItem[]; today: string }) {
@@ -53,10 +53,10 @@ export function AccountGrid({ accounts, today }: { accounts: AccountItem[]; toda
               <h3 id={`ac-${k}`} className="text-muted-foreground text-sm font-semibold">
                 {label} 계좌 <span className="font-normal tabular-nums">{list.length}</span>
               </h3>
-              <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+              <ul className="bg-card divide-y rounded-xl border">
                 {list.map((a) => (
                   <li key={a.id}>
-                    <AccountCard a={a} today={today} open={() => setForm(a)} />
+                    <AccountRow a={a} today={today} open={() => setForm(a)} />
                   </li>
                 ))}
               </ul>
@@ -69,75 +69,45 @@ export function AccountGrid({ accounts, today }: { accounts: AccountItem[]; toda
   );
 }
 
-function AccountCard({ a, today, open }: { a: AccountItem; today: string; open: () => void }) {
+/** 목록 한 줄: 이름·은행 / 요약(이율·만기·수익·연결 카드·자동 결제) · 오른쪽에 금액 */
+function AccountRow({ a, today, open }: { a: AccountItem; today: string; open: () => void }) {
   const d = a.account;
   const cat = d?.category ?? "checking";
   const interest = d && expectedInterest(d);
   const profit = d && cat === "stock" ? stockProfit(d.principal, d.balance) : null;
   const left = d?.maturityDate ? daysUntil(d.maturityDate, today) : null;
   const m = (n: number, o: { sign?: boolean } = {}) => money(n, { ...o, currency: d?.currency }); // 계좌 통화로
+  const saving = cat === "deposit" || cat === "savings";
+  // 오른쪽 큰 금액: 입출금 잔액 · 주식 평가 금액 · 예금·적금은 만기에 받을 돈(없으면 원금)
+  const main = saving ? (interest?.total ?? d?.principal) : d?.balance;
+  const sub = saving
+    ? [d?.principal != null && `${cat === "savings" ? "매월 " : ""}${m(d.principal)}`, d?.rate != null && `연 ${d.rate}%`, left !== null && (left > 0 ? `D-${left}` : left === 0 ? "오늘 만기" : "만기 지남")]
+    : [profit && `원금 ${m(d!.principal!)}`];
+  const links = [
+    a.cards.length > 0 && `카드 ${a.cards.map((c) => c.name).join(", ")}`,
+    a.autopays.length > 0 && `자동 결제 ${a.autopays.length}건 ${money(a.autopays.reduce((x, r) => x + r.amount, 0))}`,
+  ];
   return (
-    <button type="button" onClick={open} className="bg-card hover:bg-accent/40 flex h-full w-full flex-col justify-start space-y-3 rounded-xl border p-5 text-left shadow-sm">
-      <div className="space-y-1">
-        <p className="min-w-0 truncate font-semibold">{a.name}</p>
-        {(d?.bank || d?.number) && <p className="text-muted-foreground text-sm">{[d.bank, d.number].filter(Boolean).join(" · ")}</p>}
-      </div>
-
-      {(cat === "checking" || cat === "stock") && d?.balance != null && (
-        <p className="text-lg font-semibold">
-          <span className="text-muted-foreground mr-2 text-sm font-normal">{cat === "stock" ? "평가 금액" : "잔액"}</span>
-          <MoneyText amount={d.balance} currency={d.currency} />
-        </p>
-      )}
-      {profit && (
-        <p className={profit.profit < 0 ? "text-sm text-blue-600 dark:text-blue-400" : "text-destructive-text text-sm"}>
-          원금 {m(d!.principal!)} · {m(profit.profit, { sign: true })} ({profit.pct > 0 ? "+" : ""}
-          {profit.pct}%)
-        </p>
-      )}
-      {(cat === "deposit" || cat === "savings") && d && (
-        <div className="space-y-1 text-sm">
-          <p className="text-muted-foreground">
-            {[d.principal != null && `${cat === "savings" ? "매월 " : ""}${m(d.principal)}`, d.rate != null && `연 ${d.rate}%`, d.maturityDate && `${d.maturityDate.slice(0, 4)}년 ${md(d.maturityDate)} 만기`].filter(Boolean).join(" · ")}
-            {left !== null && <span className="text-foreground ml-1.5 font-medium whitespace-nowrap">{left > 0 ? `D-${left}` : left === 0 ? "오늘 만기" : "만기 지남"}</span>}
-          </p>
-          {interest ? (
-            <p>
-              예상 이자 <b className="font-semibold">{m(interest.net)}</b>
-              <span className="text-muted-foreground"> (세후) · 만기에 {m(interest.total)}</span>
-            </p>
-          ) : (
-            <p className="text-muted-foreground">금액·이율·기간을 적으면 예상 이자를 계산해 줘요</p>
-          )}
-        </div>
-      )}
-
-      {a.cards.length > 0 && (
-        <div className="space-y-1 border-t pt-3 text-sm">
-          <p className="text-muted-foreground text-caption">연결된 카드</p>
-          {a.cards.map((c) => (
-            <p key={c.id} className="flex justify-between gap-2">
-              <span className="truncate">{c.name}</span>
-              <span className="text-muted-foreground shrink-0">이번 달 {money(c.monthSpent)}</span>
-            </p>
-          ))}
-        </div>
-      )}
-      {a.autopays.length > 0 && (
-        <div className="space-y-1 border-t pt-3 text-sm">
-          <p className="text-muted-foreground text-caption">자동 결제 {a.autopays.length}건</p>
-          {a.autopays.map((r) => (
-            <div key={r.id} className="flex justify-between gap-2">
-              <span className="min-w-0">
-                <span className="block truncate">{r.name}</span>
-                <span className="text-muted-foreground text-caption block">{[r.label, r.next && `다음 ${md(r.next)}`, r.via && `${r.via}로`].filter(Boolean).join(" · ")}</span>
-              </span>
-              <span className="shrink-0">{r.variableAmount ? "약 " : ""}{money(r.amount)}</span>
-            </div>
-          ))}
-        </div>
-      )}
-      {d?.memo && <p className="line-clamp-4 text-sm whitespace-pre-line">{d.memo}</p>}
+    <button type="button" onClick={open} className="hover:bg-accent/50 flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left">
+      <span className="min-w-0 flex-1 space-y-0.5">
+        <span className="flex items-baseline gap-2">
+          <span className="truncate font-medium">{a.name}</span>
+          {(d?.bank || d?.number) && <span className="text-muted-foreground min-w-0 truncate text-caption">{[d.bank, d.number].filter(Boolean).join(" · ")}</span>}
+        </span>
+        {sub.some(Boolean) && <span className="text-muted-foreground block truncate text-sm">{sub.filter(Boolean).join(" · ")}</span>}
+        {links.some(Boolean) && <span className="text-muted-foreground block truncate text-caption">{links.filter(Boolean).join(" · ")}</span>}
+      </span>
+      <span className="shrink-0 text-right">
+        {main != null ? <MoneyText amount={main} currency={d?.currency} className="font-semibold" /> : <span className="text-muted-foreground text-sm">금액 없음</span>}
+        {saving && interest && <span className="text-muted-foreground block text-caption tabular-nums">이자 {m(interest.net, { sign: true })}</span>}
+        {profit && (
+          <span className={cn("block text-caption tabular-nums", profit.profit < 0 ? "text-blue-600 dark:text-blue-400" : "text-destructive-text")}>
+            {m(profit.profit, { sign: true })} ({profit.pct > 0 ? "+" : ""}
+            {profit.pct}%)
+          </span>
+        )}
+      </span>
+      <ChevronRight className="text-muted-foreground size-4 shrink-0" aria-hidden />
     </button>
   );
 }

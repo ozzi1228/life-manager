@@ -2,13 +2,12 @@
 
 // 페이 목록(06 §6.7): 네이버페이·카카오페이 등과 연결한 카드·계좌. 지출 입력에서 페이를 고르면 "어디서 나갔나요?"에 연결한 것이 나옴
 // 결제수단에는 실제로 돈이 나간 곳(연결 카드·계좌·페이 머니)을 적어서, 카드별 합계가 두 번 잡히지 않음
-import { Plus } from "lucide-react";
+import { ChevronRight, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { addPay, editPay, removePaymentAction } from "@/app/actions/cards";
 import { ResponsiveModal } from "@/components/app/responsive";
 import { EmptyState, toastDone } from "@/components/app/states";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -39,22 +38,19 @@ export function PayGrid({ pays, sources }: { pays: PayItem[]; sources: Source[] 
       {pays.length === 0 ? (
         <EmptyState pet="komong" title="쓰는 페이를 등록해 보세요" description="페이에 연결한 카드·계좌를 적어 두면 지출을 적을 때 실제로 돈이 나간 곳을 바로 고를 수 있어요" action={add} />
       ) : (
-        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <ul className="bg-card divide-y rounded-xl border">
           {pays.map((p) => {
             const linked = p.sourceIds.map((id) => sources.find((s) => s.id === id)).filter((s) => !!s);
             return (
               <li key={p.id}>
-                <button type="button" onClick={() => setForm(p)} className="bg-card hover:bg-accent/40 flex h-full w-full flex-col justify-start space-y-2 rounded-xl border p-5 text-left shadow-sm">
-                  <p className="truncate font-semibold">{p.name}</p>
-                  <div className="flex flex-wrap gap-1.5">
-                    <Badge variant="secondary">페이 머니</Badge>
-                    {linked.map((s) => (
-                      <Badge key={s.id} variant="outline">
-                        {s.name}
-                      </Badge>
-                    ))}
-                  </div>
-                  {p.memo ? <p className="line-clamp-6 text-sm whitespace-pre-line">{p.memo}</p> : <p className="text-muted-foreground text-sm">적립 혜택이나 쓰임새를 메모해 두세요</p>}
+                {/* 목록형: 이름 / 연결한 카드·계좌 / 메모 첫 줄 */}
+                <button type="button" onClick={() => setForm(p)} className="hover:bg-accent/50 flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left">
+                  <span className="min-w-0 flex-1 space-y-0.5">
+                    <span className="block truncate font-medium">{p.name}</span>
+                    <span className="text-muted-foreground block truncate text-sm">{["페이 머니", ...linked.map((s) => s.name)].join(" · ")}</span>
+                    {p.memo && <span className="block truncate text-sm">{p.memo.split("\n")[0]}</span>}
+                  </span>
+                  <ChevronRight className="text-muted-foreground size-4 shrink-0" aria-hidden />
                 </button>
               </li>
             );

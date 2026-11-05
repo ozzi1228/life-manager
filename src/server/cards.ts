@@ -5,6 +5,7 @@ import { z } from "zod";
 import { uuidv7 } from "../db/id.ts";
 import { db, type Tx } from "../db/index.ts";
 import { accounts, cards, paymentMethods, pays, transactions } from "../db/schema.ts";
+import { seal, unseal } from "../lib/ai/secret.ts";
 import { CURRENCY_CODES, type Currency } from "../lib/format.ts";
 import { AppError, notFound } from "./errors.ts";
 import { createPaymentMethod, dup, paymentRepo, todayIn } from "./finance.ts";
@@ -72,23 +73,46 @@ async function checkKinds(ctx: Ctx, ids: string[], kinds: string[], message: str
 }
 
 // ── 카드 ──
+// 카드번호·CVC·유효기간: 한 덩어리 JSON으로 암호화해 secret에(AI 키와 같은 AES-256-GCM). 목록엔 뒤 4자리만, 전체는 revealCard로만
+const digits = (re: RegExp, message: string) => z.string().transform((s) => s.replace(/[\s-]/g, "")).pipe(z.string().regex(re, message).or(z.literal("")));
+export const cardSecret = z.object({
+  number: digits(/^\d{12,19}$/, "카드번호를 다시 확인해 주세요"),
+  expiry: z.string().trim().regex(/^((0[1-9]|1[0-2])\/\d{2})?$/, "유효기간은 MM/YY로 입력해 주세요"),
+  cvc: digits(/^\d{3,4}$/, "CVC는 숫자 3~4자리예요"),
+});
+export type CardSecret = z.infer<typeof cardSecret>;
 export const cardInput = z.object({
   name: name("카드"),
   issuer: z.string().trim().max(20).nullable().default(null),
   cardType: z.enum(["credit", "check"]).nullable().default(null),
   billingDay: z.number().int().min(1).max(31).nullable().default(null),
-  annualFee: won(10_000_000),
+  annualFee: won(1_000_000_000), // currency의 가장 작은 단위
+  currency: z.enum(CURRENCY_CODES).default("KRW"),
   memo,
   linkedAccountId: z.uuid().nullable().default(null),
+  secret: cardSecret.optional(), // 없으면 그대로 둠, 칸을 다 비우면 지움
 });
 export type CardInput = z.input<typeof cardInput>;
+
+/** 저장할 값: secret이 오면 암호화(다 비었으면 지움), 안 오면 손대지 않음 */
+function sealCard({ secret, ...rest }: z.infer<typeof cardInput>) {
+  if (!secret) return rest;
+  const empty = !secret.number && !secret.expiry && !secret.cvc;
+  return { ...rest, last4: secret.number ? secret.number.slice(-4) : null, secret: empty ? null : seal(JSON.stringify(secret)) };
+}
+
+/** 카드번호·CVC·유효기간 풀어서 보기(카드 수정 창에서 누를 때만) */
+export async function revealCard(ctx: Ctx, pmId: string): Promise<CardSecret | null> {
+  const [row] = await db.select({ secret: cards.secret }).from(cards).where(and(eq(cards.userId, ctx.userId), eq(cards.paymentMethodId, pmId), isNull(cards.deletedAt)));
+  return row?.secret ? JSON.parse(unseal(row.secret)) : null;
+}
 
 export async function cardList(ctx: Ctx) {
   return (await listOf(ctx, "card")).map(({ pm, row: c }) => ({
     id: pm.id,
     pmVersion: pm.version,
     name: pm.name,
-    card: c ? { issuer: c.issuer, cardType: c.cardType, billingDay: c.billingDay, annualFee: c.annualFee, memo: c.memo, linkedAccountId: c.linkedAccountId } : null,
+    card: c ? { issuer: c.issuer, cardType: c.cardType, billingDay: c.billingDay, annualFee: c.annualFee, currency: c.currency as Currency, memo: c.memo, linkedAccountId: c.linkedAccountId, last4: c.last4, hasSecret: !!c.secret } : null,
   }));
 }
 export type CardItem = Awaited<ReturnType<typeof cardList>>[number];
@@ -96,12 +120,12 @@ export type CardItem = Awaited<ReturnType<typeof cardList>>[number];
 export async function createCard(ctx: Ctx, input: unknown) {
   const { name, ...rest } = parse(cardInput, input);
   await checkKinds(ctx, rest.linkedAccountId ? [rest.linkedAccountId] : [], ["account"], "결제 계좌를 다시 골라 주세요");
-  return createOf(ctx, "card", name, rest);
+  return createOf(ctx, "card", name, sealCard({ name, ...rest }));
 }
 export async function updateCard(ctx: Ctx, pmId: string, pmVersion: number, input: unknown) {
   const { name, ...rest } = parse(cardInput, input);
   await checkKinds(ctx, rest.linkedAccountId ? [rest.linkedAccountId] : [], ["account"], "결제 계좌를 다시 골라 주세요");
-  return updateOf(ctx, "card", pmId, pmVersion, name, rest);
+  return updateOf(ctx, "card", pmId, pmVersion, name, sealCard({ name, ...rest }));
 }
 
 // ── 페이 ──

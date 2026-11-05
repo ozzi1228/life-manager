@@ -2,7 +2,7 @@
 
 // 자산(계좌·카드·페이) 추가·수정·삭제 (SCR-FIN-08). 규칙은 src/server/cards.ts
 import { action } from "@/server/api";
-import { createAccount, createCard, createPay, removePaymentMethod, updateAccount, updateCard, updatePay, type AccountInput, type CardInput, type PayInput } from "@/server/cards";
+import { createAccount, createCard, createPay, removePaymentMethod, revealCard, updateAccount, updateCard, updatePay, type AccountInput, type CardInput, type PayInput } from "@/server/cards";
 
 export async function addCard(input: CardInput) {
   return action(async (ctx) => ({ id: (await createCard(ctx, input)).id }));
@@ -12,6 +12,10 @@ export async function editCard(pmId: string, pmVersion: number, input: CardInput
     await updateCard(ctx, pmId, pmVersion, input);
     return null;
   });
+}
+/** 카드번호·CVC·유효기간(암호화된 것을 풀어서) */
+export async function showCardSecret(pmId: string) {
+  return action((ctx) => revealCard(ctx, pmId));
 }
 export async function addPay(input: PayInput) {
   return action(async (ctx) => ({ id: (await createPay(ctx, input)).id }));

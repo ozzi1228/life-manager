@@ -7,7 +7,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { copyLastMonthBudget, markPlannedDone, saveMonthBudget } from "@/app/actions/budget";
 import { InfoTip } from "@/components/app/help";
-import { AmountInput, BudgetBar } from "@/components/app/money";
+import { BudgetBar, MoneyInput, type MoneyValue } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
 import { EmptyState } from "@/components/app/states";
 import { MonthNav } from "@/components/money/controls";
@@ -17,7 +17,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
-import { dayLabel, fromYmd, money } from "@/lib/format";
+import { dayLabel, fromYmd, money, type Currency } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import type { budgetView } from "@/server/budget";
 
@@ -126,7 +126,7 @@ export function BudgetView({ view, categories, lastActual, today }: { view: View
                     <li key={p.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-3 text-sm">
                       <span className="min-w-0 flex-1 truncate font-medium">{p.name}</span>
                       <span className="tabular-nums">
-                        {money(p.used)} <span className="text-muted-foreground">/ {money(p.amount)}</span>
+                        {money(p.used)} <span className="text-muted-foreground">/ {money(p.amount)}{row.foreignAmount && ` (${money(row.foreignAmount, { currency: row.currency })})`}</span>
                       </span>
                       {/* 다 안 쓴 동안은 아래 체크가 상태를 말해 줘서, 글자는 다 썼거나 넘었을 때만 */}
                       {p.used >= p.amount && (
@@ -172,6 +172,7 @@ export function BudgetView({ view, categories, lastActual, today }: { view: View
                             <span className="font-medium">{name(c.categoryId)}</span>
                             <span className="text-muted-foreground tabular-nums">
                               {money(c.used)} / {money(c.budget)}
+                              {view.budget?.foreignLines[c.categoryId] && ` (${money(view.budget.foreignLines[c.categoryId].amount, { currency: view.budget.foreignLines[c.categoryId].currency })})`}
                             </span>
                             <span className={cn("ml-auto tabular-nums", c.status === "over" ? "text-destructive-text" : c.status === "warn" ? "text-warning-text" : "text-muted-foreground")}>
                               {c.left >= 0 ? `${money(c.left)} 남음` : `${money(-c.left)} 초과`}
@@ -219,7 +220,8 @@ export function BudgetView({ view, categories, lastActual, today }: { view: View
 
 function BudgetEditor({ view, categories, lastActual, today, close, done }: { view: View; categories: Opt[]; lastActual: Record<string, number>; today: string; close: () => void; done: () => void }) {
   const [lines, setLines] = useState<Record<string, number>>(view.budget?.lines ?? {});
-  const [planned, setPlanned] = useState<{ id?: string; key: string; name: string; amount: number | null }[]>(view.planned.map((p) => ({ id: p.id, key: p.id, name: p.name, amount: p.amount })));
+  const [foreignLines, setForeignLines] = useState<Record<string, { currency: Currency; amount: number }>>(view.budget?.foreignLines ?? {}); // 다른 통화로 정한 분류 예산
+  const [planned, setPlanned] = useState<({ id?: string; key: string; name: string } & MoneyValue)[]>(view.planned.map((p) => ({ id: p.id, key: p.id, name: p.name, amount: p.amount, currency: p.currency, foreignAmount: p.foreignAmount })));
   const [copyNext, setCopyNext] = useState(view.budget?.copyNext ?? true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -227,21 +229,29 @@ function BudgetEditor({ view, categories, lastActual, today, close, done }: { vi
   const sum = (o: Record<string, number>) => Object.values(o).reduce((a, b) => a + b, 0);
   const plannedSum = planned.reduce((a, p) => a + (p.amount ?? 0), 0);
   const total = view.summary.fixed + plannedSum + sum(lines);
-  const setLine = (id: string, v: number | null) =>
-    setLines((l) => {
-      const next = { ...l };
-      if (v) next[id] = v;
+  const setLine = (id: string, v: MoneyValue) => {
+    const put = <T,>(o: Record<string, T>, x: T | null) => {
+      const next = { ...o };
+      if (x) next[id] = x;
       else delete next[id];
       return next;
-    });
+    };
+    setLines((l) => put(l, v.amount));
+    setForeignLines((l) => put(l, v.currency !== "KRW" ? { currency: v.currency, amount: v.foreignAmount ?? 0 } : null));
+  };
+  const lineValue = (id: string): MoneyValue => ({ amount: lines[id] ?? null, currency: foreignLines[id]?.currency ?? "KRW", foreignAmount: foreignLines[id]?.amount || null });
+  /** 한꺼번에 채우기(지난달 복사·실제 지출)는 원으로 */
+  const fillLines = (l: Record<string, number>) => (setLines(l), setForeignLines({}));
 
   async function save() {
-    const bad = planned.find((p) => !p.name.trim() || !p.amount);
+    const bad = planned.find((p) => !p.name.trim() || !p.amount || (p.currency !== "KRW" && !p.foreignAmount));
     if (bad) return setError("큰 지출의 이름과 금액을 채워 주세요");
+    if (Object.entries(foreignLines).some(([id, f]) => !f.amount || !lines[id])) return setError("다른 통화로 정한 예산은 금액과 원화 금액을 모두 채워 주세요");
     setBusy(true);
     const r = await saveMonthBudget(view.month, view.budget?.version ?? null, {
       lines,
-      planned: planned.map((p) => ({ id: p.id, name: p.name, amount: p.amount! })),
+      foreignLines,
+      planned: planned.map((p) => ({ id: p.id, name: p.name, amount: p.amount!, currency: p.currency, foreignAmount: p.foreignAmount })),
       copyNext,
     });
     setBusy(false);
@@ -276,7 +286,7 @@ function BudgetEditor({ view, categories, lastActual, today, close, done }: { vi
         <section className="space-y-2">
           <h3 className="font-semibold">큰 지출</h3>
           {planned.map((p, i) => (
-            <div key={p.key} className="flex items-center gap-2">
+            <div key={p.key} className="flex items-start gap-2">
               <Input
                 aria-label="큰 지출 이름"
                 placeholder="이름을 입력하세요"
@@ -285,15 +295,15 @@ function BudgetEditor({ view, categories, lastActual, today, close, done }: { vi
                 value={p.name}
                 onChange={(e) => setPlanned((l) => l.map((x, j) => (j === i ? { ...x, name: e.target.value } : x)))}
               />
-              <div className="w-36 shrink-0">
-                <AmountInput value={p.amount} onChange={(a) => setPlanned((l) => l.map((x, j) => (j === i ? { ...x, amount: a } : x)))} />
+              <div className="w-44 shrink-0">
+                <MoneyInput value={p} onChange={(m) => setPlanned((l) => l.map((x, j) => (j === i ? { ...x, ...m } : x)))} />
               </div>
               <Button variant="ghost" size="icon" aria-label={`${p.name || "큰 지출"} 빼기`} onClick={() => setPlanned((l) => l.filter((_, j) => j !== i))}>
                 <Trash2 />
               </Button>
             </div>
           ))}
-          <Button variant="outline" size="sm" onClick={() => setPlanned((l) => [...l, { key: crypto.randomUUID(), name: "", amount: null }])}>
+          <Button variant="outline" size="sm" onClick={() => setPlanned((l) => [...l, { key: crypto.randomUUID(), name: "", amount: null, currency: "KRW", foreignAmount: null }])}>
             <Plus /> 큰 지출 추가
           </Button>
         </section>
@@ -302,12 +312,12 @@ function BudgetEditor({ view, categories, lastActual, today, close, done }: { vi
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="mr-auto font-semibold">분류별 예산</h3>
             {view.prevLines && (
-              <Button variant="outline" size="sm" onClick={() => setLines(view.prevLines!)}>
+              <Button variant="outline" size="sm" onClick={() => fillLines(view.prevLines!)}>
                 지난달 예산 복사
               </Button>
             )}
             {Object.keys(lastActual).length > 0 && (
-              <Button variant="outline" size="sm" onClick={() => setLines(lastActual)}>
+              <Button variant="outline" size="sm" onClick={() => fillLines(lastActual)}>
                 지난달 실제 지출로 채우기
               </Button>
             )}
@@ -315,13 +325,13 @@ function BudgetEditor({ view, categories, lastActual, today, close, done }: { vi
           <p className="text-muted-foreground text-caption">빈칸은 예산 없음이에요</p>
           <ul className="space-y-2">
             {categories.map((c) => (
-              <li key={c.id} className="flex items-center gap-3">
-                <label htmlFor={`bl-${c.id}`} className="flex-1 truncate text-sm">
+              <li key={c.id} className="flex items-start gap-3">
+                <label htmlFor={`bl-${c.id}`} className="flex min-h-11 min-w-0 flex-1 items-center truncate text-sm md:min-h-9">
                   {c.name}
                   {lastActual[c.id] !== undefined && <span className="text-muted-foreground text-caption"> · 지난달 {money(lastActual[c.id])}</span>}
                 </label>
-                <div className="w-36 shrink-0">
-                  <AmountInput id={`bl-${c.id}`} value={lines[c.id] ?? null} onChange={(v) => setLine(c.id, v)} />
+                <div className="w-44 shrink-0">
+                  <MoneyInput id={`bl-${c.id}`} value={lineValue(c.id)} onChange={(v) => setLine(c.id, v)} />
                 </div>
               </li>
             ))}

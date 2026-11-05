@@ -54,6 +54,12 @@ try {
   assert.equal(await code(createWish(A, { kind: "shopping", name: "x", price: 1000, links: ["javascript:alert(1)"] })), "링크를 다시 확인해 주세요");
   const w = await createWish(A, { kind: "shopping", name: "무선 청소기", price: 289000, links: ["coupang.com/vp/1"] });
   assert.deepEqual([w.level, w.links], ["like", ["https://coupang.com/vp/1"]]);
+  // 다른 통화 가격: price는 원화 환산액, 원래 금액은 foreign_amount. 작품 위시는 통화를 비움
+  const jp = await createWish(A, { kind: "shopping", name: "도쿄 우산", price: 27000, currency: "JPY", foreignAmount: 3000 });
+  assert.deepEqual([jp.price, jp.currency, jp.foreignAmount], [27000, "JPY", 3000]);
+  assert.equal(await code(createWish(A, { kind: "shopping", name: "x", price: 1000, currency: "USD" })), "금액을 입력해 주세요");
+  const bookW = await createWish(A, { kind: "media", mediaKind: "book", name: "책", currency: "USD", foreignAmount: 100 });
+  assert.deepEqual([bookW.currency, bookW.foreignAmount], ["KRW", null], "작품 위시는 가격·통화 없음");
 
   // 구매함 → 지출 연결(한 트랜잭션), 되돌리기 → 지출 휴지통
   const shop = (await formData(A)).categories.find((c) => c.name === "쇼핑")!;

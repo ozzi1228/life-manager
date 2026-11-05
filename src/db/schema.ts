@@ -290,7 +290,9 @@ export const recurringPayments = pgTable(
   {
     ...userData(),
     name: text("name").notNull(),
-    amount: bigint("amount", { mode: "number" }).notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(), // 언제나 원
+    currency: text("currency").notNull().default("KRW"), // 다른 통화면 그 통화(src/lib/format.ts CURRENCIES)
+    foreignAmount: bigint("foreign_amount", { mode: "number" }), // 그 통화의 가장 작은 단위 금액. 원이면 null — amount는 원화 환산액
     variableAmount: boolean("variable_amount").notNull().default(false),
     cycle: text("cycle", { enum: ["monthly", "yearly", "every_n_months", "weekly"] }).notNull(),
     dayOfMonth: integer("day_of_month"), // 1~31, 0 = 말일
@@ -311,6 +313,7 @@ export const recurringPayments = pgTable(
   (t) => [
     index("recurring_payments_user").on(t.userId).where(sql`${t.deletedAt} is null`),
     check("recurring_amount_positive", sql`${t.amount} > 0 and ${t.amount} <= 10000000000`),
+    check("recurring_foreign", sql`(${t.currency} = 'KRW') = (${t.foreignAmount} is null) and coalesce(${t.foreignAmount}, 1) > 0`),
     check("recurring_ending_has_date", sql`${t.status} <> 'ending' or ${t.lastUseDate} is not null`),
   ],
 );
@@ -334,7 +337,8 @@ export const budgets = pgTable(
   {
     ...userData(),
     month: text("month").notNull(), // YYYY-MM
-    lines: jsonb("lines").$type<Record<string, number>>().notNull().default({}),
+    lines: jsonb("lines").$type<Record<string, number>>().notNull().default({}), // 언제나 원
+    foreignLines: jsonb("foreign_lines").$type<Record<string, { currency: string; amount: number }>>().notNull().default({}), // 다른 통화로 정한 분류 예산: 원래 통화·금액(lines는 원화 환산액)
     copyNext: boolean("copy_next").notNull().default(true), // 다음 달 첫 진입 때 분류별 예산 복사(큰 지출은 복사 안 함)
   },
   (t) => [uniqueIndex("budgets_month").on(t.userId, t.month).where(sql`${t.deletedAt} is null`)],
@@ -347,12 +351,15 @@ export const plannedExpenses = pgTable(
     ...userData(),
     month: text("month").notNull(),
     name: text("name").notNull(),
-    amount: bigint("amount", { mode: "number" }).notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(), // 언제나 원
+    currency: text("currency").notNull().default("KRW"), // 다른 통화면 그 통화(src/lib/format.ts CURRENCIES)
+    foreignAmount: bigint("foreign_amount", { mode: "number" }), // 그 통화의 가장 작은 단위 금액. 원이면 null — amount는 원화 환산액
     manuallyDone: boolean("manually_done").notNull().default(false),
   },
   (t) => [
     index("planned_expenses_month").on(t.userId, t.month).where(sql`${t.deletedAt} is null`),
     check("planned_amount_positive", sql`${t.amount} > 0 and ${t.amount} <= 10000000000`),
+    check("planned_foreign", sql`(${t.currency} = 'KRW') = (${t.foreignAmount} is null) and coalesce(${t.foreignAmount}, 1) > 0`),
   ],
 );
 
@@ -365,7 +372,10 @@ export const cards = pgTable(
     issuer: text("issuer"),
     cardType: text("card_type", { enum: ["credit", "check"] }),
     billingDay: integer("billing_day"),
-    annualFee: bigint("annual_fee", { mode: "number" }),
+    annualFee: bigint("annual_fee", { mode: "number" }), // currency의 가장 작은 단위
+    currency: text("currency").notNull().default("KRW"), // 연회비 통화
+    last4: text("last4"), // 카드번호 뒤 4자리(목록에 •••• 1234)
+    secret: text("secret"), // 카드번호·CVC·유효기간 JSON을 암호화(src/lib/ai/secret.ts seal). 볼 때만 풀어서 보냄
     memo: text("memo"),
     linkedAccountId: uuid("linked_account_id"), // 결제 계좌(결제수단 kind=account의 id). 계좌 화면의 연결 카드·카드 대금
   },
@@ -452,7 +462,9 @@ export const wishItems = pgTable(
     mediaKind: text("media_kind", { enum: ["book", "movie", "drama"] }),
     name: text("name").notNull(),
     level: text("level", { enum: ["need", "want", "like"] }),
-    price: bigint("price", { mode: "number" }),
+    price: bigint("price", { mode: "number" }), // 언제나 원
+    currency: text("currency").notNull().default("KRW"), // 다른 통화면 그 통화(src/lib/format.ts CURRENCIES)
+    foreignAmount: bigint("foreign_amount", { mode: "number" }), // 그 통화의 가장 작은 단위 금액. 원이면 null — price는 원화 환산액
     seenWhere: text("seen_where"), // 쇼핑: 어디서 봤는지 / 작품: 메모(누가 추천했는지 등)
     links: text("links").array().notNull().default(sql`'{}'::text[]`),
     status: text("status", { enum: ["saved", "bought", "dropped", "started", "finished"] }).notNull().default("saved"),
@@ -465,6 +477,7 @@ export const wishItems = pgTable(
   (t) => [
     index("wish_items_user_kind").on(t.userId, t.kind, t.status).where(sql`${t.deletedAt} is null`),
     check("wish_items_shopping_price", sql`${t.kind} <> 'shopping' or ${t.price} > 0`),
+    check("wish_items_foreign", sql`(${t.currency} = 'KRW') = (${t.foreignAmount} is null) and coalesce(${t.foreignAmount}, 1) > 0`),
   ],
 );
 
