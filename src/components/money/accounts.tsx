@@ -211,7 +211,7 @@ function AccountForm({ edit, close }: { edit?: AccountItem; close: () => void })
         </Field>
         <Field>
           <FieldLabel htmlFor="ac-name">계좌 이름</FieldLabel>
-          <Input id="ac-name" autoFocus={!edit} maxLength={20} placeholder={v.category === "stock" ? "예: 키움 주식" : saving ? "예: 1년 정기예금" : "예: 월급 통장"} className={input} value={v.name} onChange={(e) => set("name", e.target.value)} />
+          <Input id="ac-name" autoFocus={!edit} maxLength={20} placeholder="계좌 이름을 입력하세요" className={input} value={v.name} onChange={(e) => set("name", e.target.value)} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field>
@@ -328,7 +328,7 @@ function AccountForm({ edit, close }: { edit?: AccountItem; close: () => void })
 
         <Field>
           <FieldLabel htmlFor="ac-memo">메모</FieldLabel>
-          <Textarea id="ac-memo" maxLength={2000} className="field-sizing-content min-h-24 leading-7" placeholder={"예: 월급 들어오는 통장\n관리비·통신비 자동이체"} value={v.memo ?? ""} onChange={(e) => set("memo", e.target.value)} />
+          <Textarea id="ac-memo" maxLength={2000} className="field-sizing-content min-h-24 leading-7" placeholder="메모를 입력하세요" value={v.memo ?? ""} onChange={(e) => set("memo", e.target.value)} />
         </Field>
         {edit && (edit.cards.length > 0 || edit.autopays.length > 0) ? null : (
           <p className="text-muted-foreground text-caption">카드 수정에서 결제 계좌를 고르면 연결된 카드와 자동 결제가 이 계좌에 보여요</p>

@@ -75,7 +75,7 @@ function CalendarEditor({ edit, calendars, close }: { edit: Edit; calendars: Cal
       }
     >
       <FieldGroup className="gap-4">
-        <Input autoFocus aria-label="캘린더 이름" placeholder="예: 업무, 취미, 가족" maxLength={20} value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} onKeyDown={(e) => e.key === "Enter" && v.name.trim() && save()} />
+        <Input autoFocus aria-label="캘린더 이름" placeholder="캘린더 이름을 입력하세요" maxLength={20} value={v.name} onChange={(e) => setV({ ...v, name: e.target.value })} onKeyDown={(e) => e.key === "Enter" && v.name.trim() && save()} />
         <ColorPalettePicker value={v.colorHex} onChange={(colorHex) => setV({ ...v, colorHex })} used={calendars.filter((c) => c.id !== v.id).map((c) => c.colorHex)} />
         {error && <FieldError>{error}</FieldError>}
       </FieldGroup>
@@ -224,11 +224,11 @@ function GoogleConnect({ google, close }: { google: GoogleStatus; close: () => v
         <FieldGroup className="gap-3">
           <Field>
             <FieldLabel htmlFor="g-id">클라이언트 ID</FieldLabel>
-            <Input id="g-id" autoComplete="off" spellCheck={false} placeholder="1234-abcd.apps.googleusercontent.com" value={id} onChange={(e) => (setId(e.target.value), setTest(null))} />
+            <Input id="g-id" autoComplete="off" spellCheck={false} placeholder="클라이언트 ID를 입력하세요" value={id} onChange={(e) => (setId(e.target.value), setTest(null))} />
           </Field>
           <Field>
             <FieldLabel htmlFor="g-secret">클라이언트 보안 비밀번호</FieldLabel>
-            <Input id="g-secret" type="password" autoComplete="off" placeholder="GOCSPX-…" value={secret} onChange={(e) => (setSecret(e.target.value), setTest(null))} />
+            <Input id="g-secret" type="password" autoComplete="off" placeholder="보안 비밀번호를 입력하세요" value={secret} onChange={(e) => (setSecret(e.target.value), setTest(null))} />
           </Field>
           {test && (
             <p role="status" className={test.ok ? "text-success-text flex items-center gap-1 text-sm" : "text-destructive-text text-sm"}>

@@ -95,7 +95,7 @@ function EntryForm({ edit, pickable, today, close, done }: { edit?: Entry; picka
         )}
         <Field>
           <FieldLabel htmlFor="rs-name">이름</FieldLabel>
-          <Input id="rs-name" autoFocus={!edit} maxLength={100} placeholder="예: 한정판 운동화" className="h-11 text-base md:h-9 md:text-sm" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input id="rs-name" autoFocus={!edit} maxLength={100} placeholder="이름을 입력하세요" className="h-11 text-base md:h-9 md:text-sm" value={name} onChange={(e) => setName(e.target.value)} />
         </Field>
         <Field>
           <FieldLabel htmlFor="rs-amount">금액</FieldLabel>
@@ -116,7 +116,7 @@ function EntryForm({ edit, pickable, today, close, done }: { edit?: Entry; picka
         </Field>
         <Field>
           <FieldLabel htmlFor="rs-reason">참은 이유</FieldLabel>
-          <Textarea id="rs-reason" maxLength={1000} placeholder="예: 세일이라 흔들렸지만 이미 비슷한 게 있음" value={reason} onChange={(e) => setReason(e.target.value)} />
+          <Textarea id="rs-reason" maxLength={1000} placeholder="참은 이유를 입력하세요" value={reason} onChange={(e) => setReason(e.target.value)} />
         </Field>
         {error && <FieldError>{error}</FieldError>}
       </FieldGroup>

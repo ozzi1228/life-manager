@@ -123,7 +123,7 @@ function CardForm({ edit, accounts, close }: { edit?: CardItem; accounts: Opt[];
       <FieldGroup className="gap-5">
         <Field>
           <FieldLabel htmlFor="cd-name">카드 이름</FieldLabel>
-          <Input id="cd-name" autoFocus={!edit} maxLength={20} placeholder="예: 신한 Deep Dream" className="h-11 text-base md:h-9 md:text-sm" value={v.name} onChange={(e) => set("name", e.target.value)} />
+          <Input id="cd-name" autoFocus={!edit} maxLength={20} placeholder="카드 이름을 입력하세요" className="h-11 text-base md:h-9 md:text-sm" value={v.name} onChange={(e) => set("name", e.target.value)} />
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field>
@@ -187,7 +187,7 @@ function CardForm({ edit, accounts, close }: { edit?: CardItem; accounts: Opt[];
             id="cd-memo"
             maxLength={2000}
             className="field-sizing-content min-h-32 leading-7"
-            placeholder={"혜택·쓰임새를 자유롭게\n예: - 편의점 갈 때 최대 혜택\n- 전월 30만 원 넘게 써야 할인"}
+            placeholder="혜택·쓰임새를 입력하세요"
             value={v.memo ?? ""}
             onChange={(e) => set("memo", e.target.value)}
           />

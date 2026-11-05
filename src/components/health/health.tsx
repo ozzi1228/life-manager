@@ -137,7 +137,7 @@ function HealthForm({ edit, kind, today, last, names, close, done }: { edit?: He
             <div className="grid grid-cols-[1fr_7rem] gap-2">
               <Field>
                 <FieldLabel htmlFor="hl-name">약 이름</FieldLabel>
-                <Input id="hl-name" autoFocus={!v.name} list="hl-names" maxLength={40} placeholder="예: 인슐린" className="h-11 text-base md:h-9 md:text-sm" value={v.name} onChange={(e) => set("name", e.target.value)} />
+                <Input id="hl-name" autoFocus={!v.name} list="hl-names" maxLength={40} placeholder="약 이름을 입력하세요" className="h-11 text-base md:h-9 md:text-sm" value={v.name} onChange={(e) => set("name", e.target.value)} />
                 <datalist id="hl-names">
                   {names.map((n) => (
                     <option key={n} value={n} />
@@ -146,7 +146,7 @@ function HealthForm({ edit, kind, today, last, names, close, done }: { edit?: He
               </Field>
               <Field>
                 <FieldLabel htmlFor="hl-dose">용량</FieldLabel>
-                <Input id="hl-dose" maxLength={20} placeholder="예: 10단위" className="h-11 text-base md:h-9 md:text-sm" value={v.dose} onChange={(e) => set("dose", e.target.value)} />
+                <Input id="hl-dose" maxLength={20} placeholder="용량을 입력하세요" className="h-11 text-base md:h-9 md:text-sm" value={v.dose} onChange={(e) => set("dose", e.target.value)} />
               </Field>
             </div>
             <Field>
@@ -170,7 +170,7 @@ function HealthForm({ edit, kind, today, last, names, close, done }: { edit?: He
               id="hl-value"
               autoFocus
               inputMode={v.kind === "weight" ? "decimal" : "numeric"}
-              placeholder={v.kind === "weight" ? "52.3" : "98"}
+              placeholder={v.kind === "weight" ? "체중을 입력하세요" : "혈당을 입력하세요"}
               className="h-12 text-right text-title tabular-nums"
               value={v.value}
               onChange={(e) => set("value", e.target.value.replace(/[^\d.,]/g, ""))}

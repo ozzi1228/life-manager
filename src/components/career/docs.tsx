@@ -104,7 +104,7 @@ function VersionForm({ doc, edit, close, done }: { doc: CareerDoc; edit?: Versio
       <FieldGroup className="gap-4">
         <Field>
           <FieldLabel htmlFor="dv-label">버전 이름</FieldLabel>
-          <Input id="dv-label" maxLength={60} placeholder="예: v3 · 카카오 지원용" value={label} onChange={(e) => setLabel(e.target.value)} />
+          <Input id="dv-label" maxLength={60} placeholder="버전 이름을 입력하세요" value={label} onChange={(e) => setLabel(e.target.value)} />
         </Field>
         <Field>
           <FieldLabel>형식</FieldLabel>
@@ -151,7 +151,7 @@ function VersionForm({ doc, edit, close, done }: { doc: CareerDoc; edit?: Versio
         </Field>
         <Field>
           <FieldLabel htmlFor="dv-note">메모</FieldLabel>
-          <Textarea id="dv-note" maxLength={1000} placeholder="예: 지원 회사·바꾼 점" value={note} onChange={(e) => setNote(e.target.value)} />
+          <Textarea id="dv-note" maxLength={1000} placeholder="메모를 입력하세요" value={note} onChange={(e) => setNote(e.target.value)} />
         </Field>
         {error && <FieldError>{error}</FieldError>}
       </FieldGroup>
@@ -195,7 +195,7 @@ function DocForm({ edit, kind, close, done }: { edit?: CareerDoc; kind: DocKind;
         </ToggleGroup>
         <Field>
           <FieldLabel htmlFor="doc-title">이름</FieldLabel>
-          <Input id="doc-title" autoFocus maxLength={60} placeholder="예: 백엔드 개발자 이력서" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <Input id="doc-title" autoFocus maxLength={60} placeholder="이름을 입력하세요" value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
         <Field>
           <FieldLabel htmlFor="doc-memo">메모</FieldLabel>

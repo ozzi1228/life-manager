@@ -116,7 +116,7 @@ function PayForm({ edit, sources, close }: { edit?: PayItem; sources: Source[]; 
       <FieldGroup className="gap-5">
         <Field>
           <FieldLabel htmlFor="py-name">페이 이름</FieldLabel>
-          <Input id="py-name" list="py-names" autoFocus={!edit} maxLength={20} placeholder="예: 네이버페이" className="h-11 text-base md:h-9 md:text-sm [&::-webkit-calendar-picker-indicator]:opacity-0" value={v.name} onChange={(e) => setV((s) => ({ ...s, name: e.target.value }))} />
+          <Input id="py-name" list="py-names" autoFocus={!edit} maxLength={20} placeholder="페이 이름을 입력하세요" className="h-11 text-base md:h-9 md:text-sm [&::-webkit-calendar-picker-indicator]:opacity-0" value={v.name} onChange={(e) => setV((s) => ({ ...s, name: e.target.value }))} />
           <datalist id="py-names">
             {NAMES.map((n) => (
               <option key={n} value={n} />
@@ -144,7 +144,7 @@ function PayForm({ edit, sources, close }: { edit?: PayItem; sources: Source[]; 
             id="py-memo"
             maxLength={2000}
             className="field-sizing-content min-h-24 leading-7"
-            placeholder={"예: - 네이버 쇼핑은 포인트 5% 적립\n- 충전할 땐 국민 통장에서"}
+            placeholder="메모를 입력하세요"
             value={v.memo ?? ""}
             onChange={(e) => setV((s) => ({ ...s, memo: e.target.value }))}
           />

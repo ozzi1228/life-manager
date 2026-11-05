@@ -314,7 +314,7 @@ function CellEditor({ item, date, cell, close, save }: { item: Item; date: strin
           autoFocus
           aria-label="메모"
           maxLength={40}
-          placeholder="예: 30분"
+          placeholder="메모를 입력하세요"
           className="h-11 text-base md:h-9 md:text-sm"
           value={memo}
           onChange={(e) => setMemo(e.target.value)}
@@ -391,7 +391,7 @@ function ItemEditor({ month, item, preset, used, close, done }: { month: string;
       <div className="space-y-5">
         <Field data-invalid={!!error || undefined}>
           <FieldLabel htmlFor="item-name">이름</FieldLabel>
-          <Input id="item-name" autoFocus={!item} maxLength={60} placeholder="예: 독서, 물 마시기" className="h-11 text-base md:h-9 md:text-sm" value={name} onChange={(e) => setName(e.target.value)} />
+          <Input id="item-name" autoFocus={!item} maxLength={60} placeholder="습관 이름을 입력하세요" className="h-11 text-base md:h-9 md:text-sm" value={name} onChange={(e) => setName(e.target.value)} />
           {error && <FieldError>{error}</FieldError>}
         </Field>
         <Field>

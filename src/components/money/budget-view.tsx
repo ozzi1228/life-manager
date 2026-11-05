@@ -281,7 +281,7 @@ function BudgetEditor({ view, categories, lastActual, today, close, done }: { vi
             <div key={p.key} className="flex items-center gap-2">
               <Input
                 aria-label="큰 지출 이름"
-                placeholder="예: 여행"
+                placeholder="이름을 입력하세요"
                 maxLength={30}
                 className="h-11 min-w-0 flex-1 text-base md:h-9 md:text-sm"
                 value={p.name}

@@ -448,7 +448,7 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
         </div>
         <Field>
           <FieldLabel htmlFor="rc-memo">메모</FieldLabel>
-          <Textarea id="rc-memo" maxLength={1000} placeholder="예: 넷플릭스 이용권 포함" value={v.memo ?? ""} onChange={(e) => set("memo", e.target.value)} />
+          <Textarea id="rc-memo" maxLength={1000} placeholder="메모를 입력하세요" value={v.memo ?? ""} onChange={(e) => set("memo", e.target.value)} />
         </Field>
         <label className="flex items-center justify-between gap-3 text-sm">
           결제일 하루 전 알림

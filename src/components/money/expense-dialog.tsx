@@ -414,7 +414,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
                 <Input
                   autoFocus
                   aria-label="새 결제수단 이름"
-                  placeholder="예: 신한카드"
+                  placeholder="이름을 입력하세요"
                   className="h-9 w-36 max-md:h-10"
                   maxLength={20}
                   value={newPm}
@@ -463,7 +463,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
 
         <Field>
           <FieldLabel htmlFor="tx-title">내용</FieldLabel>
-          <Input id="tx-title" maxLength={60} placeholder={picked ? picked.name : "예: 점심"} className="h-11 text-base md:h-9 md:text-sm" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <Input id="tx-title" maxLength={60} placeholder={picked ? picked.name : "내용을 입력하세요"} className="h-11 text-base md:h-9 md:text-sm" value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
 
         <TagInput value={tags} onChange={setTags} suggestions={data.tags} />
@@ -555,7 +555,7 @@ function TagInput({ value, onChange, suggestions }: { value: string[]; onChange:
           maxLength={24}
           enterKeyHint="done"
           autoComplete="off"
-          placeholder={full ? "10개까지 달 수 있어요" : value.length ? "" : "예: 여행-제주, 데이트"}
+          placeholder={full ? "10개까지 달 수 있어요" : value.length ? "" : "태그를 입력하세요"}
           className="h-8 min-w-24 flex-1 bg-transparent text-base outline-none md:text-sm"
           onChange={(e) => {
             // 쉼표 앞은 태그로(붙여 넣은 "a, b"도), 뒤는 계속 입력

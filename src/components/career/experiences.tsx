@@ -469,7 +469,7 @@ export function ExperienceEditor({
       </Link>
       <Input
         aria-label="경험명"
-        placeholder="경험명 (예: 삼성청년SW·AI아카데미 13기)"
+        placeholder="경험명을 입력하세요"
         maxLength={100}
         autoFocus={!exp}
         className="focus-visible:border-primary h-12 rounded-none border-0 border-b px-0 text-title font-semibold shadow-none placeholder:font-normal md:text-title focus-visible:ring-0"
@@ -512,7 +512,7 @@ export function ExperienceEditor({
               <Input
                 autoFocus
                 aria-label="새 분류 이름"
-                placeholder="예: 방송작가"
+                placeholder="이름을 입력하세요"
                 maxLength={20}
                 className="h-8 w-32 max-md:h-10"
                 value={newCat}
@@ -560,7 +560,7 @@ export function ExperienceEditor({
             <Input
               id="ex-role"
               maxLength={60}
-              placeholder="예: 바리스타, 섭외 담당"
+              placeholder="역할·직무를 입력하세요"
               value={v.role}
               onChange={(e) => set("role", e.target.value)}
             />
@@ -573,7 +573,7 @@ export function ExperienceEditor({
               <Input
                 id="ex-start"
                 inputMode="numeric"
-                placeholder="2024.06.01"
+                placeholder="시작한 날"
                 className="min-w-0 flex-1"
                 value={v.startText}
                 onChange={(e) => set("startText", e.target.value)}
@@ -627,7 +627,7 @@ export function ExperienceEditor({
               id="ex-ach"
               maxLength={5000}
               className={grow}
-              placeholder="숫자로 말할 수 있으면 좋아요 (예: 매출 20% 증가, 수료 1600시간)"
+              placeholder="성과·결과를 입력하세요"
               value={v.achievement}
               onChange={(e) => set("achievement", e.target.value)}
             />
@@ -668,7 +668,7 @@ export function ExperienceEditor({
               <input
                 id="ex-tags"
                 className="min-w-32 flex-1 bg-transparent py-1 text-sm outline-none"
-                placeholder="입력 후 Enter (예: 고객 응대, SQL)"
+                placeholder="입력 후 Enter"
                 maxLength={20}
                 value={tagText}
                 onChange={(e) =>
@@ -736,7 +736,7 @@ export function ExperienceEditor({
               <Input
                 id="ex-score"
                 maxLength={60}
-                placeholder="예: 930 (LC 455, RC 475)"
+                placeholder="점수·등급을 입력하세요"
                 value={v.score}
                 onChange={(e) => set("score", e.target.value)}
               />
@@ -746,7 +746,7 @@ export function ExperienceEditor({
               <Input
                 id="ex-issuer"
                 maxLength={60}
-                placeholder="예: 한국데이터베이스진흥원"
+                placeholder="발급 기관을 입력하세요"
                 value={v.issuer}
                 onChange={(e) => set("issuer", e.target.value)}
               />
@@ -765,7 +765,7 @@ export function ExperienceEditor({
               <Input
                 id="ex-valid"
                 inputMode="numeric"
-                placeholder="예: 2026.09.20"
+                placeholder="날짜를 입력하세요"
                 value={v.validUntil}
                 onChange={(e) => set("validUntil", e.target.value)}
               />

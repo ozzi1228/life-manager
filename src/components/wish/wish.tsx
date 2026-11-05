@@ -223,7 +223,7 @@ function WishForm({ kind, edit, categories, initialCat, close, done }: { kind: "
         </Field>
         <Field>
           <FieldLabel htmlFor="wi-seen">{shop ? "어디서 봤는지" : "메모"}</FieldLabel>
-          <Textarea id="wi-seen" maxLength={1000} placeholder={shop ? "예: 인스타 릴스 ○○ 계정" : "예: 친구가 추천해 줌"} value={v.seenWhere} onChange={(e) => set("seenWhere", e.target.value)} />
+          <Textarea id="wi-seen" maxLength={1000} placeholder={shop ? "어디서 봤는지 입력하세요" : "메모를 입력하세요"} value={v.seenWhere} onChange={(e) => set("seenWhere", e.target.value)} />
         </Field>
         {!shop && linkInputs}
         {error && !["name", "price", "links"].includes(error.field ?? "") && <FieldError>{error.message}</FieldError>}

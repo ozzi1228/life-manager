@@ -366,7 +366,7 @@ export function GoalDialog({ goal, preset, defaultYear, categories, close, done 
       <div className="space-y-5">
         <Field data-invalid={!!error || undefined}>
           <FieldLabel htmlFor="goal-title">목표</FieldLabel>
-          <Input id="goal-title" autoFocus={!goal} maxLength={60} placeholder="예: 연간 독서 24권" className="h-11 text-base md:h-9 md:text-sm" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <Input id="goal-title" autoFocus={!goal} maxLength={60} placeholder="목표를 입력하세요" className="h-11 text-base md:h-9 md:text-sm" value={title} onChange={(e) => setTitle(e.target.value)} />
           {error && <FieldError>{error}</FieldError>}
         </Field>
         {!fixed && (
