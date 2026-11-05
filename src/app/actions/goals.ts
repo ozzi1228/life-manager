@@ -9,6 +9,7 @@ import {
   goalRepo,
   itemRepo,
   removeFromMonth,
+  renameGoal,
   reorderMonth,
   setCell,
   setGoalStatus,
@@ -71,6 +72,13 @@ export async function addPeriodGoal(scope: "year" | "month" | "week" | "day", ke
 export async function editGoal(id: string, version: number, input: GoalIn) {
   return action(async (ctx) => {
     await updateGoal(ctx, id, version, input);
+  });
+}
+
+/** 이름만 고치기(일정 화면 목표 카드) */
+export async function renameGoalAction(id: string, version: number, title: string) {
+  return action(async (ctx) => {
+    await renameGoal(ctx, id, version, title);
   });
 }
 

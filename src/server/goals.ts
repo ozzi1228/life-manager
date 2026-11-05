@@ -163,9 +163,10 @@ export async function goalCategoryList(ctx: Ctx) {
 }
 
 const year = z.number().int().min(2000).max(2100);
+const goalTitle = z.string().trim().min(1, "목표를 입력해 주세요").max(60, "목표는 60자까지 쓸 수 있어요");
 export const goalInput = z
   .object({
-    title: z.string().trim().min(1, "목표를 입력해 주세요").max(60, "목표는 60자까지 쓸 수 있어요"),
+    title: goalTitle,
     horizon: z.enum(["short", "mid", "long"]),
     startYear: year.nullable().default(null),
     endYear: year.nullable().default(null),
@@ -200,6 +201,9 @@ export async function updateGoal(ctx: Ctx, id: string, version: number, input: u
   await checkCategory(ctx, v.categoryId);
   return goalRepo.update(ctx, id, version, { ...v, memo: v.memo || null });
 }
+
+/** 이름만 고치기(일정 화면 목표 카드에서 글자를 두 번 눌러) */
+export const renameGoal = async (ctx: Ctx, id: string, version: number, title: unknown) => goalRepo.update(ctx, id, version, { title: parse(goalTitle, title) });
 
 /** 달성·진행 중·보류·포기. 달성하면 오늘 날짜를 달성일로 */
 export async function setGoalStatus(ctx: Ctx, id: string, version: number, status: "active" | "done" | "paused" | "dropped") {

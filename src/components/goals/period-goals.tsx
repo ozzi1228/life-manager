@@ -8,7 +8,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { addPeriodGoal, changeGoalStatus, deleteGoal } from "@/app/actions/goals";
+import { addPeriodGoal, changeGoalStatus, deleteGoal, renameGoalAction } from "@/app/actions/goals";
 import { type Goal, GoalDialog } from "@/components/goals/goal-list";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -38,13 +38,55 @@ function useGoals<G extends PeriodGoal>(goals: G[]) {
     if (!r.ok) return toast.error(r.error.message);
     router.refresh();
   }
-  return { list, toggle, remove, refresh: () => router.refresh() };
+  /** 이름 고치기. 실패하면 false(입력 칸을 그대로 둠) */
+  async function rename(g: G, title: string) {
+    // 연결이 끊기면 요청 자체가 실패함 → 입력 칸을 그대로 두고 안내(멈춘 채로 두지 않게)
+    const r = await renameGoalAction(g.id, g.version, title).catch(() => null);
+    if (!r) return toast.error("연결이 끊겨 저장하지 못했어요. 다시 눌러 주세요"), false;
+    if (!r.ok) return toast.error(r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 고쳤어요. 새로 고침해 주세요" : (r.error.fields?.[0]?.message ?? r.error.message)), false;
+    router.refresh();
+    return true;
+  }
+  return { list, toggle, remove, rename, refresh: () => router.refresh() };
 }
 
-/** compact: 일정 화면 카드용 — 작은 글자·체크, 좁은 줄 */
-function Row<G extends PeriodGoal>({ g, toggle, remove, edit, className, compact }: { g: G; toggle: (g: G) => void; remove: (g: G) => void; edit?: (g: G) => void; className?: string; compact?: boolean }) {
+/** compact: 일정 화면 카드용 — 작은 글자·체크, 좁은 줄. rename이 있으면 글자를 두 번 눌러(또는 ⋯ > 수정) 그 자리에서 고침 */
+function Row<G extends PeriodGoal>({ g, toggle, remove, edit, rename, className, compact }: { g: G; toggle: (g: G) => void; remove: (g: G) => void; edit?: (g: G) => void; rename?: (g: G, title: string) => Promise<boolean>; className?: string; compact?: boolean }) {
   const done = g.status === "done";
-  const title = <span className={cn("break-words", compact && "text-sm", done && "text-muted-foreground line-through")}>{g.title}</span>;
+  const [editing, setEditing] = useState(false);
+  const [text, setText] = useState(g.title);
+  const [saving, setSaving] = useState(false);
+  const start = () => (setText(g.title), setEditing(true));
+  async function save() {
+    const t = text.trim();
+    if (!t || t === g.title) return setEditing(false); // 비우거나 그대로면 원래대로
+    setSaving(true);
+    const ok = await rename!(g, t);
+    setSaving(false);
+    if (ok) setEditing(false);
+  }
+  const title = editing ? (
+    <Input
+      autoFocus
+      aria-label="목표 이름"
+      maxLength={60}
+      readOnly={saving}
+      className={cn("h-8 px-2 text-base md:text-sm", compact && "md:h-7")}
+      value={text}
+      onChange={(e) => setText(e.target.value)}
+      onFocus={(e) => e.target.select()}
+      onKeyDown={(e) => {
+        if (e.nativeEvent.isComposing) return; // 한글 조합 중 Enter는 글자 확정
+        if (e.key === "Enter") save();
+        if (e.key === "Escape") setEditing(false);
+      }}
+      onBlur={save}
+    />
+  ) : (
+    <span className={cn("break-words", compact && "text-sm", done && "text-muted-foreground line-through")} onDoubleClick={rename ? start : undefined} title={rename ? "두 번 눌러 고치기" : undefined}>
+      {g.title}
+    </span>
+  );
   return (
     <li className={cn("flex items-center", compact ? "min-h-9 gap-0.5 md:min-h-8" : "min-h-11 gap-1", className)}>
       <button
@@ -70,7 +112,7 @@ function Row<G extends PeriodGoal>({ g, toggle, remove, edit, className, compact
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">
-          {edit && <DropdownMenuItem onSelect={() => edit(g)}>수정</DropdownMenuItem>}
+          {edit ? <DropdownMenuItem onSelect={() => edit(g)}>수정</DropdownMenuItem> : rename && <DropdownMenuItem onSelect={start}>수정</DropdownMenuItem>}
           <DropdownMenuItem className="text-destructive-text" onSelect={() => remove(g)}>
             삭제
           </DropdownMenuItem>
@@ -128,7 +170,7 @@ function QuickAdd({ scope, periodKey, label, added, compact }: { scope: PeriodSc
 
 /** 일정 화면용 카드. year는 그 해가 든 연 목표, 추가하면 그 해 한 해짜리 단기 목표 */
 export function PeriodGoals({ scope, periodKey, label, goals }: { scope: PeriodScope; periodKey: string; label: string; goals: PeriodGoal[] }) {
-  const { list, toggle, remove, refresh } = useGoals(goals);
+  const { list, toggle, remove, rename, refresh } = useGoals(goals);
   return (
     <section className="bg-card space-y-1 rounded-lg border p-3">
       <div className="flex items-center gap-2">
@@ -140,7 +182,7 @@ export function PeriodGoals({ scope, periodKey, label, goals }: { scope: PeriodS
       {list.length > 0 && (
         <ul>
           {doneLast(list).map((g) => (
-            <Row key={g.id} g={g} toggle={toggle} remove={remove} compact />
+            <Row key={g.id} g={g} toggle={toggle} remove={remove} rename={rename} compact />
           ))}
         </ul>
       )}

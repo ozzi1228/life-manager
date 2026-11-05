@@ -5,7 +5,7 @@ import { db } from "../src/db/index.ts";
 import { goalCategories, goals, revisions, trackerCells, trackerItems, trackerMonthItems } from "../src/db/schema.ts";
 import { GOAL_PALETTE } from "../src/lib/palette.ts";
 import { AppError } from "../src/server/errors.ts";
-import { addItem, createGoal, createPeriodGoal, goalCategoryList, periodGoals, removeFromMonth, setCell, setGoalStatus, startMonthWith, suggestColor, trackerMonth } from "../src/server/goals.ts";
+import { addItem, createGoal, createPeriodGoal, goalCategoryList, periodGoals, removeFromMonth, renameGoal, setCell, setGoalStatus, startMonthWith, suggestColor, trackerMonth } from "../src/server/goals.ts";
 import { periodKey } from "../src/server/calendar.ts";
 import type { Ctx } from "../src/server/repo.ts";
 import { todayIn } from "../src/server/time.ts";
@@ -68,6 +68,14 @@ try {
   assert.equal(mg.startYear, null, "기간 목표는 연도 비움");
   assert.deepEqual((await periodGoals(A, "month", mk)).map((x) => x.title), ["이번 달 책 2권"]);
   assert.equal((await periodGoals(B, "month", mk)).length, 0, "남의 목표는 안 보임");
+  // 이름만 고치기(일정 화면 목표 카드): 앞뒤 공백 정리, 빈 이름·60자 넘는 이름·남의 목표·옛 버전은 거절
+  const rg = await createPeriodGoal(A, "year", "2031", "물 2L");
+  const rn = await renameGoal(A, rg.id, rg.version, "  물 2L 마시기 ");
+  assert.deepEqual([rn.title, rn.periodKey], ["물 2L 마시기", rg.periodKey], "이름만 바뀜");
+  assert.equal(await code(renameGoal(A, rg.id, rn.version, "  ")), "VALIDATION_FAILED");
+  assert.equal(await code(renameGoal(A, rg.id, rn.version, "가".repeat(61))), "VALIDATION_FAILED");
+  assert.equal(await code(renameGoal(A, rg.id, rg.version, "x")), "VERSION_CONFLICT");
+  assert.equal(await code(renameGoal(B, rg.id, rn.version, "x")), "NOT_FOUND");
   assert.equal((await periodGoals(A, "year", "2027")).some((x) => x.id === mg.id), false, "연 보기엔 연 목표만");
   assert.deepEqual((await periodGoals(A, "year", "2027")).map((x) => x.id), [g.id]);
   const mDone = await setGoalStatus(A, mg.id, mg.version, "done");
