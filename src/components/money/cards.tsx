@@ -21,7 +21,7 @@ import { money, rescale, type Currency } from "@/lib/format";
 import type { CardInput, CardItem, CardSecret } from "@/server/cards";
 
 const ISSUERS = ["신한", "삼성", "현대", "KB국민", "롯데", "하나", "우리", "BC", "NH농협", "IBK기업", "카카오뱅크", "토스뱅크"];
-const TYPE = { credit: "신용", check: "체크" } as const;
+const TYPE = { credit: "신용", check: "체크", transit: "교통" } as const;
 
 type Opt = { id: string; name: string };
 
@@ -159,6 +159,7 @@ function CardForm({ edit, accounts, close }: { edit?: CardItem; accounts: Opt[];
             <ToggleGroup type="single" variant="outline" value={v.cardType ?? ""} onValueChange={(t) => set("cardType", (t || null) as CardInput["cardType"])} aria-label="카드 종류">
               <ToggleGroupItem value="credit">신용</ToggleGroupItem>
               <ToggleGroupItem value="check">체크</ToggleGroupItem>
+              <ToggleGroupItem value="transit">교통</ToggleGroupItem>
             </ToggleGroup>
           </Field>
         </div>

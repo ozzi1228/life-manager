@@ -370,7 +370,7 @@ export const cards = pgTable(
     ...userData(),
     paymentMethodId: uuid("payment_method_id").notNull(),
     issuer: text("issuer"),
-    cardType: text("card_type", { enum: ["credit", "check"] }),
+    cardType: text("card_type", { enum: ["credit", "check", "transit"] }), // 신용 · 체크 · 교통
     billingDay: integer("billing_day"),
     annualFee: bigint("annual_fee", { mode: "number" }), // currency의 가장 작은 단위
     currency: text("currency").notNull().default("KRW"), // 연회비 통화

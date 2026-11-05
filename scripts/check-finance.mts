@@ -256,6 +256,8 @@ try {
   await uc(A, sc.id, 1, { name: "비밀카드", secret: { number: "", expiry: "", cvc: "" } });
   assert.equal(await revealCard(A, sc.id), null, "다 비우면 지움");
   assert.equal((await cl(A)).find((c) => c.id === sc.id)!.card?.last4, null);
+  const tm = await createCard(A, { name: "티머니", cardType: "transit" });
+  assert.equal((await cl(A)).find((c) => c.id === tm.id)?.card?.cardType, "transit", "교통카드 종류");
   console.log("카드 정보 확인 통과");
 } catch (e) {
   // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄

@@ -84,7 +84,7 @@ export type CardSecret = z.infer<typeof cardSecret>;
 export const cardInput = z.object({
   name: name("카드"),
   issuer: z.string().trim().max(20).nullable().default(null),
-  cardType: z.enum(["credit", "check"]).nullable().default(null),
+  cardType: z.enum(["credit", "check", "transit"]).nullable().default(null),
   billingDay: z.number().int().min(1).max(31).nullable().default(null),
   annualFee: won(1_000_000_000), // currency의 가장 작은 단위
   currency: z.enum(CURRENCY_CODES).default("KRW"),
