@@ -112,5 +112,13 @@ export async function entryWithPhotos(ctx: Ctx, id: string) {
   return { id: r.id, version: r.version, date: r.date, topicId: r.topicId, title: r.title, bodyMd: r.bodyMd, photos: photos.get(id) ?? [] };
 }
 
-/** 최근 글 n개(날짜 순) — 홈 "최근 기록" */
-export const recentEntries = (ctx: Ctx, n: number) => entryRepo.list(ctx, { orderBy: [desc(journalEntries.date), desc(journalEntries.createdAt)], limit: n });
+/** 최근 글 n개(날짜 순) + 첫 사진 — 홈 "최근 기록" */
+export async function recentEntries(ctx: Ctx, n: number) {
+  const rows = await entryRepo.list(ctx, { orderBy: [desc(journalEntries.date), desc(journalEntries.createdAt)], limit: n });
+  const photos = await imagesOf(
+    ctx,
+    OWNER,
+    rows.map((r) => r.id),
+  );
+  return rows.map((r) => ({ id: r.id, date: r.date, topicId: r.topicId, title: r.title, bodyMd: r.bodyMd, cover: photos.get(r.id)?.[0]?.id ?? null }));
+}

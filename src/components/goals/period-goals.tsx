@@ -168,6 +168,28 @@ function QuickAdd({ scope, periodKey, label, added, compact }: { scope: PeriodSc
   );
 }
 
+/** 홈 "오늘" 카드: 이번 주·오늘 목표를 한 목록으로(체크만). 오늘 목표는 "오늘" 표시 */
+export function HomeGoals({ week, day }: { week: PeriodGoal[]; day: PeriodGoal[] }) {
+  const { list, toggle } = useGoals([...day, ...week]);
+  const isDay = new Set(day.map((g) => g.id));
+  return (
+    <ul>
+      {doneLast(list).map((g) => {
+        const done = g.status === "done";
+        return (
+          <li key={g.id} className="flex min-h-9 items-center gap-1 md:min-h-8">
+            <button type="button" aria-label={done ? `${g.title} 달성 취소` : `${g.title} 달성`} aria-pressed={done} onClick={() => toggle(g)} className="group -ml-2 flex size-9 shrink-0 items-center justify-center rounded-md md:size-8">
+              <GoalCheck done={done} small />
+            </button>
+            <span className={cn("min-w-0 flex-1 truncate text-sm", done && "text-muted-foreground line-through")}>{g.title}</span>
+            <span className="text-muted-foreground shrink-0 text-caption">{isDay.has(g.id) ? "오늘" : "이번 주"}</span>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
 /** 일정 화면용 카드. year는 그 해가 든 연 목표, 추가하면 그 해 한 해짜리 단기 목표 */
 export function PeriodGoals({ scope, periodKey, label, goals }: { scope: PeriodScope; periodKey: string; label: string; goals: PeriodGoal[] }) {
   const { list, toggle, remove, rename, refresh } = useGoals(goals);
