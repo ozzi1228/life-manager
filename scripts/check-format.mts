@@ -1,6 +1,6 @@
 // 표시 형식(src/lib/format.ts) 확인: node scripts/check-format.mts
 import assert from "node:assert/strict";
-import { addMonths, dateLabel, dayLabel, money, moneyShort, monthLabel, parseMoney, timeLabel } from "../src/lib/format.ts";
+import { addMonths, dateLabel, dayLabel, decimals, money, moneyShort, monthLabel, parseMoney, rateOf, timeLabel, toKrw } from "../src/lib/format.ts";
 
 const today = new Date(2026, 10, 1); // 2026-11-01 (일)
 assert.equal(money(12000), "12,000원");
@@ -13,6 +13,24 @@ assert.equal(moneyShort(2_300_000), "230만원");
 assert.equal(moneyShort(150_000_000), "1.5억원");
 assert.equal(parseMoney("12,000원"), 12000);
 assert.equal(parseMoney(" 원 "), null);
+// 다른 통화: 가장 작은 단위 정수로 저장, 소수 자리는 통화마다
+assert.equal(decimals("KRW"), 0);
+assert.equal(decimals("JPY"), 0);
+assert.equal(decimals("USD"), 2);
+assert.equal(decimals("CNY"), 2);
+assert.equal(parseMoney("12.5", "USD"), 1250);
+assert.equal(parseMoney("1,234.567", "USD"), 123456, "소수 셋째 자리는 버림");
+assert.equal(parseMoney(".99", "CAD"), 99);
+assert.equal(parseMoney("12.5", "JPY"), 125, "엔은 소수 없음(점 무시)");
+assert.equal(parseMoney("12.5"), 125, "원도 소수 없음");
+assert.equal(parseMoney(".", "USD"), null);
+assert.equal(money(1250, { currency: "USD" }), "US$12.50");
+assert.equal(money(1000, { currency: "JPY" }), "JP¥1,000");
+assert.equal(money(1999, { currency: "CAD", sign: true }), "+CA$19.99");
+assert.equal(money(500, { currency: "KRW" }), "500원");
+assert.equal(toKrw(1250, "USD", 1380.5), 17256, "12.50달러 × 1380.5원, 반올림");
+assert.equal(toKrw(1000, "JPY", 9.12), 9120);
+assert.equal(rateOf(17256, 1250, "USD"), 1380.48);
 assert.equal(dateLabel("2026-11-01", today), "11월 1일 (일)");
 assert.equal(dateLabel("2025-12-31", today), "2025년 12월 31일");
 assert.equal(dayLabel("2026-11-01", today), "오늘");

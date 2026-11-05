@@ -206,7 +206,24 @@ try {
   const depRow = (await accountList(A)).find((a) => a.id === dep.id)!.account!;
   assert.deepEqual([depRow.balance, depRow.tax], [null, "normal"], "예금은 잔액 칸 비우고 과세 기본 일반");
   assert.equal(await code(updateAccount(A, dep.id, 1, { name: "정기예금", category: "deposit", startDate: "2027-01-01", maturityDate: "2026-01-01" })), "VALIDATION_FAILED", "만기일은 시작일 뒤");
+  const cad = await createAccount(A, { name: "캐나다 통장", category: "checking", currency: "CAD", balance: 123456 });
+  assert.deepEqual(((await accountList(A)).find((a) => a.id === cad.id)!.account!).currency, "CAD", "계좌 통화(잔액은 센트 단위 그대로)");
+  assert.equal(await code(createAccount(A, { name: "이상한 통화", currency: "XYZ" })), "VALIDATION_FAILED");
   console.log("페이·계좌 규칙 확인 통과");
+
+  // 다른 통화 지출: amount는 원(합계·예산은 그대로), 원래 금액은 foreign_amount. 마지막 환율을 입력 창에 줌
+  const fx = { type: "expense", date: "2024-06-10", categoryId: food.id };
+  const ny = await createTransaction(A, { ...fx, amount: 17250, currency: "USD", foreignAmount: 1250, title: "뉴욕 커피" });
+  assert.deepEqual([ny.row.amount, ny.row.currency, ny.row.foreignAmount], [17250, "USD", 1250]);
+  assert.equal(await code(createTransaction(A, { ...fx, amount: 17250, currency: "USD" })), "VALIDATION_FAILED", "외화인데 원래 금액이 없으면 안 됨");
+  assert.equal(await code(createTransaction(A, { ...fx, amount: 17250, currency: "USD", foreignAmount: 12.5 })), "VALIDATION_FAILED", "원래 금액도 가장 작은 단위 정수");
+  const won = await createTransaction(A, { ...fx, amount: 5000, foreignAmount: 999 });
+  assert.deepEqual([won.row.currency, won.row.foreignAmount], ["KRW", null], "원이면 원래 금액은 비움");
+  await createTransaction(A, { ...fx, date: "2024-06-01", amount: 9000, currency: "JPY", foreignAmount: 1000 });
+  await createTransaction(A, { ...fx, date: "2024-06-12", amount: 9300, currency: "JPY", foreignAmount: 1000 });
+  assert.deepEqual((await formData(A)).rates, { USD: 1380, JPY: 9.3 }, "통화마다 가장 최근 날짜의 환율");
+  assert.equal(totals(await monthTransactions(A, "2024-06")).expense, 17250 + 5000 + 9000 + 9300, "합계는 원으로");
+  console.log("다른 통화 확인 통과");
 } catch (e) {
   // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄
   console.error(e);

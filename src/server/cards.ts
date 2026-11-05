@@ -5,6 +5,7 @@ import { z } from "zod";
 import { uuidv7 } from "../db/id.ts";
 import { db, type Tx } from "../db/index.ts";
 import { accounts, cards, paymentMethods, pays, transactions } from "../db/schema.ts";
+import { CURRENCY_CODES, type Currency } from "../lib/format.ts";
 import { AppError, notFound } from "./errors.ts";
 import { createPaymentMethod, dup, paymentRepo, todayIn } from "./finance.ts";
 import { recurringList } from "./recurring.ts";
@@ -128,6 +129,7 @@ export const accountInput = z
   .object({
     name: name("계좌"),
     category: z.enum(["checking", "deposit", "savings", "stock"]).default("checking"),
+    currency: z.enum(CURRENCY_CODES).default("KRW"), // 잔액·원금은 이 통화의 가장 작은 단위
     bank: z.string().trim().max(20).nullable().default(null),
     number: z.string().trim().max(40, "계좌번호는 40자까지 쓸 수 있어요").nullable().default(null),
     balance: won(100_000_000_000),
@@ -168,7 +170,7 @@ export async function accountList(ctx: Ctx) {
       id: pm.id,
       pmVersion: pm.version,
       name: pm.name,
-      account: a && { category: a.category, bank: a.bank, number: a.number, balance: a.balance, principal: a.principal, rate: a.rate, tax: a.tax, startDate: a.startDate, maturityDate: a.maturityDate, memo: a.memo },
+      account: a && { category: a.category, currency: a.currency as Currency, bank: a.bank, number: a.number, balance: a.balance, principal: a.principal, rate: a.rate, tax: a.tax, startDate: a.startDate, maturityDate: a.maturityDate, memo: a.memo },
       cards: myCards,
       autopays: live
         .filter((r) => r.paymentMethodId === pm.id || via.has(r.paymentMethodId ?? ""))

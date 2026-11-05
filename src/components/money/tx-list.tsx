@@ -50,8 +50,10 @@ export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; c
                         {[r.title ? categories[r.categoryId] : null, payLabel(r, payments)].filter(Boolean).join(" · ")}
                       </span>
                     </span>
-                    <span className="shrink-0 tabular-nums">
+                    <span className="shrink-0 text-right tabular-nums">
                       {signed(r) > 0 ? `+${money(r.amount)}` : money(r.amount)}
+                      {/* 외화로 쓴 돈: 원래 금액을 아래에 작게 */}
+                      {r.foreignAmount && r.currency && <span className="text-muted-foreground block text-caption">{money(r.foreignAmount, { currency: r.currency })}</span>}
                     </span>
                   </button>
                 </li>

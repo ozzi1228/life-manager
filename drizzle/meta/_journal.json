@@ -218,6 +218,13 @@
       "when": 1793837679499,
       "tag": "0030_accounts_pays",
       "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1793848720764,
+      "tag": "0031_currency",
+      "breakpoints": true
     }
   ]
 }

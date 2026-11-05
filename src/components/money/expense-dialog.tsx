@@ -34,7 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { fromYmd, money, timeLabel, ymd } from "@/lib/format";
+import { fromYmd, money, rateOf, rescale, timeLabel, toKrw, ymd, type Currency } from "@/lib/format";
 import type { HistoryEntry } from "@/server/history";
 import { cn } from "@/lib/utils";
 
@@ -43,6 +43,8 @@ export type TxEdit = {
   version: number;
   type: "expense" | "income";
   amount: number;
+  currency?: Currency;
+  foreignAmount?: number | null;
   isRefund: boolean;
   restraint?: boolean;
   date: string;
@@ -90,7 +92,9 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
   const [type, setType] = useState<"expense" | "income">(edit?.type ?? "expense");
   const [refund, setRefund] = useState(edit?.isRefund ?? false);
   const [restraint, setRestraint] = useState(edit?.restraint ?? false); // 참아서 갚기(20 §3)
-  const [amount, setAmount] = useState<number | null>(edit?.amount ?? wish?.price ?? null);
+  const [amount, setAmount] = useState<number | null>(edit?.amount ?? wish?.price ?? null); // 언제나 원
+  const [currency, setCurrency] = useState<Currency>(edit?.currency ?? "KRW");
+  const [foreign, setForeign] = useState<number | null>(edit?.foreignAmount ?? null); // 외화면 그 통화 금액
   const [categoryId, setCategoryId] = useState<string | null>(edit?.categoryId ?? null); // 직전 선택 기억 안 함(오기록 방지, 04 §6.3)
   const [paymentId, setPaymentId] = useState<string | null>(edit?.paymentMethodId ?? null); // 돈이 실제로 나간 곳
   const [payId, setPayId] = useState<string | null>(edit?.payId ?? null); // 거친 페이(06 §6.7)
@@ -124,7 +128,23 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
   const shownCats = allCats ? cats : cats.slice(0, 6);
   const picked = cats.find((c) => c.id === categoryId);
   const future = date > ymd(new Date());
-  const canSave = !!amount && !busy;
+  const fx = currency !== "KRW";
+  const canSave = !!amount && (!fx || !!foreign) && !busy;
+  const rate = data?.rates[currency];
+  /** 외화 금액을 바꾸면 마지막에 쓴 환율로 원화 금액을 채움(고칠 수 있음) */
+  const setForeignAmount = (v: number | null) => {
+    setForeign(v);
+    if (rate) setAmount(v ? toKrw(v, currency, rate) : null);
+  };
+  /** 통화를 바꿔도 친 숫자는 그대로(12,000원 → 12,000엔) */
+  const changeCurrency = (c: Currency) => {
+    const n = rescale(fx ? foreign : amount, currency, c);
+    setCurrency(c);
+    if (c === "KRW") return setForeign(null), setAmount(n);
+    setForeign(n);
+    const r = data?.rates[c];
+    setAmount(n && r ? toKrw(n, c, r) : null);
+  };
   // 큰 지출 연결: 고른 날짜가 든 달의 큰 지출만(06 §3.1)
   const plannedOpts = type === "expense" ? (data?.planned.filter((p) => p.month === date.slice(0, 7)) ?? []) : [];
   const linked = plannedOpts.some((p) => p.id === plannedId) ? plannedId : null;
@@ -134,7 +154,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
     if (!categoryId) return setError({ field: "category", message: "분류를 골라 주세요" });
     setBusy(true);
     setError(null);
-    const input = { type, amount, isRefund: type === "expense" && refund, restraint: type === "expense" && restraint, date, categoryId, paymentMethodId: paymentId, payId: type === "expense" ? payId : null, title: title.trim() || null, memo: memo.trim() || null, tags, plannedExpenseId: linked };
+    const input = { type, amount, currency, foreignAmount: fx ? foreign : null, isRefund: type === "expense" && refund, restraint: type === "expense" && restraint, date, categoryId, paymentMethodId: paymentId, payId: type === "expense" ? payId : null, title: title.trim() || null, memo: memo.trim() || null, tags, plannedExpenseId: linked };
     // 연결이 끊기면 요청 자체가 실패함 → 입력은 그대로 두고 안내(같은 key로 다시 눌러도 한 건만 저장)
     const r = await (edit ? editTransaction(edit.id, edit.version, input) : wish ? buyWish(key, wish.id, wish.version, input) : addTransaction(key, input)).catch(() => null);
     setBusy(false);
@@ -142,7 +162,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
     if (!r.ok) {
       if (r.error.code === "VERSION_CONFLICT") return setError({ message: "다른 기기에서 먼저 수정했어요. 닫고 다시 열어 주세요" });
       const f = r.error.fields?.[0];
-      return setError({ field: f?.path === "categoryId" ? "category" : f?.path === "amount" ? "amount" : undefined, message: f?.message ?? r.error.message });
+      return setError({ field: f?.path === "categoryId" ? "category" : f?.path === "amount" || f?.path === "foreignAmount" ? "amount" : undefined, message: f?.message ?? r.error.message });
     }
     router.refresh();
     if (edit) return close();
@@ -152,6 +172,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
     if (repeat) {
       // 연속 입력: 비우고 다시 금액부터
       setAmount(null);
+      setForeign(null); // 통화는 그대로(여행 중 연달아 적을 때)
       setTitle("");
       setMemo("");
       setTags([]);
@@ -272,9 +293,31 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
             </span>
           )}
           <div className="flex-1">
-            <AmountInput value={amount} onChange={setAmount} autoFocus={!edit} invalid={error?.field === "amount"} />
+            <AmountInput
+              value={fx ? foreign : amount}
+              onChange={fx ? setForeignAmount : setAmount}
+              currency={currency}
+              onCurrency={changeCurrency}
+              autoFocus={!edit}
+              invalid={error?.field === "amount"}
+            />
           </div>
         </div>
+        {/* 외화: 합계·예산·통계는 원으로 셈 → 그때 원화로 얼마였는지(카드 명세서 금액)를 적음 */}
+        {fx && (
+          <div className="flex items-center gap-2">
+            <span className="text-muted-foreground shrink-0 text-sm">원화로</span>
+            <div className="flex-1">
+              <AmountInput id="tx-krw" value={amount} onChange={setAmount} />
+            </div>
+          </div>
+        )}
+        {fx && (
+          <p className="text-muted-foreground text-caption">
+            {amount && foreign ? `1 ${currency} ≈ ${rateOf(amount, foreign, currency).toLocaleString("ko-KR")}원 · ` : ""}
+            {rate ? "마지막에 쓴 환율로 계산해요. 명세서 금액으로 고칠 수 있어요" : "원화 금액을 적어 주세요. 다음부터 그 환율로 계산해요"}
+          </p>
+        )}
         {type === "expense" && refund && <p className="text-muted-foreground text-caption">돌려받은 금액이에요. 이 달 지출 합계에서 빠져요</p>}
         {error?.field === "amount" && <FieldError>{error.message}</FieldError>}
       </Field>

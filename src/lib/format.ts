@@ -1,12 +1,35 @@
-// 화면 표시 형식 (docs/planning/03 §9.4). 금액은 원 단위 정수
+// 화면 표시 형식 (docs/planning/03 §9.4). 금액은 통화의 가장 작은 단위 정수(원·엔은 1, 달러·위안은 센트·펀). 기본은 원
 // 주의: today를 생략하면 지금 시각을 읽음 → 클라이언트 컴포넌트의 렌더 중에는 today를 넘겨야 함(미리 그리는 화면에 날짜가 굳지 않게)
 const won = new Intl.NumberFormat("ko-KR");
 
-/** 12,000원 · 수입·환불은 +50,000원(색이 아니라 부호로) */
-export function money(n: number, o: { sign?: boolean } = {}) {
-  const s = `${won.format(Math.abs(n))}원`;
+/** 고를 수 있는 통화. 더 필요하면 코드만 넣으면 됨(소수 자리는 Intl이 앎) */
+export const CURRENCIES = { KRW: "원", USD: "미국 달러", JPY: "엔", CAD: "캐나다 달러", CNY: "위안", EUR: "유로", GBP: "파운드", AUD: "호주 달러", HKD: "홍콩 달러", TWD: "대만 달러", SGD: "싱가포르 달러", THB: "바트", VND: "동" } as const;
+export type Currency = keyof typeof CURRENCIES;
+export const CURRENCY_CODES = Object.keys(CURRENCIES) as [Currency, ...Currency[]];
+
+const fmts = new Map<string, Intl.NumberFormat>();
+const fmtOf = (c: Currency) => {
+  if (!fmts.has(c)) fmts.set(c, new Intl.NumberFormat("ko-KR", { style: "currency", currency: c }));
+  return fmts.get(c)!;
+};
+/** 소수 자리: 원·엔 0, 달러·위안 2 */
+export const decimals = (c: Currency) => fmtOf(c).resolvedOptions().maximumFractionDigits ?? 0;
+/** 가장 작은 단위 정수 → 보이는 수(1250 USD → 12.5) */
+export const toMajor = (n: number, c: Currency) => n / 10 ** decimals(c);
+
+/** 12,000원 · US$12.50 · JP¥1,000. 수입·환불은 +50,000원(색이 아니라 부호로) */
+export function money(n: number, o: { sign?: boolean; currency?: Currency } = {}) {
+  const c = o.currency ?? "KRW";
+  const s = c === "KRW" ? `${won.format(Math.abs(n))}원` : fmtOf(c).format(toMajor(Math.abs(n), c));
   return n < 0 ? `-${s}` : o.sign && n > 0 ? `+${s}` : s;
 }
+
+/** 통화를 바꿔도 보이는 숫자는 그대로(12,000원 → 12,000엔, 12원 → 12.00달러) */
+export const rescale = (n: number | null, from: Currency, to: Currency) => (n === null ? null : Math.round(toMajor(n, from) * 10 ** decimals(to)));
+/** 외화 → 원: 금액 × 1단위당 원, 반올림 */
+export const toKrw = (n: number, c: Currency, rate: number) => Math.round(toMajor(n, c) * rate);
+/** 저장된 두 금액에서 1단위당 원(소수 둘째 자리까지) */
+export const rateOf = (krw: number, n: number, c: Currency) => Math.round((krw / toMajor(n, c)) * 100) / 100;
 
 /** 위젯용 요약: 9,800원 · 1.2만원 · 230만원 · 1.5억원 */
 export function moneyShort(n: number) {
@@ -18,10 +41,13 @@ export function moneyShort(n: number) {
   return money(n);
 }
 
-/** 글자 → 원 단위 정수(쉼표·원·공백 무시). 숫자가 없으면 null */
-export function parseMoney(s: string) {
-  const digits = s.replace(/[^\d]/g, "");
-  return digits ? Number(digits.slice(0, 15)) : null;
+/** 글자 → 가장 작은 단위 정수(쉼표·원·공백 무시, 소수는 통화 자리만큼 — 넘치면 버림). 숫자가 없으면 null */
+export function parseMoney(s: string, c: Currency = "KRW") {
+  const d = decimals(c);
+  const [int, ...rest] = s.replace(d ? /[^\d.]/g : /[^\d]/g, "").split(".");
+  const frac = rest.join("").slice(0, d);
+  if (!int && !frac) return null;
+  return Number((int.slice(0, 15 - d) || "0") + frac.padEnd(d, "0"));
 }
 
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];

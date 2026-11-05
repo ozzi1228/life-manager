@@ -9,7 +9,6 @@ import { addAccount, editAccount, removePaymentAction } from "@/app/actions/card
 import { AmountInput, MoneyText } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
 import { EmptyState, toastDone } from "@/components/app/states";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -19,7 +18,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ACCOUNT_CATEGORY, TAX, daysUntil, expectedInterest, stockProfit, type AccountCategory, type Tax } from "@/lib/accounts";
-import { money } from "@/lib/format";
+import { money, rescale, type Currency } from "@/lib/format";
 import type { AccountInput, AccountItem } from "@/server/cards";
 
 const BANKS = ["KB국민", "신한", "우리", "하나", "NH농협", "IBK기업", "카카오뱅크", "토스뱅크", "케이뱅크", "SC제일", "새마을금고", "우체국", "키움증권", "미래에셋증권", "삼성증권", "한국투자증권", "토스증권"];
@@ -45,13 +44,25 @@ export function AccountGrid({ accounts, today }: { accounts: AccountItem[]; toda
       {accounts.length === 0 ? (
         <EmptyState pet="komong" title="계좌를 등록해 보세요" description="예금·적금은 만기와 예상 이자를, 모든 계좌는 연결된 카드와 자동 결제를 한눈에 볼 수 있어요" action={add} />
       ) : (
-        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {accounts.map((a) => (
-            <li key={a.id}>
-              <AccountCard a={a} today={today} open={() => setForm(a)} />
-            </li>
-          ))}
-        </ul>
+        // 종류별 소제목: 입출금 · 예금 · 적금 · 주식 순(있는 것만)
+        Object.entries(ACCOUNT_CATEGORY).map(([k, label]) => {
+          const list = accounts.filter((a) => (a.account?.category ?? "checking") === k);
+          if (!list.length) return null;
+          return (
+            <section key={k} aria-labelledby={`ac-${k}`} className="space-y-2">
+              <h3 id={`ac-${k}`} className="text-muted-foreground text-sm font-semibold">
+                {label} 계좌 <span className="font-normal tabular-nums">{list.length}</span>
+              </h3>
+              <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+                {list.map((a) => (
+                  <li key={a.id}>
+                    <AccountCard a={a} today={today} open={() => setForm(a)} />
+                  </li>
+                ))}
+              </ul>
+            </section>
+          );
+        })
       )}
       {form && <AccountForm edit={form === "new" ? undefined : form} close={() => setForm(null)} />}
     </div>
@@ -64,40 +75,36 @@ function AccountCard({ a, today, open }: { a: AccountItem; today: string; open: 
   const interest = d && expectedInterest(d);
   const profit = d && cat === "stock" ? stockProfit(d.principal, d.balance) : null;
   const left = d?.maturityDate ? daysUntil(d.maturityDate, today) : null;
+  const m = (n: number, o: { sign?: boolean } = {}) => money(n, { ...o, currency: d?.currency }); // 계좌 통화로
   return (
     <button type="button" onClick={open} className="bg-card hover:bg-accent/40 flex h-full w-full flex-col justify-start space-y-3 rounded-xl border p-5 text-left shadow-sm">
       <div className="space-y-1">
-        <div className="flex items-center gap-2">
-          <p className="min-w-0 truncate font-semibold">{a.name}</p>
-          <Badge variant="secondary" className="shrink-0">
-            {ACCOUNT_CATEGORY[cat]}
-          </Badge>
-        </div>
+        <p className="min-w-0 truncate font-semibold">{a.name}</p>
         {(d?.bank || d?.number) && <p className="text-muted-foreground text-sm">{[d.bank, d.number].filter(Boolean).join(" · ")}</p>}
       </div>
 
       {(cat === "checking" || cat === "stock") && d?.balance != null && (
         <p className="text-lg font-semibold">
           <span className="text-muted-foreground mr-2 text-sm font-normal">{cat === "stock" ? "평가 금액" : "잔액"}</span>
-          <MoneyText amount={d.balance} />
+          <MoneyText amount={d.balance} currency={d.currency} />
         </p>
       )}
       {profit && (
         <p className={profit.profit < 0 ? "text-sm text-blue-600 dark:text-blue-400" : "text-destructive-text text-sm"}>
-          원금 {money(d!.principal!)} · {money(profit.profit, { sign: true })} ({profit.pct > 0 ? "+" : ""}
+          원금 {m(d!.principal!)} · {m(profit.profit, { sign: true })} ({profit.pct > 0 ? "+" : ""}
           {profit.pct}%)
         </p>
       )}
       {(cat === "deposit" || cat === "savings") && d && (
         <div className="space-y-1 text-sm">
           <p className="text-muted-foreground">
-            {[d.principal != null && `${cat === "savings" ? "매월 " : ""}${money(d.principal)}`, d.rate != null && `연 ${d.rate}%`, d.maturityDate && `${d.maturityDate.slice(0, 4)}년 ${md(d.maturityDate)} 만기`].filter(Boolean).join(" · ")}
+            {[d.principal != null && `${cat === "savings" ? "매월 " : ""}${m(d.principal)}`, d.rate != null && `연 ${d.rate}%`, d.maturityDate && `${d.maturityDate.slice(0, 4)}년 ${md(d.maturityDate)} 만기`].filter(Boolean).join(" · ")}
             {left !== null && <span className="text-foreground ml-1.5 font-medium whitespace-nowrap">{left > 0 ? `D-${left}` : left === 0 ? "오늘 만기" : "만기 지남"}</span>}
           </p>
           {interest ? (
             <p>
-              예상 이자 <b className="font-semibold">{money(interest.net)}</b>
-              <span className="text-muted-foreground"> (세후) · 만기에 {money(interest.total)}</span>
+              예상 이자 <b className="font-semibold">{m(interest.net)}</b>
+              <span className="text-muted-foreground"> (세후) · 만기에 {m(interest.total)}</span>
             </p>
           ) : (
             <p className="text-muted-foreground">금액·이율·기간을 적으면 예상 이자를 계산해 줘요</p>
@@ -141,6 +148,7 @@ function AccountForm({ edit, close }: { edit?: AccountItem; close: () => void })
   const [v, setV] = useState<AccountInput & { category: AccountCategory }>({
     name: edit?.name ?? "",
     category: d?.category ?? "checking",
+    currency: d?.currency ?? "KRW",
     bank: d?.bank ?? null,
     number: d?.number ?? null,
     balance: d?.balance ?? null,
@@ -155,6 +163,11 @@ function AccountForm({ edit, close }: { edit?: AccountItem; close: () => void })
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const set = <K extends keyof AccountInput>(k: K, val: AccountInput[K]) => setV((s) => ({ ...s, [k]: val }));
+  const cur = (v.currency ?? "KRW") as Currency;
+  const m = (n: number, o: { sign?: boolean } = {}) => money(n, { ...o, currency: cur });
+  /** 통화 바꾸기: 적어 둔 숫자는 그대로 */
+  const onCurrency = (c: Currency) => setV((s) => ({ ...s, currency: c, balance: rescale(s.balance ?? null, cur, c), principal: rescale(s.principal ?? null, cur, c) }));
+  const amt = { currency: cur, onCurrency };
   const saving = v.category === "deposit" || v.category === "savings";
   const interest = saving ? expectedInterest({ category: v.category, principal: v.principal ?? null, rate: v.rate ?? null, tax: (v.tax ?? "normal") as Tax, startDate: v.startDate ?? null, maturityDate: v.maturityDate ?? null }) : null;
   const profit = v.category === "stock" ? stockProfit(v.principal ?? null, v.balance ?? null) : null;
@@ -230,7 +243,7 @@ function AccountForm({ edit, close }: { edit?: AccountItem; close: () => void })
         {v.category === "checking" && (
           <Field>
             <FieldLabel htmlFor="ac-balance">잔액</FieldLabel>
-            <AmountInput id="ac-balance" placeholder="선택" value={v.balance ?? null} onChange={(a) => set("balance", a)} />
+            <AmountInput id="ac-balance" placeholder="선택" value={v.balance ?? null} onChange={(a) => set("balance", a)} {...amt} />
           </Field>
         )}
 
@@ -239,7 +252,7 @@ function AccountForm({ edit, close }: { edit?: AccountItem; close: () => void })
             <div className="grid grid-cols-2 gap-3">
               <Field>
                 <FieldLabel htmlFor="ac-principal">{v.category === "savings" ? "월 납입액" : "예치 금액"}</FieldLabel>
-                <AmountInput id="ac-principal" value={v.principal ?? null} onChange={(a) => set("principal", a)} />
+                <AmountInput id="ac-principal" value={v.principal ?? null} onChange={(a) => set("principal", a)} {...amt} />
               </Field>
               <Field>
                 <FieldLabel htmlFor="ac-rate">연 이율</FieldLabel>
@@ -290,10 +303,10 @@ function AccountForm({ edit, close }: { edit?: AccountItem; close: () => void })
                 <>
                   <p className="flex justify-between">
                     <span>예상 이자 (세후, 단리)</span>
-                    <b className="font-semibold">{money(interest.net)}</b>
+                    <b className="font-semibold">{m(interest.net)}</b>
                   </p>
                   <p className="text-muted-foreground mt-1">
-                    {interest.months}개월 · 세전 {money(interest.gross)} − 세금 {money(interest.tax)} · 만기에 {money(interest.total)}
+                    {interest.months}개월 · 세전 {m(interest.gross)} − 세금 {m(interest.tax)} · 만기에 {m(interest.total)}
                   </p>
                 </>
               ) : (
@@ -308,16 +321,16 @@ function AccountForm({ edit, close }: { edit?: AccountItem; close: () => void })
             <div className="grid grid-cols-2 gap-3">
               <Field>
                 <FieldLabel htmlFor="ac-principal">투자 원금</FieldLabel>
-                <AmountInput id="ac-principal" value={v.principal ?? null} onChange={(a) => set("principal", a)} />
+                <AmountInput id="ac-principal" value={v.principal ?? null} onChange={(a) => set("principal", a)} {...amt} />
               </Field>
               <Field>
                 <FieldLabel htmlFor="ac-balance">평가 금액</FieldLabel>
-                <AmountInput id="ac-balance" value={v.balance ?? null} onChange={(a) => set("balance", a)} />
+                <AmountInput id="ac-balance" value={v.balance ?? null} onChange={(a) => set("balance", a)} {...amt} />
               </Field>
             </div>
             {profit && (
               <p className="bg-muted/50 rounded-lg p-3 text-sm">
-                수익 {money(profit.profit, { sign: true })} ({profit.pct > 0 ? "+" : ""}
+                수익 {m(profit.profit, { sign: true })} ({profit.pct > 0 ? "+" : ""}
                 {profit.pct}%)
               </p>
             )}

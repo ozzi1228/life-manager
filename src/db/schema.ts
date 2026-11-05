@@ -139,13 +139,15 @@ export const paymentMethods = pgTable(
   (t) => [uniqueIndex("payment_methods_name").on(t.userId, t.name).where(sql`${t.deletedAt} is null`)],
 );
 
-// 지출·수입. 금액은 원 단위 양의 정수, 환불은 is_refund=true로 차감(06 §3.2)
+// 지출·수입. 금액은 원 단위 양의 정수(외화는 원화 환산액 + 원래 금액), 환불은 is_refund=true로 차감(06 §3.2)
 export const transactions = pgTable(
   "transactions",
   {
     ...userData(),
     type: text("type", { enum: ["expense", "income"] }).notNull(),
-    amount: bigint("amount", { mode: "number" }).notNull(),
+    amount: bigint("amount", { mode: "number" }).notNull(), // 언제나 원(합계·예산·통계는 이것만 셈)
+    currency: text("currency").notNull().default("KRW"), // 다른 통화로 쓴 돈이면 그 통화(src/lib/format.ts CURRENCIES)
+    foreignAmount: bigint("foreign_amount", { mode: "number" }), // 그 통화의 가장 작은 단위 금액(센트 등). 원이면 null — amount는 그때 원화로 얼마였는지
     isRefund: boolean("is_refund").notNull().default(false),
     restraint: boolean("restraint").notNull().default(false), // "참아서 갚기": 이 지출만큼 참은 소비를 채워야 함(20 §3)
     date: date("date").notNull(),
@@ -162,6 +164,7 @@ export const transactions = pgTable(
     index("transactions_user_date").on(t.userId, t.date.desc()).where(sql`${t.deletedAt} is null`),
     index("transactions_user_category").on(t.userId, t.categoryId, t.date),
     check("transactions_amount_positive", sql`${t.amount} > 0 and ${t.amount} <= 10000000000`),
+    check("transactions_foreign", sql`(${t.currency} = 'KRW') = (${t.foreignAmount} is null) and coalesce(${t.foreignAmount}, 1) > 0`),
   ],
 );
 
@@ -389,6 +392,7 @@ export const accounts = pgTable(
     ...userData(),
     paymentMethodId: uuid("payment_method_id").notNull(),
     category: text("category", { enum: ["checking", "deposit", "savings", "stock"] }).notNull().default("checking"),
+    currency: text("currency").notNull().default("KRW"), // 잔액·원금의 통화. 금액은 그 통화의 가장 작은 단위
     bank: text("bank"),
     number: text("number"),
     balance: bigint("balance", { mode: "number" }), // 입출금 잔액 / 주식 평가 금액

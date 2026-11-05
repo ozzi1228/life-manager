@@ -7,7 +7,7 @@ import { nameMaps } from "./finance.ts";
 import type { Ctx } from "./repo.ts";
 
 const FIELDS: Record<string, Record<string, string>> = {
-  transaction: { amount: "금액", date: "날짜", categoryId: "분류", paymentMethodId: "결제수단", title: "내용", memo: "메모", isRefund: "환불", restraint: "참아서 갚기", tags: "태그", type: "종류", plannedExpenseId: "큰 지출", payId: "페이" },
+  transaction: { amount: "금액", currency: "통화", date: "날짜", categoryId: "분류", paymentMethodId: "결제수단", title: "내용", memo: "메모", isRefund: "환불", restraint: "참아서 갚기", tags: "태그", type: "종류", plannedExpenseId: "큰 지출", payId: "페이" },
 };
 const ACTION = { create: "만듦", update: "고침", delete: "휴지통으로", restore: "복구" } as const;
 
