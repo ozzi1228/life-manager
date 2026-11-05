@@ -614,12 +614,12 @@ function TopPanels({ label, goals, note, children }: { label: string; goals: Per
   );
 }
 
-// ── 연 보기: 연간 계획표(세로 1~12월 × 가로 1~31일) ──
-// 칸을 누르면 그 날 일정 추가, 칩을 누르면 상세, +N은 그 달 보기. 없는 날(2월 30일 등)은 회색. 토·일은 요일 글자색만
-// 가로가 넓어 PC·휴대폰 모두 옆으로 스크롤(월 칸·날짜 줄은 고정)
+// ── 연 보기: 연간 계획표(가로 1~12월 × 세로 1~31일) ──
+// 화면 폭에 12달이 다 들어감(옆으로 스크롤 없음, 위아래로만). 칸을 누르면 그 날 목록, 칩을 누르면 상세, 월 이름은 그 달 보기
+// 모바일은 칸이 좁아 일정을 색 막대로만(제목은 칸을 눌러 목록에서). 없는 날(2월 30일 등)은 회색. 토·일은 요일 글자색만
 
-function YearPlanner({ year, focus, today, items, color, open, add, month }: { year: string; focus: string; today: string; items: Instance[]; color: (e: Instance) => string; open: (e: Instance) => void; add: (d: string) => void; month: (d: string) => void }) {
-  // 날짜별 일정(여러 날 일정은 그 사이 모든 날 — 같은 색이 가로 띠로 이어짐)
+function YearPlanner({ year, focus, today, items, color, open, openDay, month, mobile }: { year: string; focus: string; today: string; items: Instance[]; color: (e: Instance) => string; open: (e: Instance) => void; openDay: (d: string) => void; month: (d: string) => void; mobile: boolean }) {
+  // 날짜별 일정(여러 날 일정은 그 사이 모든 날 — 같은 색이 세로 띠로 이어짐)
   const byDay = new Map<string, Instance[]>();
   for (const e of items) {
     for (let d = e.startDate < `${year}-01-01` ? `${year}-01-01` : e.startDate; d <= e.endDate && d <= `${year}-12-31`; d = addDays(d, 1)) {
@@ -628,72 +628,73 @@ function YearPlanner({ year, focus, today, items, color, open, add, month }: { y
       else byDay.set(d, [e]);
     }
   }
-  // 처음엔 보던 날(오늘)이 보이게: 그 날이 왼쪽에서 몇 칸 안쪽에, 그 달 줄이 위쪽에. 화면 위 위치 기준
+  // 처음엔 보던 날(오늘)이 든 줄이 위쪽에 보이게
   const scroller = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
     const el = scroller.current;
     const cell = el?.querySelector<HTMLElement>(`[data-day="${focus}"]`);
     const corner = el?.querySelector<HTMLElement>("[data-corner]");
     if (!el || !cell || !corner) return;
-    const c = cell.getBoundingClientRect();
-    const box = el.getBoundingClientRect();
-    const head = corner.getBoundingClientRect();
-    el.scrollLeft += c.left - box.left - head.width - c.width * 3;
-    el.scrollTop += c.top - box.top - head.height - c.height;
+    el.scrollTop += cell.getBoundingClientRect().top - el.getBoundingClientRect().top - corner.getBoundingClientRect().height - cell.getBoundingClientRect().height * 2;
   }, [focus]);
   const months = Array.from({ length: 12 }, (_, i) => `${year}-${String(i + 1).padStart(2, "0")}`);
   const lengths = months.map((_, i) => new Date(Date.UTC(+year, i + 1, 0)).getUTCDate());
+  const max = mobile ? 3 : 2;
   return (
-    <div ref={scroller} className="bg-card relative max-h-[75dvh] overflow-auto overscroll-x-contain rounded-lg border" role="region" aria-label={`${year}년 연간 계획표`} tabIndex={-1}>
-      <div className="grid w-max min-w-full auto-rows-[minmax(3.25rem,auto)] grid-cols-[2.75rem_repeat(31,minmax(4.5rem,1fr))] grid-rows-[auto]">
-        <div data-corner className="bg-card sticky top-0 left-0 z-30 border-r border-b" />
-        {Array.from({ length: 31 }, (_, k) => (
-          <div key={`n${k}`} className="bg-card text-muted-foreground sticky top-0 z-20 border-b border-l py-1 text-center text-caption tabular-nums">
-            {k + 1}
+    <div ref={scroller} className="bg-card relative max-h-[75dvh] overflow-x-hidden overflow-y-auto rounded-lg border" role="region" aria-label={`${year}년 연간 계획표`} tabIndex={-1}>
+      <div className="grid auto-rows-[minmax(1.75rem,auto)] grid-cols-[1.25rem_repeat(12,minmax(0,1fr))] md:auto-rows-[minmax(2.25rem,auto)] md:grid-cols-[2rem_repeat(12,minmax(0,1fr))]">
+        <div data-corner className="bg-card sticky top-0 z-20 border-b" />
+        {months.map((m) => (
+          <div key={m} className="bg-card sticky top-0 z-20 min-w-0 border-b border-l">
+            <button type="button" onClick={() => month(`${m}-01`)} aria-label={`${+m.slice(5)}월 보기`} className={cn("hover:bg-accent/50 size-full py-1.5 text-caption font-semibold md:text-sm", m === today.slice(0, 7) && "text-link")}>
+              {+m.slice(5)}
+              <span className="max-md:hidden">월</span>
+            </button>
           </div>
         ))}
-        {months.map((m, i) => [
-          <div key={m} className="bg-card sticky left-0 z-10 border-r border-b">
-            <button type="button" onClick={() => month(`${m}-01`)} aria-label={`${+m.slice(5)}월 보기`} className={cn("hover:bg-accent/50 size-full text-sm font-semibold", m === today.slice(0, 7) && "text-link")}>
-              {+m.slice(5)}월
-            </button>
+        {Array.from({ length: 31 }, (_, k) => [
+          <div key={`n${k}`} className="text-muted-foreground border-b pt-1 text-center text-micro tabular-nums md:text-caption">
+            {k + 1}
           </div>,
-          ...Array.from({ length: 31 }, (_, k) => {
+          ...months.map((m, i) => {
             if (k >= lengths[i]) return <div key={`${m}-x${k}`} aria-hidden className="bg-muted/70 border-b border-l" />;
             const d = `${m}-${String(k + 1).padStart(2, "0")}`;
             const w = dayOfWeek(d);
             const list = byDay.get(d) ?? [];
-            const max = list.length > 2 ? 1 : 2;
             return (
-              <div key={d} data-day={d} className={cn("relative space-y-px border-b border-l p-0.5", d === today && "ring-primary ring-2 ring-inset")}>
-                <button
-                  type="button"
-                  aria-label={`${md(d)} ${WEEK[w]}요일${d === today ? ", 오늘" : ""}, ${list.length ? `일정 ${list.length}개` : "일정 없음"}`}
-                  title={`${dayTitle(d)} 일정 추가`}
-                  onClick={() => add(d)}
-                  className="hover:bg-accent/50 focus-visible:ring-ring absolute inset-0 outline-none focus-visible:ring-2 focus-visible:ring-inset"
-                />
-                <span aria-hidden className={cn("pointer-events-none relative block px-0.5 text-micro", d === today ? "text-link font-bold" : w === 6 ? "text-link" : w === 0 ? "text-destructive-text" : "text-muted-foreground")}>
+              <div
+                key={d}
+                role="button"
+                tabIndex={-1}
+                data-day={d}
+                aria-label={`${md(d)} ${WEEK[w]}요일${d === today ? ", 오늘" : ""}, ${list.length ? `일정 ${list.length}개` : "일정 없음"}`}
+                onClick={() => openDay(d)}
+                onKeyDown={(ev) => ev.key === "Enter" && openDay(d)}
+                className={cn("hover:bg-accent/40 flex min-w-0 cursor-pointer gap-0.5 border-b border-l p-px md:p-0.5", d === today && "ring-primary ring-2 ring-inset")}
+              >
+                <span aria-hidden className={cn("w-3 shrink-0 pt-px text-center text-[9px] leading-3 md:text-micro", d === today ? "text-link font-bold" : w === 6 ? "text-link" : w === 0 ? "text-destructive-text" : "text-muted-foreground/70")}>
                   {WEEK[w]}
                 </span>
-                {list.slice(0, max).map((e) => (
-                  <button
-                    key={e.id + e.occurrenceDate}
-                    type="button"
-                    data-ev={evKey(e)}
-                    onClick={() => open(e)}
-                    title={`${e.title} · ${whenLabel(e)}`}
-                    className="relative block w-full truncate rounded-[3px] px-0.5 text-left text-micro leading-3.5 hover:brightness-95"
-                    style={e.startDate === d ? tint(color(e)) : { background: `${color(e)}26` }}
-                  >
-                    {e.title}
-                  </button>
-                ))}
-                {list.length > max && (
-                  <button type="button" onClick={() => month(d)} aria-label={`${md(d)} 일정 ${list.length - max}개 더 보기`} className="text-muted-foreground hover:text-foreground relative block px-0.5 text-micro leading-3.5">
-                    +{list.length - max}
-                  </button>
-                )}
+                <div className="min-w-0 flex-1 space-y-px">
+                  {list.slice(0, max).map((e) =>
+                    mobile ? (
+                      <span key={e.id + e.occurrenceDate} data-ev={evKey(e)} className="block h-1.5 rounded-full" style={{ background: color(e) }} />
+                    ) : (
+                      <button
+                        key={e.id + e.occurrenceDate}
+                        type="button"
+                        data-ev={evKey(e)}
+                        onClick={(ev) => (ev.stopPropagation(), open(e))}
+                        title={`${e.title} · ${whenLabel(e)}`}
+                        className="block w-full truncate rounded-[3px] px-0.5 text-left text-micro leading-3.5 hover:brightness-95"
+                        style={e.startDate === d ? tint(color(e)) : { background: `${color(e)}26` }}
+                      >
+                        {e.title}
+                      </button>
+                    ),
+                  )}
+                  {list.length > max && <span className="text-muted-foreground block px-0.5 text-[9px] leading-3 md:text-micro md:leading-3.5">+{list.length - max}</span>}
+                </div>
               </div>
             );
           }),
@@ -947,7 +948,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
         </TopPanels>
         {view === "year" ? (
           <>
-            {menu(<YearPlanner key={date} year={date.slice(0, 4)} focus={date} today={today} items={visible} color={colorOf} open={setDetail} add={(d) => (setSelected(d), addAt(d))} month={(d) => go("month", d)} />)}
+            {menu(<YearPlanner key={date} year={date.slice(0, 4)} focus={date} today={today} items={visible} color={colorOf} open={setDetail} openDay={(d) => (setSelected(d), setDayOpen(d))} month={(d) => go("month", d)} mobile={mobile} />)}
           </>
         ) : view === "month" ? (
           menu(<MonthGrid from={from} month={date.slice(0, 7)} selected={selected} today={today} items={visible} color={colorOf} openDay={(d) => (setSelected(d), setDayOpen(d))} open={setDetail} mobile={mobile} />)
@@ -967,7 +968,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
         )}
       </div>
 
-      {dayOpen && (view === "month" || view === "week") && <DaySheet day={dayOpen} today={today} items={dayItems(dayOpen)} color={colorOf} open={setDetail} add={() => addAt(dayOpen)} close={() => setDayOpen(null)} wrap={menu} />}
+      {dayOpen && view !== "day" && <DaySheet day={dayOpen} today={today} items={dayItems(dayOpen)} color={colorOf} open={setDetail} add={() => addAt(dayOpen)} close={() => setDayOpen(null)} wrap={menu} />}
       {detail && <Detail e={detail} cal={calOf(detail)} close={() => setDetail(null)} edit={() => editOf(detail)} copy={() => copyOf(detail)} remove={() => askRemove(detail)} />}
       {scopeFor && <ScopeDialog title="반복 일정을 어떻게 지울까요?" close={() => setScopeFor(null)} pick={(s) => remove(scopeFor, s)} />}
       {form && <EventForm key={form.edit?.id ?? "new"} draft={form.draft} edit={form.edit} calendars={calendars} close={() => setForm(null)} done={done} />}
