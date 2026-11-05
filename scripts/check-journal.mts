@@ -14,7 +14,8 @@ const { db } = await import("../src/db/index.ts");
 const { attachments, journalEntries, journalTopics, revisions } = await import("../src/db/schema.ts");
 const { AppError } = await import("../src/server/errors.ts");
 const { readImage, saveImage } = await import("../src/server/files.ts");
-const { createEntry, entryWithPhotos, monthEntries, topicList, updateEntry } = await import("../src/server/journal.ts");
+const { addTopic, colorTopic, createEntry, entryWithPhotos, monthEntries, removeTopic, renameTopic, reorderTopics, topicList, updateEntry } = await import("../src/server/journal.ts");
+const { photoIdsIn, photoLine, photoOf, textOnly } = await import("../src/lib/journal-body.ts");
 type Ctx = import("../src/server/repo.ts").Ctx;
 
 const A: Ctx = { userId: "check-jrn-a", actor: "user" };
@@ -53,6 +54,31 @@ try {
   assert.equal((await monthEntries(A, "2026-11")).length, 1);
   assert.equal((await monthEntries(B, "2026-11")).length, 0);
   assert.equal(await code(createEntry(B, { date: "2026-11-01", bodyMd: "x", topicId: topics[0].id })), "VALIDATION_FAILED", "남의 주제 불가");
+  // 분류: 추가·이름·색·순서·지우기(지운 분류의 일기는 그대로), 같은 이름·잘못된 색 거절
+  const tp = await addTopic(A, "  독서 ");
+  assert.equal(tp.name, "독서");
+  assert.equal(await code(addTopic(A, "독서")), "DUPLICATE");
+  assert.equal((await renameTopic(A, tp.id, "책")).name, "책");
+  assert.equal((await colorTopic(A, tp.id, "#3b82f6")).colorHex, "#3B82F6");
+  assert.equal(await code(colorTopic(A, tp.id, "파랑")), "VALIDATION_FAILED");
+  assert.equal(await code(renameTopic(B, tp.id, "x")), "NOT_FOUND", "남의 분류는 못 고침");
+  const before = await topicList(A);
+  await reorderTopics(A, [tp.id, ...before.filter((t) => t.id !== tp.id).map((t) => t.id)]);
+  assert.equal((await topicList(A))[0].id, tp.id, "순서 바꾸기");
+  const withTopic = await createEntry(A, { date: "2026-11-05", topicId: tp.id, bodyMd: "분류 있는 일기" });
+  await removeTopic(A, tp.id);
+  assert.equal((await topicList(A)).some((t) => t.id === tp.id), false);
+  assert.equal((await entryWithPhotos(A, withTopic.id)).bodyMd, "분류 있는 일기", "분류를 지워도 일기는 그대로");
+
+  // 본문 사진 자리(블로그처럼): 사진 줄은 미리보기에서 빠지고, 순서는 본문 순서
+  const P1 = "0190a1b2-0000-7000-8000-000000000001";
+  const P2 = "0190a1b2-0000-7000-8000-000000000002";
+  const md = ["첫 줄", photoLine(P2), "", "가운데", photoLine(P1), "끝"].join("\n");
+  assert.equal(photoOf(photoLine(P1)), P1);
+  assert.equal(photoOf("![](photo:../etc)"), null, "id가 아니면 사진 줄 아님");
+  assert.deepEqual(photoIdsIn(md), [P2, P1]);
+  assert.equal(textOnly(md), "첫 줄\n\n가운데\n끝");
+
   console.log("일기·사진 규칙 확인 통과", `(사진 파일 ${readdirSync(join(dir, A.userId), { recursive: true }).length}개)`);
 } catch (e) {
   // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄

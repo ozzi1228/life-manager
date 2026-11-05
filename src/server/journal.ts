@@ -6,6 +6,7 @@ import { journalEntries, journalTopics } from "../db/schema.ts";
 import { GOAL_PALETTE } from "../lib/palette.ts";
 import { AppError } from "./errors.ts";
 import { imagesOf, linkImages } from "./files.ts";
+import { dup } from "./finance.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
 import { parse } from "./validate.ts";
 
@@ -25,6 +26,33 @@ export async function topicList(ctx: Ctx) {
     for (const [i, name] of DEFAULT_TOPICS.entries()) await topicRepo.create(ctx, { name, colorHex: GOAL_PALETTE[(i * 2) % GOAL_PALETTE.length].hex, sort: i }, { source: "default", tx });
   });
   return topicRepo.list(ctx, { orderBy: [asc(journalTopics.sort)] });
+}
+
+// ── 분류(주제) 편집: 이름·색·순서·지우기. 지운 분류의 일기는 분류 없음으로 보임 ──
+const topicName = z.string().trim().min(1, "이름을 입력해 주세요").max(20, "이름은 20자까지 쓸 수 있어요");
+const hex = z.string().regex(/^#[0-9A-Fa-f]{6}$/, "색을 다시 골라 주세요");
+
+export async function addTopic(ctx: Ctx, name: unknown) {
+  const list = await topicRepo.list(ctx, {});
+  return topicRepo.create(ctx, { name: parse(topicName, name), colorHex: GOAL_PALETTE[list.length % GOAL_PALETTE.length].hex, sort: list.length }).catch((e) => dup(e, "분류"));
+}
+export async function renameTopic(ctx: Ctx, id: string, name: unknown) {
+  const cur = await topicRepo.get(ctx, id);
+  return topicRepo.update(ctx, id, cur.version, { name: parse(topicName, name) }).catch((e) => dup(e, "분류"));
+}
+export async function colorTopic(ctx: Ctx, id: string, colorHex: unknown) {
+  const cur = await topicRepo.get(ctx, id);
+  return topicRepo.update(ctx, id, cur.version, { colorHex: parse(hex, colorHex).toUpperCase() });
+}
+export async function removeTopic(ctx: Ctx, id: string) {
+  await topicRepo.get(ctx, id);
+  await topicRepo.remove(ctx, id);
+}
+export async function reorderTopics(ctx: Ctx, ids: string[]) {
+  if (ids.length > 100) throw new AppError("VALIDATION_FAILED", "순서를 저장할 수 없어요");
+  await db.transaction(async (tx) => {
+    for (const [i, id] of ids.entries()) await tx.update(journalTopics).set({ sort: i, updatedAt: new Date() }).where(and(eq(journalTopics.id, id), eq(journalTopics.userId, ctx.userId)));
+  });
 }
 
 export const entryInput = z.object({

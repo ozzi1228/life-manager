@@ -2,19 +2,20 @@
 
 // 일기 쓰기·고치기 (SCR-JRN-03, 08 §2): 날짜·주제·제목·본문·사진 10장. 전체 화면
 // 쓰는 중 5초마다 이 기기에 임시 저장(08 §2.5) → 다시 열면 이어 쓰기
-// ponytail: 본문은 마크다운 글자 그대로(Textarea). 서식 도구가 필요해지면 에디터 라이브러리(Q-070)
+// 본문은 글 사이에 사진이 놓이는 편집 칸(JournalBody). 저장은 글자 + 사진 줄(src/lib/journal-body.ts)
 import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { addEntry, editEntry, removeEntry } from "@/app/actions/journal";
-import { PhotoPicker, type Photo } from "@/components/app/photo-picker";
+import { addEntry, addTopicAction, colorTopicAction, editEntry, removeEntry, removeTopicAction, renameTopicAction, reorderTopicsAction } from "@/app/actions/journal";
+import { CategoryEditor } from "@/components/app/category-editor";
+import type { Photo } from "@/components/app/photo-picker";
+import { JournalBody } from "@/components/journal/journal-body";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Spinner } from "@/components/ui/spinner";
-import { Textarea } from "@/components/ui/textarea";
 import { fromYmd, ymd } from "@/lib/format";
 
 export type Entry = { id: string; version: number; date: string; topicId: string | null; title: string | null; bodyMd: string; photos: Photo[] };
@@ -42,6 +43,7 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
   const [error, setError] = useState("");
   const [dateOpen, setDateOpen] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
+  const [bodyKey, setBodyKey] = useState(0); // 이어 쓰기로 본문을 바꾸면 편집 칸을 새로 그림
   const key = useRef(crypto.randomUUID());
 
   // 다시 열었을 때 이 기기에 남은 임시 저장이 있으면 이어 쓰기 제안
@@ -100,11 +102,13 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
     if (!entry) return;
     await removeEntry(entry.id);
     localStorage.removeItem(draftKey(entry.id));
-    // 이동만(목록은 이동하며 새로 불러옴). 바로 refresh하면 지운 일기 주소를 다시 불러와 404가 뜸
-    router.replace(`/records?month=${entry.date.slice(0, 7)}`);
+    // 목록을 새로 받아 오도록 페이지째 이동(router.replace는 예전 목록을 보여 줌, refresh는 지운 일기 주소를 다시 불러와 404)
+    location.replace(`/records?month=${entry.date.slice(0, 7)}`);
   }
 
   const empty = !title.trim() && !body.trim() && !photos.length;
+  /** 분류 편집 뒤 목록 새로 불러오기 */
+  const done = <R extends { ok: boolean }>(r: R) => (r.ok && router.refresh(), r);
   const listHref = `/records?month=${(entry?.date ?? today).slice(0, 7)}`;
 
   return (
@@ -124,6 +128,7 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
               setTitle(draft.title);
               setBody(draft.body);
               setPhotos(draft.photos);
+              setBodyKey((k) => k + 1);
               setDraft(null);
             }}
           >
@@ -144,7 +149,7 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
             <Calendar mode="single" selected={fromYmd(date)} onSelect={(d) => (d && setDate(ymd(d)), setDateOpen(false))} />
           </PopoverContent>
         </Popover>
-        <div className="flex flex-wrap gap-1.5" role="radiogroup" aria-label="주제">
+        <div className="flex flex-wrap items-center gap-1.5" role="radiogroup" aria-label="분류">
           {topics.map((t) => (
             <Button
               key={t.id}
@@ -160,20 +165,29 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
               {t.name}
             </Button>
           ))}
+          {/* 분류 편집: 이름·색·순서·지우기(바로 저장, 목록은 새로 불러옴) */}
+          <CategoryEditor
+            title="일기 분류 편집"
+            description="이름과 색을 마음대로 정해요. 이 순서대로 보여요"
+            items={topics.map((t) => ({ key: t.id, name: t.name, color: t.colorHex }))}
+            onAdd={async (name) => done(await addTopicAction(name))}
+            onRename={async (it, name) => done(await renameTopicAction(it.key, name))}
+            onColor={async (it, hex) => done(hex ? await colorTopicAction(it.key, hex) : { ok: true as const })}
+            onRemove={async (it) => {
+              const r = await removeTopicAction(it.key);
+              if (r.ok && topicId === it.key) setTopicId(null);
+              return done(r);
+            }}
+            onReorder={async (ids) => done(await reorderTopicsAction(ids))}
+            removeNote="이 분류의 일기는 분류 없음으로 남아요"
+            countLabel="편"
+            className="h-9 max-md:h-10"
+          />
         </div>
       </div>
 
       <Input aria-label="제목" placeholder="제목 (선택)" maxLength={100} className="focus-visible:border-primary h-12 rounded-none border-0 border-b px-0 text-title font-semibold shadow-none placeholder:font-normal focus-visible:ring-0" value={title} onChange={(e) => setTitle(e.target.value)} />
-      <Textarea
-        aria-label="본문"
-        placeholder="오늘 있었던 일을 적어 보세요"
-        maxLength={50_000}
-        className="min-h-[28vh] resize-none md:min-h-[40vh] border-0 px-0 text-base leading-7 shadow-none focus-visible:ring-0 md:text-body"
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-      />
-
-      <PhotoPicker value={photos} onChange={setPhotos} onBusy={setUploading} purpose="journal_photo" />
+      <JournalBody key={bodyKey} initial={body} photos={photos} placeholder="오늘 있었던 일을 적어 보세요" onBusy={setUploading} onChange={(v) => (setBody(v.body), setPhotos(v.photos))} />
 
       {error && <p className="text-destructive-text text-sm">{error}</p>}
 

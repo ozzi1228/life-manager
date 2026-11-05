@@ -59,23 +59,12 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
   const path = usePathname();
   const router = useRouter();
   const active = activeNav(path);
-  const [quickOpen, setQuickOpen] = useState(false); // PC는 추가 메뉴, 모바일은 아래 창
+  const [quickOpen, setQuickOpen] = useState(false); // 모바일 빠른 추가 아래 창
   const mobile = useIsMobile();
   const { prefs, loaded: petLoaded } = usePetPrefs();
   // 주 메뉴 순서: 끌어서 바꿈(위아래)
   const side = useNavOrder("main", MAIN_NAV, "y");
 
-  // PC 단축키: N = 빠른 추가(입력 중이 아닐 때, 02 §5.3)
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (e.key.toLowerCase() !== "n" || e.metaKey || e.ctrlKey || e.altKey || t.closest("input, textarea, select, [contenteditable=true]")) return;
-      e.preventDefault();
-      setQuickOpen(true);
-    };
-    addEventListener("keydown", onKey);
-    return () => removeEventListener("keydown", onKey);
-  }, []);
 
   const signOut = async () => {
     await authClient.signOut();
@@ -171,29 +160,8 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
           {/* 상단바 */}
           <header data-pet-avoid className="bg-background/95 sticky top-0 z-10 flex h-14 items-center gap-2 border-b px-4 backdrop-blur md:px-6">
             <MenuButton />
+            {/* PC 상단의 빠른 추가는 없앰(화면마다 추가 버튼이 있음). 모바일은 오른쪽 아래 + */}
             <h1 className="text-title flex-1 truncate font-semibold">{titleFor(path)}</h1>
-            <DropdownMenu open={quickOpen && !mobile} onOpenChange={setQuickOpen}>
-              <DropdownMenuTrigger asChild>
-                <Button size="sm" className="max-md:hidden">
-                  <Plus /> 추가
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {QUICK_ADD.map((q) =>
-                  q.dialog ? (
-                    <DropdownMenuItem key={q.label} onSelect={() => openExpense()}>
-                      <q.icon /> {q.label}
-                    </DropdownMenuItem>
-                  ) : (
-                    <DropdownMenuItem key={q.label} asChild>
-                      <Link href={q.href}>
-                        <q.icon /> {q.label}
-                      </Link>
-                    </DropdownMenuItem>
-                  ),
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
             {profile}
           </header>
 
