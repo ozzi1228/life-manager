@@ -6,6 +6,7 @@ import { action } from "@/server/api";
 import { cancelEnd, createRecurring, endNow, reactivate, recurringRepo, scheduleEnd, updateRecurring } from "@/server/recurring";
 
 export type RecurringIn = {
+  type: "expense" | "income";
   name: string;
   amount: number; // 원
   currency: Currency;

@@ -6,7 +6,7 @@ import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { AmountInput } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { AddExpenseButton, MonthNav } from "@/components/money/controls";
+import { MonthNav } from "@/components/money/controls";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -81,9 +81,6 @@ export function TxSearch({ f, options, today }: { f: TxFilter; options: FilterOp
         {/* 모바일: 달 이동 옆에 같은 줄로 */}
         <span className="max-md:ml-auto md:order-2">
           <TypeFilter value={f.type} />
-        </span>
-        <span className="ml-auto max-md:hidden md:order-4">
-          <AddExpenseButton />
         </span>
       </div>
       {chips.length > 0 && (

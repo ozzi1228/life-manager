@@ -77,7 +77,7 @@ export function BudgetView({ view, categories, lastActual, today }: { view: View
               <p className="text-muted-foreground text-sm">{s.left >= 0 ? "남은 예산" : "예산 초과"}</p>
               <InfoTip label="예산 계산 방식">예산 = 분류별 예산 + 이번 달 큰 지출 + 고정 지출. 남은 예산 = 예산 − 쓴 돈(오늘까지, 환불 뺀 금액)</InfoTip>
             </div>
-            <p className={cn("text-display font-bold tabular-nums", s.left < 0 && "text-destructive-text")}>{money(Math.abs(s.left))}</p>
+            <p className={cn("text-display font-bold tabular-nums", s.left < 0 && "text-over-text")}>{money(Math.abs(s.left))}</p>
             <p className="text-muted-foreground text-sm tabular-nums">
               {money(s.total)} 중 {money(s.spent)} 썼어요
               {s.scheduled > 0 && ` · 예정 ${money(s.scheduled)}`}
@@ -130,7 +130,7 @@ export function BudgetView({ view, categories, lastActual, today }: { view: View
                       </span>
                       {/* 다 안 쓴 동안은 아래 체크가 상태를 말해 줘서, 글자는 다 썼거나 넘었을 때만 */}
                       {p.used >= p.amount && (
-                        <span className={cn("tabular-nums", p.state === "over" ? "text-destructive-text" : "text-muted-foreground")}>
+                        <span className={cn("tabular-nums", p.state === "over" ? "text-over-text" : "text-muted-foreground")}>
                           {p.state === "over" ? `${money(p.used - p.amount)} 초과` : "다 썼어요"}
                         </span>
                       )}
@@ -174,7 +174,7 @@ export function BudgetView({ view, categories, lastActual, today }: { view: View
                               {money(c.used)} / {money(c.budget)}
                               {view.budget?.foreignLines[c.categoryId] && ` (${money(view.budget.foreignLines[c.categoryId].amount, { currency: view.budget.foreignLines[c.categoryId].currency })})`}
                             </span>
-                            <span className={cn("ml-auto tabular-nums", c.status === "over" ? "text-destructive-text" : c.status === "warn" ? "text-warning-text" : "text-muted-foreground")}>
+                            <span className={cn("ml-auto tabular-nums", c.status === "over" ? "text-over-text" : c.status === "warn" ? "text-warning-text" : "text-muted-foreground")}>
                               {c.left >= 0 ? `${money(c.left)} 남음` : `${money(-c.left)} 초과`}
                             </span>
                           </span>

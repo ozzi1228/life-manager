@@ -239,6 +239,13 @@
       "when": 1793859390753,
       "tag": "0033_wish_simple",
       "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1793861762490,
+      "tag": "0034_recurring_income",
+      "breakpoints": true
     }
   ]
 }

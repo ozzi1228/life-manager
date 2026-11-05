@@ -186,7 +186,7 @@ export async function accountList(ctx: Ctx) {
         .where(and(eq(transactions.userId, ctx.userId), isNull(transactions.deletedAt), eq(transactions.type, "expense"), gte(transactions.date, `${month}-01`), lt(transactions.date, next), inArray(transactions.paymentMethodId, linked.map((c) => c.pm.id))))
         .groupBy(transactions.paymentMethodId)
     : [];
-  const live = recurring.filter((r) => r.status !== "ended");
+  const live = recurring.filter((r) => r.status !== "ended" && r.type === "expense"); // 자동 결제 = 나가는 고정 지출만
   return list.map(({ pm, row: a }) => {
     const myCards = linked.filter((c) => c.row!.linkedAccountId === pm.id).map((c) => ({ id: c.pm.id, name: c.pm.name, monthSpent: spent.find((s) => s.id === c.pm.id)?.sum ?? 0 }));
     const via = new Map(myCards.map((c) => [c.id, c.name]));

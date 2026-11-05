@@ -11,7 +11,7 @@ import { Page } from "@/components/app/page-shell";
 import { HomeMenu } from "@/components/home/home-menu";
 import { TodayGoals } from "@/components/home/today-goals";
 import { Button } from "@/components/ui/button";
-import { dayLabel, fromYmd, money, soonLabel } from "@/lib/format";
+import { dayLabel, fromYmd, money, signClass, signedMoney, soonLabel } from "@/lib/format";
 import { budgetView } from "@/server/budget";
 import { rangeView } from "@/server/calendar";
 import { monthTransactions, totals } from "@/server/finance";
@@ -111,7 +111,7 @@ export default async function Home() {
       href: "/money",
       body: hasBudget ? (
         <>
-          <p className={s.left < 0 ? "text-destructive-text text-title font-semibold tabular-nums" : "text-title font-semibold tabular-nums"}>
+          <p className={s.left < 0 ? "text-over-text text-title font-semibold tabular-nums" : "text-title font-semibold tabular-nums"}>
             {s.left < 0 ? `${money(-s.left)} 초과` : `남은 예산 ${money(s.left)}`}
           </p>
           <p className="text-muted-foreground text-sm tabular-nums">
@@ -133,7 +133,7 @@ export default async function Home() {
     },
     soon.length
       ? {
-          title: "다가오는 결제",
+          title: "다가오는 결제·입금",
           href: "/money/fixed",
           body: (
             <ul className="space-y-1.5">
@@ -142,9 +142,9 @@ export default async function Home() {
                   <span className="text-muted-foreground w-16 shrink-0">{soonLabel(u.date, today)}</span>
                   <span className="min-w-0 flex-1 truncate">{u.name}</span>
                   {u.memo && <StickyNote className="text-muted-foreground size-3.5 shrink-0" aria-label={`메모: ${u.memo.split("\n")[0]}`} />}
-                  <span className="shrink-0 tabular-nums">
+                  <span className={`shrink-0 tabular-nums ${signClass(u.type === "income" ? 1 : -1)}`}>
                     {u.variableAmount && "약 "}
-                    {money(u.amount)}
+                    {signedMoney(u.type === "income" ? u.amount : -u.amount)}
                   </span>
                 </li>
               ))}

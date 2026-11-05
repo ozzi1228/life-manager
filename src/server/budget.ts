@@ -47,9 +47,9 @@ export type BudgetInput = z.input<typeof budgetInput>;
 const findBudget = async (ctx: Ctx, month: string) => (await budgetRepo.list(ctx, { where: eq(budgets.month, month), limit: 1 }))[0] ?? null;
 const plannedOf = (ctx: Ctx, month: string) => plannedRepo.list(ctx, { where: eq(plannedExpenses.month, month), orderBy: [asc(plannedExpenses.createdAt)] });
 
-/** 그 달 고정 지출: 결제일마다 금액 */
+/** 그 달 고정 지출: 결제일마다 금액(고정 수입은 빼고) */
 async function fixedOf(ctx: Ctx, month: string) {
-  const rows = await recurringRepo.list(ctx, { limit: 500 });
+  const rows = (await recurringRepo.list(ctx, { limit: 500 })).filter((r) => r.type === "expense");
   const from = `${month}-01`;
   const to = monthEnd(month);
   return rows.flatMap((r) => paysBetween(r, from, to).map((date) => ({ id: r.id, name: r.name, amount: r.amount, date }))).sort((a, b) => a.date.localeCompare(b.date));

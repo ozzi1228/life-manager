@@ -31,6 +31,10 @@ export const toKrw = (n: number, c: Currency, rate: number) => Math.round(toMajo
 /** 저장된 두 금액에서 1단위당 원(소수 둘째 자리까지) */
 export const rateOf = (krw: number, n: number, c: Currency) => Math.round((krw / toMajor(n, c)) * 100) / 100;
 
+/** 들어온 돈은 빨강 +, 나간 돈은 파랑 −(색만으로 전하지 않게 부호도). 서버·화면 공용 */
+export const signedMoney = (n: number) => (n > 0 ? `+${money(n)}` : n < 0 ? `-${money(-n)}` : money(0));
+export const signClass = (n: number) => (n > 0 ? "text-red-600 dark:text-red-400" : n < 0 ? "text-blue-600 dark:text-blue-400" : "text-muted-foreground");
+
 /** 위젯용 요약: 9,800원 · 1.2만원 · 230만원 · 1.5억원 */
 export function moneyShort(n: number) {
   const a = Math.abs(n);

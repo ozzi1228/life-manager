@@ -71,6 +71,7 @@ export type Part = { key: string; amount: number; count: number };
 
 /**
  * 결과 통계. 지출은 환불을 빼고 셈. 결과가 모두 수입이면 수입 기준(kind)으로 나눔·흐름을 냄
+ * 지출 기준일 때도 수입이 섞여 있으면 흐름에 수입(income)을, 수입 분류별(incomeByCategory)을 따로 냄
  * 흐름: 기간이 62일 이하면 날짜별, 넘으면 달별. 빈 날·달도 0으로 채움
  */
 export function txStats<T extends STx>(rows: T[], from?: string, to?: string) {
@@ -93,9 +94,9 @@ export function txStats<T extends STx>(rows: T[], from?: string, to?: string) {
   const total = kind === "income" ? income : expense;
   const value = (r: T) => (r.isRefund ? -r.amount : r.amount);
 
-  const group = (keys: (r: T) => string[]) => {
+  const group = (keys: (r: T) => string[], list = focus) => {
     const m = new Map<string, Part>();
-    for (const r of focus)
+    for (const r of list)
       for (const key of keys(r)) {
         const p = m.get(key) ?? { key, amount: 0, count: 0 };
         p.amount += value(r);
@@ -109,18 +110,23 @@ export function txStats<T extends STx>(rows: T[], from?: string, to?: string) {
   const dates = focus.map((r) => r.date).sort();
   const start = from ?? dates[0];
   const end = to ?? dates.at(-1);
-  const trend: { unit: "day" | "month"; points: Part[] } = { unit: "day", points: [] };
+  const trend: { unit: "day" | "month"; points: (Part & { income: number })[] } = { unit: "day", points: [] };
+  const incomes = kind === "expense" ? rows.filter((r) => r.type === "income") : [];
   if (start && end) {
     const days = (Date.parse(end) - Date.parse(start)) / 86_400_000;
     trend.unit = days > 62 ? "month" : "day";
     const keyOf = (d: string) => (trend.unit === "month" ? d.slice(0, 7) : d);
-    const sums = new Map<string, Part>();
-    for (let k = keyOf(start); k <= keyOf(end); k = trend.unit === "month" ? addMonths(k, 1) : addDays(k, 1)) sums.set(k, { key: k, amount: 0, count: 0 });
+    const sums = new Map<string, Part & { income: number }>();
+    for (let k = keyOf(start); k <= keyOf(end); k = trend.unit === "month" ? addMonths(k, 1) : addDays(k, 1)) sums.set(k, { key: k, amount: 0, count: 0, income: 0 });
     for (const r of focus) {
       const p = sums.get(keyOf(r.date));
       if (!p) continue;
       p.amount += value(r);
       if (!r.isRefund) p.count++;
+    }
+    for (const r of incomes) {
+      const p = sums.get(keyOf(r.date));
+      if (p) p.income += r.amount;
     }
     trend.points = [...sums.values()];
   }
@@ -136,6 +142,7 @@ export function txStats<T extends STx>(rows: T[], from?: string, to?: string) {
     avg: plain.length ? Math.round(total / plain.length) : 0,
     top: [...plain].sort((a, b) => b.amount - a.amount).slice(0, 3),
     byCategory: group((r) => [r.categoryId]),
+    incomeByCategory: group((r) => [r.categoryId], incomes),
     byPayment: group((r) => [r.paymentMethodId ?? ""]),
     byTag: group((r) => (r.tags.length ? r.tags : [""])),
     trend,

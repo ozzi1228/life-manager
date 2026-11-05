@@ -9,7 +9,7 @@ import { AddExpenseButton } from "@/components/money/controls";
 import { MoneyTabs } from "@/components/money/money-tabs";
 import { TxList } from "@/components/money/tx-list";
 import { Button } from "@/components/ui/button";
-import { money, soonLabel } from "@/lib/format";
+import { money, signClass, signedMoney, soonLabel } from "@/lib/format";
 import { budgetView } from "@/server/budget";
 import { monthTransactions, nameMaps, todayIn, totals, toRow } from "@/server/finance";
 import { upcoming } from "@/server/recurring";
@@ -45,7 +45,7 @@ export default async function MoneyHome() {
                 <p className="text-muted-foreground text-sm">{m}월 {s.left >= 0 ? "남은 예산" : "예산 초과"}</p>
                 <InfoTip label="예산 계산 방식">예산 = 분류별 예산 + 이번 달 큰 지출 + 고정 지출. 남은 예산 = 예산 − 쓴 돈(오늘까지, 환불 뺀 금액)</InfoTip>
               </div>
-              <p className={s.left < 0 ? "text-display text-destructive-text flex items-center gap-2 font-bold tabular-nums" : "text-display font-bold tabular-nums"}>
+              <p className={s.left < 0 ? "text-display text-over-text flex items-center gap-2 font-bold tabular-nums" : "text-display font-bold tabular-nums"}>
                 {s.left < 0 && <CircleAlert className="size-7" aria-hidden />}
                 {money(Math.abs(s.left))}
               </p>
@@ -72,9 +72,9 @@ export default async function MoneyHome() {
 
         <section className={card}>
           <div className="flex items-center justify-between">
-            <h2 className="text-subtitle font-semibold">7일 안 결제 예정</h2>
+            <h2 className="text-subtitle font-semibold">7일 안 예정</h2>
             <Button asChild variant="link" size="sm">
-              <Link href="/money/fixed">고정 지출</Link>
+              <Link href="/money/fixed">고정 수입·지출</Link>
             </Button>
           </div>
           {soon.length ? (
@@ -86,15 +86,15 @@ export default async function MoneyHome() {
                     {u.name}
                     {u.memo && <span className="text-muted-foreground"> · {u.memo.split("\n")[0]}</span>}
                   </span>
-                  <span className="shrink-0 tabular-nums">
+                  <span className={`shrink-0 tabular-nums ${signClass(u.type === "income" ? 1 : -1)}`}>
                     {u.variableAmount && "약 "}
-                    {money(u.amount)}
+                    {signedMoney(u.type === "income" ? u.amount : -u.amount)}
                   </span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-muted-foreground text-sm">7일 안에 나갈 고정 지출이 없어요</p>
+            <p className="text-muted-foreground text-sm">7일 안에 오갈 고정 수입·지출이 없어요</p>
           )}
         </section>
 
@@ -113,7 +113,7 @@ export default async function MoneyHome() {
                     <li key={id} className="space-y-1">
                       <div className="flex justify-between gap-2 text-sm">
                         <span>{names.categories[id]}</span>
-                        <span className={line !== undefined && v > line ? "text-destructive-text tabular-nums" : "tabular-nums"}>
+                        <span className={line !== undefined && v > line ? "text-over-text tabular-nums" : "tabular-nums"}>
                           {money(v)}
                           {line !== undefined && <span className="text-muted-foreground"> / {money(line)}</span>}
                         </span>

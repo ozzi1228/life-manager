@@ -3,7 +3,7 @@
 // 지출 목록 (SCR-FIN-02, 04 §6.2): 날짜별 묶음 · 행 = 제목 #태그 / 분류·결제수단 · 금액. 행을 누르면 수정
 import { Badge } from "@/components/ui/badge";
 import { useExpenseDialog, type TxEdit } from "@/components/money/expense-dialog";
-import { dayLabel, fromYmd, money } from "@/lib/format";
+import { dayLabel, fromYmd, money, signClass, signedMoney } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export type TxRow = TxEdit;
@@ -17,11 +17,7 @@ export const payLabel = (r: Pick<TxRow, "paymentMethodId" | "payId">, payments: 
 };
 
 const signed = (r: TxRow) => (r.type === "income" || r.isRefund ? r.amount : -r.amount);
-/** 들어온 돈은 빨강 +, 나간 돈은 파랑 −(색만으로 전하지 않게 부호도) */
-export const IN = "text-red-600 dark:text-red-400";
-export const OUT = "text-blue-600 dark:text-blue-400";
-export const signedMoney = (n: number) => (n > 0 ? `+${money(n)}` : n < 0 ? `-${money(-n)}` : money(0));
-export const signClass = (n: number) => (n > 0 ? IN : n < 0 ? OUT : "text-muted-foreground");
+
 
 export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; categories: Names; payments: Names; today: string }) {
   const openExpense = useExpenseDialog();

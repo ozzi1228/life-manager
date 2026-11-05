@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 /** 금액 글자. over면 초과 표시(빨간 글자 + 아이콘, 색만으로 전달하지 않음) */
 export function MoneyText({ amount, sign, over, currency, className }: { amount: number; sign?: boolean; over?: boolean; currency?: Currency; className?: string }) {
   return (
-    <span className={cn("tabular-nums", over && "text-destructive-text inline-flex items-center gap-1", className)}>
+    <span className={cn("tabular-nums", over && "text-over-text inline-flex items-center gap-1", className)}>
       {over && <CircleAlert className="size-4" aria-hidden />}
       {money(amount, { sign, currency })}
     </span>
@@ -177,14 +177,14 @@ export function BudgetBar({ used, planned = 0, budget, label, compact }: { used:
         aria-valuenow={used}
         aria-valuetext={valueText}
       >
-        <div className={cn("h-full rounded-full", over ? "bg-destructive" : warn ? "bg-warning" : "bg-primary")} style={{ width: `${usedW}%` }} />
+        <div className={cn("h-full rounded-full", over ? "bg-over" : warn ? "bg-warning" : "bg-primary")} style={{ width: `${usedW}%` }} />
         {plannedW > 0 && <div className="bg-primary/30 absolute inset-y-0" style={{ left: `${usedW}%`, width: `${plannedW}%` }} title="계획된 지출" />}
       </div>
       {!compact && (
         <div className="text-caption flex justify-between">
           <span className="text-muted-foreground tabular-nums">{Math.round(pct)}% 사용</span>
           {over ? (
-            <span className="text-destructive-text inline-flex items-center gap-1 tabular-nums">
+            <span className="text-over-text inline-flex items-center gap-1 tabular-nums">
               <CircleAlert className="size-3.5" aria-hidden />
               {money(used - budget)} 초과
             </span>

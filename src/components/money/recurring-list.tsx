@@ -31,8 +31,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Spinner } from "@/components/ui/spinner";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { dateLabel, fromYmd, money, ymd } from "@/lib/format";
+import { dateLabel, fromYmd, money, signClass, signedMoney, ymd } from "@/lib/format";
+import { cn } from "@/lib/utils";
 
 export type RecurringItem = RecurringIn & {
   id: string;
@@ -45,20 +47,26 @@ export type RecurringItem = RecurringIn & {
   perMonth: number;
 };
 type Opt = { id: string; name: string };
+type Cat = Opt & { kind: "expense" | "income" };
 
 const md = (d: string) => `${Number(d.slice(5, 7))}월 ${Number(d.slice(8))}일`;
 /** 고르기 칸 높이를 입력칸(모바일 44px·PC 36px)과 맞춤 */
 const SEL_H = "data-[size=default]:h-11 md:data-[size=default]:h-9";
-const SUGGEST = ["넷플릭스", "유튜브 프리미엄", "쿠팡 와우", "네이버플러스", "티빙", "디즈니+", "멜론", "통신비", "인터넷", "보험", "월세", "관리비"];
+const SUGGEST = {
+  expense: ["넷플릭스", "유튜브 프리미엄", "쿠팡 와우", "네이버플러스", "티빙", "디즈니+", "멜론", "통신비", "인터넷", "보험", "월세", "관리비"],
+  income: ["월급", "용돈", "이자", "월세 수입", "부수입"],
+};
 
-export function RecurringList({ items, categories, payments, today }: { items: RecurringItem[]; categories: Opt[]; payments: Opt[]; today: string }) {
+export function RecurringList({ items, categories, payments, today }: { items: RecurringItem[]; categories: Cat[]; payments: Opt[]; today: string }) {
   const router = useRouter();
   const mobile = useIsMobile();
   const [detail, setDetail] = useState<RecurringItem | null>(null);
   const [form, setForm] = useState<{ item?: RecurringItem; preset?: string } | null>(null);
   const live = items.filter((i) => i.status !== "ended");
   const ended = items.filter((i) => i.status === "ended");
-  const monthSum = live.reduce((a, i) => a + i.perMonth, 0);
+  // 월 환산: 나가는 돈·들어오는 돈 따로
+  const monthOut = live.filter((i) => i.type !== "income").reduce((a, i) => a + i.perMonth, 0);
+  const monthIn = live.filter((i) => i.type === "income").reduce((a, i) => a + i.perMonth, 0);
   const pmName = (id: string | null) => payments.find((p) => p.id === id)?.name;
   const refresh = () => router.refresh();
 
@@ -77,9 +85,10 @@ export function RecurringList({ items, categories, payments, today }: { items: R
           </span>
           {i.memo && <span className="text-muted-foreground block truncate text-caption">{i.memo.split("\n")[0]}</span>}
         </span>
-        <span className={i.status === "ended" ? "text-muted-foreground shrink-0 tabular-nums" : "shrink-0 tabular-nums"}>
+        {/* 들어오는 돈 빨강 +, 나가는 돈 파랑 −(가계부 내역과 같게) */}
+        <span className={i.status === "ended" ? "text-muted-foreground shrink-0 tabular-nums" : cn("shrink-0 tabular-nums", signClass(i.type === "income" ? 1 : -1))}>
           {i.variableAmount && "약 "}
-          {money(i.amount)}
+          {signedMoney(i.type === "income" ? i.amount : -i.amount)}
           {/* 다른 통화 구독: 원래 금액을 아래에 작게 */}
           {i.foreignAmount && <span className="text-muted-foreground block text-right text-caption">{money(i.foreignAmount, { currency: i.currency })}</span>}
         </span>
@@ -89,24 +98,33 @@ export function RecurringList({ items, categories, payments, today }: { items: R
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
-        <p className="tabular-nums">
-          월 <span className="font-semibold">{money(monthSum)}</span>
-          <span className="text-muted-foreground"> · 연 환산 {money(monthSum * 12)}</span>
-        </p>
-        <InfoTip label="월 환산">매년·몇 개월마다·매주 나가는 돈도 한 달 기준으로 바꿔 더했어요. 해지된 것은 빼요.</InfoTip>
+      {/* 월 환산: 나가는 돈 / 들어오는 돈 한 줄씩 */}
+      <div className="flex items-center gap-2">
+        <div className="min-w-0 space-y-0.5 tabular-nums">
+          <p>
+            나가는 돈 월 <span className={cn("font-semibold", signClass(-1))}>{money(monthOut)}</span>
+            <span className="text-muted-foreground text-sm max-md:hidden"> · 연 {money(monthOut * 12)}</span>
+          </p>
+          {monthIn > 0 && (
+            <p>
+              들어오는 돈 월 <span className={cn("font-semibold", signClass(1))}>{money(monthIn)}</span>
+              <span className="text-muted-foreground text-sm max-md:hidden"> · 연 {money(monthIn * 12)}</span>
+            </p>
+          )}
+        </div>
+        <InfoTip label="월 환산">매년·몇 개월마다·매주 오가는 돈도 한 달 기준으로 바꿔 더했어요. 해지된 것은 빼요.</InfoTip>
         <Button className="ml-auto" variant={mobile ? "outline" : "default"} onClick={() => setForm({})}>
-          <Plus /> 고정 지출 추가
+          <Plus /> 추가
         </Button>
       </div>
 
       {items.length === 0 ? (
         <EmptyState
           pet="pomong"
-          title="매달 나가는 돈을 등록해 보세요"
+          title="매달 나가는 돈, 들어오는 돈을 등록해 보세요"
           action={
             <div className="flex flex-wrap justify-center gap-2">
-              {["넷플릭스", "통신비", "보험"].map((n) => (
+              {["넷플릭스", "통신비", "월급"].map((n) => (
                 <Button key={n} variant="outline" className="rounded-full" onClick={() => setForm({ preset: n })}>
                   {n}
                 </Button>
@@ -246,12 +264,16 @@ function Detail({ item, today, payment, category, close, edit, done }: { item: R
           </div>
         )}
         <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1">
-          <dt className="text-muted-foreground">결제수단</dt>
+          <dt className="text-muted-foreground">{item.type === "income" ? "받은 곳" : "결제수단"}</dt>
           <dd>{payment ?? "—"}</dd>
           <dt className="text-muted-foreground">분류</dt>
           <dd>{category ?? "—"}</dd>
-          <dt className="text-muted-foreground">결제일 알림</dt>
-          <dd>{item.notify ? "켬(하루 전)" : "끔"}</dd>
+          {item.type !== "income" && (
+            <>
+              <dt className="text-muted-foreground">결제일 알림</dt>
+              <dd>{item.notify ? "켬(하루 전)" : "끔"}</dd>
+            </>
+          )}
         </dl>
       </div>
 
@@ -259,10 +281,13 @@ function Detail({ item, today, payment, category, close, edit, done }: { item: R
   );
 }
 
-function RecurringForm({ item, preset, categories, payments, today, close, done }: { item?: RecurringItem; preset?: string; categories: Opt[]; payments: Opt[]; today: string; close: () => void; done: () => void }) {
-  const fixedCat = categories.find((c) => c.name === "구독·고정")?.id ?? null;
+function RecurringForm({ item, preset, categories, payments, today, close, done }: { item?: RecurringItem; preset?: string; categories: Cat[]; payments: Opt[]; today: string; close: () => void; done: () => void }) {
+  // 기본 분류: 지출은 '구독·고정', 수입은 '급여'(있으면). 월급을 눌러 열면 수입으로
+  const defaultCat = (t: "expense" | "income") => categories.find((c) => c.kind === t && c.name === (t === "income" ? "급여" : "구독·고정"))?.id ?? null;
+  const startType = preset && SUGGEST.income.includes(preset) ? "income" : "expense";
   const [v, setV] = useState<RecurringIn>(
     item ?? {
+      type: startType,
       name: preset ?? "",
       amount: 0,
       currency: "KRW",
@@ -275,9 +300,9 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
       anchorMonth: today.slice(0, 7),
       weekday: fromYmd(today).getDay(),
       paymentMethodId: null,
-      categoryId: fixedCat,
+      categoryId: defaultCat(startType),
       memo: null,
-      notify: true,
+      notify: startType === "expense",
     },
   );
   const [busy, setBusy] = useState(false);
@@ -329,19 +354,35 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
     <ResponsiveModal
       open
       onOpenChange={(o) => !o && close()}
-      title={item ? "고정 지출 수정" : "고정 지출 추가"}
+      title={item ? (v.type === "income" ? "고정 수입 수정" : "고정 지출 수정") : "고정 수입·지출 추가"}
       footer={
         <Button disabled={!v.name.trim() || !v.amount || busy} onClick={save}>
-          {busy && <Spinner />} {item ? "저장" : "고정 지출 추가"}
+          {busy && <Spinner />} {item ? "저장" : v.type === "income" ? "고정 수입 추가" : "고정 지출 추가"}
         </Button>
       }
     >
       <FieldGroup className="gap-5">
+        <ToggleGroup
+          type="single"
+          variant="outline"
+          className="w-full"
+          aria-label="종류"
+          value={v.type}
+          // 종류를 바꾸면 분류는 그 종류의 기본으로, 결제 알림은 지출만
+          onValueChange={(t) => t && t !== v.type && setV((s) => ({ ...s, type: t as "expense" | "income", categoryId: defaultCat(t as "expense" | "income"), notify: t === "expense" }))}
+        >
+          <ToggleGroupItem value="expense" className="flex-1">
+            지출
+          </ToggleGroupItem>
+          <ToggleGroupItem value="income" className="flex-1">
+            수입
+          </ToggleGroupItem>
+        </ToggleGroup>
         <Field>
           <FieldLabel htmlFor="rc-name">이름</FieldLabel>
           <Input id="rc-name" list="rc-suggest" autoFocus={!item} maxLength={40} className="h-11 text-base md:h-9 md:text-sm [&::-webkit-calendar-picker-indicator]:opacity-0" value={v.name} onChange={(e) => set("name", e.target.value)} />
           <datalist id="rc-suggest">
-            {SUGGEST.map((s) => (
+            {SUGGEST[v.type].map((s) => (
               <option key={s} value={s} />
             ))}
           </datalist>
@@ -359,7 +400,7 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
         </Field>
         <Field>
           <FieldLabel>
-            결제일 <InfoTip label="결제일">매월 31일처럼 없는 날은 그 달 마지막 날에 결제돼요.</InfoTip>
+            {v.type === "income" ? "들어오는 날" : "결제일"} <InfoTip label="날짜">매월 31일처럼 없는 날은 그 달 마지막 날로 쳐요.</InfoTip>
           </FieldLabel>
           <div className="flex flex-wrap items-center gap-2">
             <Select value={v.cycle} onValueChange={(c) => set("cycle", c as RecurringIn["cycle"])}>
@@ -417,9 +458,9 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
         </Field>
         <div className="grid grid-cols-2 gap-3">
           <Field>
-            <FieldLabel>결제수단</FieldLabel>
+            <FieldLabel>{v.type === "income" ? "받은 곳" : "결제수단"}</FieldLabel>
             <Select value={v.paymentMethodId ?? "none"} onValueChange={(p) => set("paymentMethodId", p === "none" ? null : p)}>
-              <SelectTrigger aria-label="결제수단" className={`w-full ${SEL_H}`}>
+              <SelectTrigger aria-label={v.type === "income" ? "받은 곳" : "결제수단"} className={`w-full ${SEL_H}`}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -440,7 +481,7 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="none">정하지 않음</SelectItem>
-                {categories.map((c) => (
+                {categories.filter((c) => c.kind === v.type).map((c) => (
                   <SelectItem key={c.id} value={c.id}>
                     {c.name}
                   </SelectItem>
@@ -453,10 +494,13 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
           <FieldLabel htmlFor="rc-memo">메모</FieldLabel>
           <Textarea id="rc-memo" maxLength={1000} placeholder="메모를 입력하세요" value={v.memo ?? ""} onChange={(e) => set("memo", e.target.value)} />
         </Field>
-        <label className="flex items-center justify-between gap-3 text-sm">
-          결제일 하루 전 알림
-          <Switch checked={v.notify} onCheckedChange={(n) => set("notify", n)} />
-        </label>
+        {/* 결제 알림은 나가는 돈만 */}
+        {v.type === "expense" && (
+          <label className="flex items-center justify-between gap-3 text-sm">
+            결제일 하루 전 알림
+            <Switch checked={v.notify} onCheckedChange={(n) => set("notify", n)} />
+          </label>
+        )}
         {error && <FieldError>{error}</FieldError>}
       </FieldGroup>
     </ResponsiveModal>

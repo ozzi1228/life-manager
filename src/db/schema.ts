@@ -284,11 +284,12 @@ export const journalEntries = pgTable(
   (t) => [index("journal_entries_user_date").on(t.userId, t.date.desc()).where(sql`${t.deletedAt} is null`)],
 );
 
-// 고정 지출 (06 §5, 14 §4.4). 해지해도 지우지 않고 상태로(이용 중 → 해지 예정(마지막 이용일) → 해지됨)
+// 고정 지출·수입 (06 §5, 14 §4.4). 해지해도 지우지 않고 상태로(이용 중 → 해지 예정(마지막 이용일) → 해지됨)
 export const recurringPayments = pgTable(
   "recurring_payments",
   {
     ...userData(),
+    type: text("type", { enum: ["expense", "income"] }).notNull().default("expense"), // 고정 수입(월급 등)은 예산·결제 알림에서 빠짐
     name: text("name").notNull(),
     amount: bigint("amount", { mode: "number" }).notNull(), // 언제나 원
     currency: text("currency").notNull().default("KRW"), // 다른 통화면 그 통화(src/lib/format.ts CURRENCIES)

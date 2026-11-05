@@ -14,13 +14,13 @@ export const MoneyTabs = () => (
   />
 );
 
-/** 가계부 탭 안: 내역(수입·지출) / 고정 지출 */
+/** 가계부 탭 안: 내역(수입·지출) / 고정(수입·지출) */
 export const ExpenseTabs = () => (
   <SubTabs
     label="가계부"
     tabs={[
       { href: "/money/expenses", label: "내역" },
-      { href: "/money/fixed", label: "고정 지출" },
+      { href: "/money/fixed", label: "고정 수입·지출" },
     ]}
   />
 );

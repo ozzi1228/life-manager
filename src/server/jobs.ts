@@ -92,7 +92,7 @@ async function paymentAlerts(today: string) {
   const subscribed = await pushUsers();
   let sent = 0;
   for (const ctx of (await users()).filter((u) => subscribed.has(u.userId))) {
-    const due = (await upcoming(ctx)).filter((u) => u.date === tomorrow);
+    const due = (await upcoming(ctx)).filter((u) => u.date === tomorrow && u.type === "expense"); // 결제 알림은 나가는 돈만
     if (!due.length) continue;
     const body = due.map((u) => `${u.name} ${u.variableAmount ? "약 " : ""}${won(u.amount)}`).join(", ");
     sent += (await once(`notify:payment:${ctx.userId}:${tomorrow}`, "notify.payment", () => sendPush(ctx.userId, "payment", { title: "내일 결제 예정", body, url: "/money/fixed" }))) ?? 0;

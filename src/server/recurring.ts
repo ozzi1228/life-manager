@@ -18,6 +18,7 @@ const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜를 다시 선택해 
 const dayOfMonth = z.number().int().min(0).max(31);
 export const recurringInput = z
   .object({
+    type: z.enum(["expense", "income"]).default("expense"),
     name: z.string().trim().min(1, "이름을 입력해 주세요").max(40, "이름은 40자까지 쓸 수 있어요"),
     amount: z.number({ error: "금액을 입력해 주세요" }).int().min(1, "1원 이상 입력해 주세요").max(10_000_000_000),
     ...foreignFields,
@@ -77,11 +78,11 @@ export function paysBetween(r: Row, from: string, to: string) {
   return start > end ? [] : datesBetween(ruleOf(r), start, end);
 }
 
-async function checkRefs(ctx: Ctx, v: { paymentMethodId: string | null; categoryId: string | null }) {
+async function checkRefs(ctx: Ctx, v: { type: string; paymentMethodId: string | null; categoryId: string | null }) {
   if (v.paymentMethodId && !(await paymentRepo.get(ctx, v.paymentMethodId).catch(() => null))) throw new AppError("VALIDATION_FAILED", "결제수단을 다시 골라 주세요");
   if (v.categoryId) {
     const c = await categoryRepo.get(ctx, v.categoryId).catch(() => null);
-    if (!c || c.kind !== "expense") throw new AppError("VALIDATION_FAILED", "분류를 다시 골라 주세요");
+    if (!c || c.kind !== v.type) throw new AppError("VALIDATION_FAILED", "분류를 다시 골라 주세요");
   }
 }
 
@@ -119,6 +120,7 @@ export async function recurringList(ctx: Ctx) {
       return {
         id: r.id,
         version: r.version,
+        type: r.type,
         name: r.name,
         amount: r.amount,
         currency: r.currency as Currency,
@@ -146,12 +148,12 @@ export async function recurringList(ctx: Ctx) {
     .sort((a, b) => (a.next ?? "9999").localeCompare(b.next ?? "9999") || a.name.localeCompare(b.name));
 }
 
-/** 오늘부터 n일 안 결제 예정(한눈에, 06 §5) */
+/** 오늘부터 n일 안 결제·입금 예정(한눈에, 06 §5). type으로 지출·수입 구분 */
 export async function upcoming(ctx: Ctx, days = 7) {
   const today = todayIn();
   const to = addDays(today, days - 1);
   const rows = await recurringRepo.list(ctx, { limit: 500 });
   return rows
-    .flatMap((r) => paysBetween(r, today, to).map((date) => ({ id: r.id, name: r.name, amount: r.amount, variableAmount: r.variableAmount, date, memo: r.memo, ending: r.status === "ending" ? r.lastUseDate : null })))
+    .flatMap((r) => paysBetween(r, today, to).map((date) => ({ id: r.id, type: r.type, name: r.name, amount: r.amount, variableAmount: r.variableAmount, date, memo: r.memo, ending: r.status === "ending" ? r.lastUseDate : null })))
     .sort((a, b) => a.date.localeCompare(b.date));
 }

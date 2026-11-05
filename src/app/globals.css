@@ -81,6 +81,8 @@
   --color-warning: var(--warning);
   --color-warning-foreground: var(--warning-foreground);
   --color-warning-text: var(--warning-text);
+  --color-over: var(--over);
+  --color-over-text: var(--over-text);
   --color-info: var(--primary);
   --color-overlay: var(--overlay);
   --color-health: var(--health);
@@ -163,6 +165,9 @@
   --warning: oklch(0.80 0.15 80);
   --warning-foreground: oklch(0.20 0.03 80);
   --warning-text: oklch(0.50 0.11 70);
+  /* 예산 초과: 빨강(= 들어온 돈)과 헷갈리지 않게 진한 주황 */
+  --over: oklch(0.66 0.18 48);
+  --over-text: oklch(0.52 0.16 45);
   --overlay: oklch(0.2 0.01 234 / 0.4);
   --health: oklch(0.70 0.11 350);
 }
@@ -226,6 +231,8 @@
   --warning: oklch(0.78 0.14 80);
   --warning-foreground: oklch(0.20 0.03 80);
   --warning-text: oklch(0.82 0.13 80);
+  --over: oklch(0.72 0.17 50);
+  --over-text: oklch(0.80 0.14 55);
   --overlay: oklch(0 0 0 / 0.6);
   --health: oklch(0.76 0.10 350);
 }

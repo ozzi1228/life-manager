@@ -4,11 +4,11 @@
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 import { useExpenseDialog } from "@/components/money/expense-dialog";
-import { signClass, signedMoney, TxList, type TxRow } from "@/components/money/tx-list";
+import { TxList, type TxRow } from "@/components/money/tx-list";
 import { useFilterNav } from "@/components/money/tx-search";
 import { Button } from "@/components/ui/button";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
-import { dayLabel, fromYmd, money } from "@/lib/format";
+import { dayLabel, fromYmd, money, signClass, signedMoney } from "@/lib/format";
 import type { Part, STx, TxStats } from "@/lib/tx-search";
 import { cn } from "@/lib/utils";
 
@@ -45,6 +45,13 @@ export function TxResults({ rows, stats, categories, payments, today, capped }: 
         <div className="max-md:hidden">{summary}</div>
         <Trend s={stats} today={today} />
         <Breakdown s={stats} categories={categories} payments={payments} />
+        {/* 모두 보기: 수입도 분류별로 */}
+        {stats.kind === "expense" && stats.incomeByCategory.length > 0 && (
+          <section className={card}>
+            <h3 className="font-semibold">수입 분류별</h3>
+            <Parts parts={stats.incomeByCategory} total={stats.income} name={(id) => categories[id] ?? "지운 분류"} share pick={(id) => nav({ cat: [id], type: "income" })} />
+          </section>
+        )}
         <Top s={stats} today={today} categories={categories} />
       </aside>
     </div>
@@ -99,26 +106,35 @@ function Trend({ s, today }: { s: Stats; today: string }) {
   const nav = useFilterNav();
   const pts = s.trend.points;
   if (pts.length < 2) return null;
-  const peak = Math.max(...pts.map((p) => p.amount), 1);
+  const both = s.kind === "expense" && s.income > 0; // 지출 기준인데 수입도 섞임 → 막대 두 개
+  const peak = Math.max(...pts.map((p) => Math.max(p.amount, both ? p.income : 0)), 1);
   const month = s.trend.unit === "month";
   const label = (k: string) => (month ? (k.slice(0, 4) === today.slice(0, 4) ? `${+k.slice(5)}월` : `${k.slice(2, 4)}년 ${+k.slice(5)}월`) : `${+k.slice(5, 7)}/${+k.slice(8)}`);
   const pick = (k: string) => nav(month ? { period: null, from: null, to: null, month: k } : { period: "range", from: k, to: k });
   return (
     <section className={card}>
       <h3 className="font-semibold">
-        흐름 <span className="text-muted-foreground text-sm font-normal">· {month ? "달별" : "날짜별"} {s.kind === "income" ? "수입" : "지출"}</span>
+        흐름 <span className="text-muted-foreground text-sm font-normal">· {month ? "달별" : "날짜별"} {both ? "" : s.kind === "income" ? "수입" : "지출"}</span>
+        {both && (
+          <span className="text-muted-foreground ml-2 inline-flex items-center gap-2 text-caption font-normal">
+            <span className="inline-flex items-center gap-1"><span className="size-2 rounded-full bg-blue-500" />지출</span>
+            <span className="inline-flex items-center gap-1"><span className="size-2 rounded-full bg-red-500" />수입</span>
+          </span>
+        )}
       </h3>
       <div className="flex h-28 items-end gap-0.5 border-b">
         {pts.map((p) => (
           <button
             key={p.key}
             type="button"
-            title={`${label(p.key)} ${money(p.amount)}`}
-            aria-label={`${month ? label(p.key) : dayLabel(p.key, fromYmd(today))} ${money(p.amount)}${p.count ? ` · ${p.count}건` : ""}`}
-            className="group flex h-full min-w-0 flex-1 items-end"
+            title={`${label(p.key)} ${both ? `지출 ${money(p.amount)} · 수입 ${money(p.income)}` : money(p.amount)}`}
+            aria-label={`${month ? label(p.key) : dayLabel(p.key, fromYmd(today))} ${both ? `지출 ${money(p.amount)}, 수입 ${money(p.income)}` : money(p.amount)}${p.count ? ` · ${p.count}건` : ""}`}
+            className="group flex h-full min-w-0 flex-1 items-end gap-px"
             onClick={() => pick(p.key)}
           >
-            <span className={cn("w-full rounded-t-[4px] group-hover:bg-primary", p.amount === peak ? "bg-primary" : "bg-primary/55")} style={{ height: `${(Math.max(0, p.amount) / peak) * 100}%` }} />
+            {/* 지출 파랑 · 수입 빨강(목록 금액 색과 같게) */}
+            <span className={cn("w-full rounded-t-[4px]", s.kind === "income" ? "bg-red-500/70 group-hover:bg-red-500" : "bg-blue-500/70 group-hover:bg-blue-500")} style={{ height: `${(Math.max(0, p.amount) / peak) * 100}%` }} />
+            {both && <span className="w-full rounded-t-[4px] bg-red-500/70 group-hover:bg-red-500" style={{ height: `${(p.income / peak) * 100}%` }} />}
           </button>
         ))}
       </div>

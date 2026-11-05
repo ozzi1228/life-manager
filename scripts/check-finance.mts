@@ -259,6 +259,27 @@ try {
   const tm = await createCard(A, { name: "티머니", cardType: "transit" });
   assert.equal((await cl(A)).find((c) => c.id === tm.id)?.card?.cardType, "transit", "교통카드 종류");
   console.log("카드 정보 확인 통과");
+
+  // 고정 수입: 수입 분류만, 예산(고정 지출 합계)·결제 알림 대상에서 빠짐, 예정에는 type으로 구분
+  const inc = (await formData(A)).categories.find((c) => c.kind === "income")!;
+  const paydayMonth = "2027-03";
+  assert.equal(await code(createRecurring(A, { type: "income", name: "월급", amount: 3000000, cycle: "monthly", dayOfMonth: 25, startedAt: "2027-01-01", categoryId: food.id })), "VALIDATION_FAILED", "고정 수입에 지출 분류는 못 씀");
+  const pay = await createRecurring(A, { type: "income", name: "월급", amount: 3000000, cycle: "monthly", dayOfMonth: 25, startedAt: "2027-01-01", categoryId: inc.id });
+  await createRecurring(A, { name: "보험", amount: 50000, cycle: "monthly", dayOfMonth: 10, startedAt: "2027-01-01" });
+  assert.equal((await recurringList(A)).find((r) => r.id === pay.id)?.type, "income");
+  const bv2 = await budgetView(A, paydayMonth);
+  assert.equal(bv2.fixed.some((f) => f.name === "월급"), false, "예산의 고정 지출 합계에 고정 수입은 안 들어감");
+  assert.ok(bv2.fixed.some((f) => f.name === "보험"));
+
+  // 통계: 모두 보기(지출 기준)에도 수입 흐름·수입 분류별
+  const mix = txStats([
+    { type: "expense", amount: 10000, isRefund: false, restraint: false, date: "2026-11-01", categoryId: food.id, paymentMethodId: null, tags: [] },
+    { type: "income", amount: 50000, isRefund: false, restraint: false, date: "2026-11-02", categoryId: inc.id, paymentMethodId: null, tags: [] },
+  ], "2026-11-01", "2026-11-03");
+  assert.deepEqual([mix.kind, mix.total, mix.income], ["expense", 10000, 50000]);
+  assert.deepEqual(mix.trend.points.map((p) => [p.amount, p.income]), [[10000, 0], [0, 50000], [0, 0]]);
+  assert.deepEqual(mix.incomeByCategory, [{ key: inc.id, amount: 50000, count: 1 }]);
+  console.log("고정 수입·통계 확인 통과");
 } catch (e) {
   // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄
   console.error(e);
