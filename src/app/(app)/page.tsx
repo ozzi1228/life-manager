@@ -1,4 +1,4 @@
-// 홈 (SCR-HOME, 04 §3.1): 인사 + 요약 한 줄 → "오늘"(일정·습관·이번 주·오늘 목표) · "돈"(남은 예산·이번 달 수입·지출·다가오는 결제) → 최근 기록
+// 홈 (SCR-HOME, 04 §3.1): 인사 + 요약 한 줄 → "오늘"(오늘 일정·습관·이번 주·오늘 목표) · "돈"(남은 예산·이번 달 수입·지출·다가오는 결제) → 최근 기록
 // 휴대폰·PC 같은 구성(휴대폰은 위에서 아래로 쌓임). 비어 있는 칸은 카드 안에 한 줄 안내로 — 날마다 배치가 흔들리지 않게
 // 건강 등 민감 정보는 홈에 내보내지 않음(10 §7)
 // ponytail: 홈 편집(위젯 켜기·끄기·순서, P1)·위젯별 따로 불러오기는 아직 — 한 번에 불러옴
@@ -10,7 +10,6 @@ import { Page } from "@/components/app/page-shell";
 import { HomeGoals } from "@/components/goals/period-goals";
 import { TodayGoals } from "@/components/home/today-goals";
 import { Button } from "@/components/ui/button";
-import { addDays } from "@/lib/calendar";
 import { dayLabel, fromYmd, money, moneyShort, signClass, signedMoney } from "@/lib/format";
 import { textOnly } from "@/lib/journal-body";
 import { cn } from "@/lib/utils";
@@ -28,10 +27,10 @@ const hm = (t: string) => {
   const [h, m] = t.split(":").map(Number);
   return `${h < 12 ? "오전" : "오후"} ${h % 12 || 12}:${String(m).padStart(2, "0")}`;
 };
-/** 짧은 날짜: 오늘·내일·모레, 그 뒤는 11/10 (화) — 한 줄에 들어가게 */
+/** 짧은 날짜: 오늘·내일·모레, 그 뒤는 11/10 — 한 줄에 들어가게(요일 없이) */
 const short = (d: string, today: string) => {
   const n = Math.round((fromYmd(d).getTime() - fromYmd(today).getTime()) / 86_400_000);
-  return n === 0 ? "오늘" : n === 1 ? "내일" : n === 2 ? "모레" : `${+d.slice(5, 7)}/${+d.slice(8, 10)} (${WEEK[fromYmd(d).getDay()]})`;
+  return n === 0 ? "오늘" : n === 1 ? "내일" : n === 2 ? "모레" : `${+d.slice(5, 7)}/${+d.slice(8, 10)}`;
 };
 
 /** 카드: 제목(누르면 그 화면) + 내용 */
@@ -65,9 +64,8 @@ export default async function Home() {
   const { ctx, name } = await pageUser();
   const today = todayIn();
   const month = today.slice(0, 7);
-  const [cal, later, tracker, view, txs, soon, entries, weekGoals, dayGoals] = await Promise.all([
+  const [cal, tracker, view, txs, soon, entries, weekGoals, dayGoals] = await Promise.all([
     rangeView(ctx, today, today),
-    rangeView(ctx, addDays(today, 1), addDays(today, 30)), // 오늘 일정이 없으면 가장 가까운 다음 일정
     trackerMonth(ctx, month),
     budgetView(ctx, month),
     monthTransactions(ctx, month),
@@ -83,9 +81,8 @@ export default async function Home() {
   const dateLabel = `${d.getMonth() + 1}월 ${d.getDate()}일 ${WEEK[d.getDay()]}요일`;
 
   // 일정: 일 보기에서 숨긴 캘린더는 빼고
-  const hiddenIn = (c: typeof cal) => new Set(c.calendars.filter((x) => x.hiddenIn.includes("day")).map((x) => x.id));
-  const events = cal.instances.filter((e) => !hiddenIn(cal).has(e.calendarId));
-  const next = later.instances.filter((e) => !hiddenIn(later).has(e.calendarId)).sort((a, b) => (a.occurrenceDate + (a.startTime ?? "")).localeCompare(b.occurrenceDate + (b.startTime ?? "")))[0];
+  const hidden = new Set(cal.calendars.filter((x) => x.hiddenIn.includes("day")).map((x) => x.id));
+  const events = cal.instances.filter((e) => !hidden.has(e.calendarId));
   const color = (id: string) => cal.calendars.find((c) => c.id === id)?.colorHex ?? "#888";
 
   const todayCells = tracker.cells.filter((c) => c.date === today);
@@ -137,7 +134,7 @@ export default async function Home() {
                   {events.length > 4 && <li className="text-muted-foreground text-sm">+{events.length - 4}개 더</li>}
                 </ul>
               ) : (
-                <Empty text={next ? `오늘 일정 없음 · 다음: ${dayLabel(next.occurrenceDate, d)} ${next.allDay ? "" : hm(next.startTime!)} ${next.title}` : "오늘 일정이 없어요"} href="/calendar?new=1" action="일정" />
+                <Empty text="오늘 일정이 없어요" href="/calendar?new=1" action="일정" />
               )}
             </div>
             <div className="space-y-1 border-t pt-3">
@@ -155,7 +152,7 @@ export default async function Home() {
               )}
             </div>
             <div className="space-y-1 border-t pt-3">
-              <Sub>이번 주·오늘 목표</Sub>
+              <Sub>이번 주 목표</Sub>
               {goalsAll.length ? <HomeGoals week={weekGoals} day={dayGoals} /> : <Empty text="이번 주에 이룰 목표를 적어 보세요" href="/goals/week" action="목표" />}
             </div>
           </Card>
@@ -186,7 +183,7 @@ export default async function Home() {
                 <ul className="space-y-1.5">
                   {soon.slice(0, 4).map((u) => (
                     <li key={u.id + u.date} className="flex items-center gap-2 text-sm">
-                      <span className="text-muted-foreground w-16 shrink-0 tabular-nums">{short(u.date, today)}</span>
+                      <span className="text-muted-foreground w-11 shrink-0 tabular-nums">{short(u.date, today)}</span>
                       <span className="min-w-0 flex-1 truncate">{u.name}</span>
                       <span className={`shrink-0 tabular-nums ${signClass(u.type === "income" ? 1 : -1)}`}>
                         {u.variableAmount && "약 "}
