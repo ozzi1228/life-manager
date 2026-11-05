@@ -42,7 +42,7 @@ const SHOWN: Record<string, { area: string; name: (r: AnyRow, batch: { entity: s
   recurring_payment: { area: "고정 지출", name: (r) => `${r.name} · ${won(r.amount)}` },
   planned_expense: { area: "예산", name: (r) => `큰 지출 ${r.name}` },
   fin_category: { area: "지출", name: (r) => `${r.name} 분류` },
-  payment_method: { area: "지출", name: (r) => `${r.name} 결제수단` },
+  payment_method: { area: "결제 수단", name: (r) => `${r.name} ${({ card: "카드", pay: "페이", account: "계좌" } as Record<string, string>)[String(r.kind)] ?? "결제수단"}` },
   restraint_entry: { area: "참은 소비", name: (r) => `${r.name} · ${won(r.amount)}` },
   journal_topic: { area: "일기", name: (r) => `${r.name} 주제` },
   journal_entry: { area: "일기", name: (r) => String(r.title || `${r.date} 일기`) },

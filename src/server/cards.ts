@@ -2,6 +2,7 @@
 // 셋 다 결제수단(payment_methods) + 1:1 설정 행(cards·pays·accounts). 설정은 처음 고칠 때 만듦 — 지출 입력에서 만든 것도 목록에 나옴
 import { and, asc, eq, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { z } from "zod";
+import { uuidv7 } from "../db/id.ts";
 import { db, type Tx } from "../db/index.ts";
 import { accounts, cards, paymentMethods, pays, transactions } from "../db/schema.ts";
 import { AppError, notFound } from "./errors.ts";
@@ -49,11 +50,17 @@ async function updateOf(ctx: Ctx, kind: Kind, pmId: string, pmVersion: number, p
   });
 }
 
-/** 숨기기: 지난 지출의 결제수단 이름은 그대로(06 §10, 지우기보다 숨김) */
-export async function hidePaymentMethod(ctx: Ctx, kind: Kind, pmId: string, version: number) {
+/** 삭제: 결제수단 + 설정 행을 한 묶음으로 휴지통에(되돌리기·복구 가능). 지난 지출의 결제수단 이름은 그대로 보임(nameMaps) */
+export async function removePaymentMethod(ctx: Ctx, kind: Kind, pmId: string) {
   const pm = await paymentRepo.get(ctx, pmId);
   if (pm.kind !== kind) throw new AppError("NOT_FOUND", "찾을 수 없어요");
-  return paymentRepo.update(ctx, pmId, version, { isHidden: true });
+  const { repo, table } = detail[kind];
+  await db.transaction(async (tx: Tx) => {
+    const batchId = uuidv7();
+    await paymentRepo.remove(ctx, pmId, { batchId, tx });
+    const [row] = await tx.select({ id: table.id }).from(table).where(and(eq(table.userId, ctx.userId), eq(table.paymentMethodId, pmId), isNull(table.deletedAt)));
+    if (row) await (repo as typeof cardRepo).remove(ctx, row.id, { batchId, tx });
+  });
 }
 
 /** 연결할 결제수단이 내 것이고 종류가 맞는지 */

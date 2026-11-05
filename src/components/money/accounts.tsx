@@ -6,10 +6,10 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { addAccount, editAccount, hidePaymentAction } from "@/app/actions/cards";
+import { addAccount, editAccount, removePaymentAction, restorePaymentAction } from "@/app/actions/cards";
 import { AmountInput, MoneyText } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState } from "@/components/app/states";
+import { EmptyState, toastUndo } from "@/components/app/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -171,13 +171,16 @@ function AccountForm({ edit, close }: { edit?: AccountItem; close: () => void })
     router.refresh();
   }
 
-  async function hide() {
+  async function remove() {
     if (!edit) return;
-    const r = await hidePaymentAction("account", edit.id, edit.pmVersion);
+    const r = await removePaymentAction("account", edit.id);
     if (!r.ok) return setError(r.error.message);
-    toast("계좌를 숨겼어요. 지난 지출의 이름은 그대로예요");
     close();
     router.refresh();
+    toastUndo(`${edit.name}을(를) 휴지통으로 옮겼어요. 지난 지출의 이름은 그대로예요`, async () => {
+      await restorePaymentAction(edit.id);
+      router.refresh();
+    });
   }
 
   return (
@@ -188,8 +191,8 @@ function AccountForm({ edit, close }: { edit?: AccountItem; close: () => void })
       footer={
         <div className="flex w-full gap-2 max-md:flex-col-reverse">
           {edit && (
-            <Button variant="ghost" className="text-destructive-text" onClick={hide}>
-              계좌 숨기기
+            <Button variant="ghost" className="text-destructive-text" onClick={remove}>
+              계좌 삭제
             </Button>
           )}
           <Button className="md:ml-auto" disabled={!v.name.trim() || busy} onClick={save}>

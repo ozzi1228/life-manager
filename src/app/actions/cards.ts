@@ -1,8 +1,9 @@
 "use server";
 
-// 결제 수단(카드·페이·계좌) 추가·수정·숨기기 (SCR-FIN-08). 규칙은 src/server/cards.ts
+// 결제 수단(카드·페이·계좌) 추가·수정·삭제 (SCR-FIN-08). 규칙은 src/server/cards.ts
 import { action } from "@/server/api";
-import { createAccount, createCard, createPay, hidePaymentMethod, updateAccount, updateCard, updatePay, type AccountInput, type CardInput, type PayInput } from "@/server/cards";
+import { restore } from "@/server/repo";
+import { createAccount, createCard, createPay, removePaymentMethod, updateAccount, updateCard, updatePay, type AccountInput, type CardInput, type PayInput } from "@/server/cards";
 
 export async function addCard(input: CardInput) {
   return action(async (ctx) => ({ id: (await createCard(ctx, input)).id }));
@@ -31,9 +32,12 @@ export async function editAccount(pmId: string, pmVersion: number, input: Accoun
     return null;
   });
 }
-export async function hidePaymentAction(kind: "card" | "pay" | "account", pmId: string, version: number) {
+export async function removePaymentAction(kind: "card" | "pay" | "account", pmId: string) {
   return action(async (ctx) => {
-    await hidePaymentMethod(ctx, kind, pmId, version);
+    await removePaymentMethod(ctx, kind, pmId);
     return null;
   });
+}
+export async function restorePaymentAction(pmId: string) {
+  return action((ctx) => restore(ctx, "payment_method", pmId));
 }

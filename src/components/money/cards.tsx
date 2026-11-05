@@ -6,10 +6,10 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { addCard, editCard, hidePaymentAction } from "@/app/actions/cards";
+import { addCard, editCard, removePaymentAction, restorePaymentAction } from "@/app/actions/cards";
 import { AmountInput } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState } from "@/components/app/states";
+import { EmptyState, toastUndo } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -92,13 +92,16 @@ function CardForm({ edit, accounts, close }: { edit?: CardItem; accounts: Opt[];
     router.refresh();
   }
 
-  async function hide() {
+  async function remove() {
     if (!edit) return;
-    const r = await hidePaymentAction("card", edit.id, edit.pmVersion);
+    const r = await removePaymentAction("card", edit.id);
     if (!r.ok) return setError(r.error.message);
-    toast("카드를 숨겼어요. 지난 지출의 결제수단 이름은 그대로예요");
     close();
     router.refresh();
+    toastUndo(`${edit.name}을(를) 휴지통으로 옮겼어요. 지난 지출의 이름은 그대로예요`, async () => {
+      await restorePaymentAction(edit.id);
+      router.refresh();
+    });
   }
 
   return (
@@ -110,8 +113,8 @@ function CardForm({ edit, accounts, close }: { edit?: CardItem; accounts: Opt[];
         // 모바일은 다른 서랍처럼 저장이 위에서 꽉 차게
         <div className="flex w-full gap-2 max-md:flex-col-reverse">
           {edit && (
-            <Button variant="ghost" className="text-destructive-text" onClick={hide}>
-              카드 숨기기
+            <Button variant="ghost" className="text-destructive-text" onClick={remove}>
+              카드 삭제
             </Button>
           )}
           <Button className="md:ml-auto" disabled={!v.name.trim() || busy} onClick={save}>

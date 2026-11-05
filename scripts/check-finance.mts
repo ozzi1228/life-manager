@@ -160,8 +160,8 @@ try {
   assert.ok(!(await formData(A)).categories.some((c) => c.id === extra.id), "지운 분류는 고르기 목록에서 빠짐");
   console.log("분류 편집 확인 통과");
 
-  // 카드: 지출 입력에서 만든 카드도 목록에, 메모, 남의 카드 불가, 같은 이름 불가, 숨기면 목록에서 빠짐(D-071: 혜택 계산 없음)
-  const { createCard, cardList, updateCard, hidePaymentMethod } = await import("../src/server/cards.ts");
+  // 카드: 지출 입력에서 만든 카드도 목록에, 메모, 남의 카드 불가, 같은 이름 불가, 지우면 목록에서 빠지고 되돌리기 가능(D-071: 혜택 계산 없음)
+  const { createCard, cardList, updateCard, removePaymentMethod } = await import("../src/server/cards.ts");
   const { createPaymentMethod } = await import("../src/server/finance.ts");
   const quick = await createPaymentMethod(A, { kind: "card", name: "빠른카드" });
   const pmA = await createCard(A, { name: "A카드", issuer: "우나카드", cardType: "credit", billingDay: 14, memo: "- 편의점 갈 때 최대 혜택" });
@@ -172,9 +172,12 @@ try {
   assert.equal(await code(updateCard(A, pmA.id, 1, { name: "빠른카드" })), "DUPLICATE", "같은 이름 카드 불가");
   const renamed = await updateCard(A, quick.id, quick.version, { name: "B카드", billingDay: 1, memo: "주유" });
   assert.deepEqual([renamed.billingDay, renamed.memo], [1, "주유"], "설정이 없던 카드도 고치면 생김");
-  const b2 = (await cardList(A)).find((c) => c.id === quick.id)!;
-  await hidePaymentMethod(A, "card", quick.id, b2.pmVersion);
-  assert.deepEqual((await cardList(A)).map((c) => c.name), ["A카드"], "숨긴 카드는 목록에서 빠짐");
+  await removePaymentMethod(A, "card", quick.id);
+  assert.deepEqual((await cardList(A)).map((c) => c.name), ["A카드"], "지운 카드는 목록에서 빠짐");
+  assert.ok(!(await formData(A)).paymentMethods.some((p) => p.id === quick.id), "지운 카드는 입력 창에도 없음");
+  await restore(A, "payment_method", quick.id);
+  assert.equal((await cardList(A)).find((c) => c.id === quick.id)?.card?.memo, "주유", "되돌리면 카드 설정도 함께 돌아옴");
+  await removePaymentMethod(A, "card", quick.id);
   console.log("카드 규칙 확인 통과");
 
   // 페이·계좌: 결제수단은 실제로 돈이 나간 곳, 페이는 pay_id로 따로 → 카드 합계 한 번만, 페이로 찾으면 다 나옴
