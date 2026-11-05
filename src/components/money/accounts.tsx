@@ -1,7 +1,6 @@
 "use client";
 
 // 계좌 목록(06 §7): 종류마다 다른 칸 — 입출금(잔액), 예금·적금(시작·만기·이율·예상 이자), 주식(원금·평가 금액·수익)
-// 모든 계좌에 연결된 카드(카드의 결제 계좌, 이번 달 쓴 돈)와 자동 결제(이 계좌·연결 카드로 나가는 고정 지출)
 import { ChevronRight, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -42,7 +41,7 @@ export function AccountGrid({ accounts, today }: { accounts: AccountItem[]; toda
         </div>
       )}
       {accounts.length === 0 ? (
-        <EmptyState pet="komong" title="계좌를 등록해 보세요" description="예금·적금은 만기와 예상 이자를, 모든 계좌는 연결된 카드와 자동 결제를 한눈에 볼 수 있어요" action={add} />
+        <EmptyState pet="komong" title="계좌를 등록해 보세요" description="잔액, 예금·적금의 만기와 예상 이자를 한눈에 볼 수 있어요" action={add} />
       ) : (
         // 종류별 소제목: 입출금 · 예금 · 적금 · 주식 순(있는 것만)
         Object.entries(ACCOUNT_CATEGORY).map(([k, label]) => {
@@ -69,7 +68,7 @@ export function AccountGrid({ accounts, today }: { accounts: AccountItem[]; toda
   );
 }
 
-/** 목록 한 줄: 이름·은행 / 요약(이율·만기·수익·연결 카드·자동 결제) · 오른쪽에 금액 */
+/** 목록 한 줄: 이름·은행 / 요약(이율·만기·수익) · 오른쪽에 금액 */
 function AccountRow({ a, today, open }: { a: AccountItem; today: string; open: () => void }) {
   const d = a.account;
   const cat = d?.category ?? "checking";
@@ -83,10 +82,6 @@ function AccountRow({ a, today, open }: { a: AccountItem; today: string; open: (
   const sub = saving
     ? [d?.principal != null && `${cat === "savings" ? "매월 " : ""}${m(d.principal)}`, d?.rate != null && `연 ${d.rate}%`, left !== null && (left > 0 ? `D-${left}` : left === 0 ? "오늘 만기" : "만기 지남")]
     : [profit && `원금 ${m(d!.principal!)}`];
-  const links = [
-    a.cards.length > 0 && `카드 ${a.cards.map((c) => c.name).join(", ")}`,
-    a.autopays.length > 0 && `자동 결제 ${a.autopays.length}건 ${money(a.autopays.reduce((x, r) => x + r.amount, 0))}`,
-  ];
   return (
     <button type="button" onClick={open} className="hover:bg-accent/50 flex min-h-14 w-full items-center gap-3 px-4 py-3 text-left">
       <span className="min-w-0 flex-1 space-y-0.5">
@@ -95,7 +90,6 @@ function AccountRow({ a, today, open }: { a: AccountItem; today: string; open: (
           {(d?.bank || d?.number) && <span className="text-muted-foreground min-w-0 truncate text-caption">{[d.bank, d.number].filter(Boolean).join(" · ")}</span>}
         </span>
         {sub.some(Boolean) && <span className="text-muted-foreground block truncate text-sm">{sub.filter(Boolean).join(" · ")}</span>}
-        {links.some(Boolean) && <span className="text-muted-foreground block truncate text-caption">{links.filter(Boolean).join(" · ")}</span>}
       </span>
       <span className="shrink-0 text-right">
         {main != null ? <MoneyText amount={main} currency={d?.currency} className="font-semibold" /> : <span className="text-muted-foreground text-sm">금액 없음</span>}
@@ -311,9 +305,6 @@ function AccountForm({ edit, close }: { edit?: AccountItem; close: () => void })
           <FieldLabel htmlFor="ac-memo">메모</FieldLabel>
           <Textarea id="ac-memo" maxLength={2000} className="field-sizing-content min-h-24 leading-7" placeholder="메모를 입력하세요" value={v.memo ?? ""} onChange={(e) => set("memo", e.target.value)} />
         </Field>
-        {edit && (edit.cards.length > 0 || edit.autopays.length > 0) ? null : (
-          <p className="text-muted-foreground text-caption">카드 수정에서 결제 계좌를 고르면 연결된 카드와 자동 결제가 이 계좌에 보여요</p>
-        )}
         {error && <FieldError>{error}</FieldError>}
       </FieldGroup>
     </ResponsiveModal>
