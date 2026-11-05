@@ -1,6 +1,6 @@
 "use client";
 
-// 자산 화면의 작은 조작: 달 이동(주소 ?month=), 지출 추가 버튼
+// 금융 화면의 작은 조작: 달 이동(주소 ?month=), 지출 추가 버튼
 import { Plus } from "lucide-react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { MonthSwitcher } from "@/components/app/pickers";

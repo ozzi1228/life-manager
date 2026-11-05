@@ -22,13 +22,17 @@ type Row<T extends AnyTable> = T["$inferSelect"];
 type Insert<T extends AnyTable> = Omit<T["$inferInsert"], Common>;
 type Patch<T extends AnyTable> = Partial<Insert<T>>;
 
-const registry: { entity: string; table: AnyTable }[] = [];
+// 작업 기록 되돌리기(activity.ts)가 entity 이름으로 고치기·지우기를 부를 수 있게 저장소도 함께
+type LooseRepo = {
+  update(ctx: Ctx, id: string, version: number, patch: Record<string, unknown>, o?: { tx?: Tx }): Promise<unknown>;
+  remove(ctx: Ctx, id: string, o?: { batchId?: string; tx?: Tx }): Promise<unknown>;
+};
+const registry: { entity: string; table: AnyTable; repo: LooseRepo }[] = [];
 /** 등록된 사용자 데이터 테이블 전부(휴지통 목록·영구 삭제용). 서비스 모듈을 불러와야 채워짐 */
 export const registeredTables = () => registry;
 
 /** 사용자 데이터 테이블 하나의 저장소. entity는 변경 이력·휴지통에 쓰는 이름(예: "transaction") */
 export function defineRepo<T extends AnyTable>(table: T, entity: string) {
-  registry.push({ entity, table });
   const mine = (ctx: Ctx, ...more: (SQL | undefined)[]) => and(eq(table.userId, ctx.userId), ...more);
   const alive = (ctx: Ctx, ...more: (SQL | undefined)[]) => mine(ctx, isNull(table.deletedAt), ...more);
 
@@ -38,7 +42,7 @@ export function defineRepo<T extends AnyTable>(table: T, entity: string) {
     return row as Row<T>;
   }
 
-  return {
+  const repo = {
     entity,
     table,
     get: (ctx: Ctx, id: string) => get(ctx, id),
@@ -117,6 +121,8 @@ export function defineRepo<T extends AnyTable>(table: T, entity: string) {
       return (await db.select().from(table as PgTable).where(mine(ctx, isNotNull(table.deletedAt))).orderBy(desc(table.deletedAt))) as Row<T>[];
     },
   };
+  registry.push({ entity, table, repo: repo as unknown as LooseRepo });
+  return repo;
 }
 
 /** 복구: 그 행과 같은 묶음으로 지워진 모든 테이블의 행을 함께 살림 */

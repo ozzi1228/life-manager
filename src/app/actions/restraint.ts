@@ -3,7 +3,6 @@
 // 참은 소비 기록·빼기·다시 정산 (SCR-FIN-14). 규칙은 src/server/restraint.ts
 import { action } from "@/server/api";
 import { once } from "@/server/idempotency";
-import { restore } from "@/server/repo";
 import { createRestraint, resettle, restraintEntryRepo, setExcluded, updateRestraint, type RestraintInput } from "@/server/restraint";
 
 export async function addRestraint(key: string, input: RestraintInput) {
@@ -22,9 +21,6 @@ export async function deleteRestraint(id: string) {
   return action(async (ctx) => {
     await restraintEntryRepo.remove(ctx, id);
   });
-}
-export async function restoreRestraint(id: string) {
-  return action((ctx) => restore(ctx, "restraint_entry", id));
 }
 export async function resettleMonth(month: string) {
   return action((ctx) => resettle(ctx, month));

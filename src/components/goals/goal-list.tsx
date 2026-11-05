@@ -6,10 +6,11 @@ import { Check, ChevronDown, Ellipsis, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type ReactNode, useEffect, useState } from "react";
-import { addGoal, changeGoalStatus, deleteGoal, editGoal, restoreGoal } from "@/app/actions/goals";
+import { addGoal, changeGoalStatus, deleteGoal, editGoal } from "@/app/actions/goals";
 import { InfoTip } from "@/components/app/help";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastUndo } from "@/components/app/states";
+import { EmptyState, toastDone } from "@/components/app/states";
+import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -82,21 +83,15 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
 
   async function setStatus(g: Goal, status: Goal["status"]) {
     const r = await changeGoalStatus(g.id, g.version, status);
-    if (!r.ok) return toastUndo(r.error.message, () => {});
+    if (!r.ok) return toast(r.error.message);
     router.refresh();
     if (status === "done")
-      toastUndo("목표를 달성했어요 🎉", async () => {
-        await changeGoalStatus(g.id, r.data.version, "active");
-        router.refresh();
-      });
+      toastDone("목표를 달성했어요 🎉");
   }
   async function remove(g: Goal) {
     await deleteGoal(g.id);
     router.refresh();
-    toastUndo("휴지통으로 옮겼어요", async () => {
-      await restoreGoal(g.id);
-      router.refresh();
-    });
+    toastDone("휴지통으로 옮겼어요");
   }
 
   // y: 연도별 화면에서 이 줄이 놓인 해

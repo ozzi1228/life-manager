@@ -6,11 +6,11 @@ import { BookOpen, ChevronDown, Film, Plus, Star, StarHalf, Tv } from "lucide-re
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { addMedia, deleteMedia, editMedia, restoreMedia } from "@/app/actions/media";
+import { addMedia, deleteMedia, editMedia } from "@/app/actions/media";
 import { PhotoPicker } from "@/components/app/photo-picker";
 import { MonthSwitcher } from "@/components/app/pickers";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastUndo } from "@/components/app/states";
+import { EmptyState, toastDone } from "@/components/app/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -484,10 +484,7 @@ export function MediaView({ items, categories, today }: { items: MediaItem[]; ca
     if (!r.ok) return toast(r.error.message);
     setDetail(null);
     router.refresh();
-    toastUndo("휴지통으로 옮겼어요", async () => {
-      await restoreMedia(i.id);
-      router.refresh();
-    });
+    toastDone("휴지통으로 옮겼어요");
   }
 
   const add = (

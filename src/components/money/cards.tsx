@@ -6,10 +6,10 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { addCard, editCard, removePaymentAction, restorePaymentAction } from "@/app/actions/cards";
+import { addCard, editCard, removePaymentAction } from "@/app/actions/cards";
 import { AmountInput } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastUndo } from "@/components/app/states";
+import { EmptyState, toastDone } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -98,10 +98,7 @@ function CardForm({ edit, accounts, close }: { edit?: CardItem; accounts: Opt[];
     if (!r.ok) return setError(r.error.message);
     close();
     router.refresh();
-    toastUndo(`${edit.name}을(를) 휴지통으로 옮겼어요. 지난 지출의 이름은 그대로예요`, async () => {
-      await restorePaymentAction(edit.id);
-      router.refresh();
-    });
+    toastDone(`${edit.name}을(를) 휴지통으로 옮겼어요. 지난 지출의 이름은 그대로예요`);
   }
 
   return (

@@ -32,7 +32,7 @@ export function Delayed({ children, ms = 300 }: { children: ReactNode; ms?: numb
   return show ? <>{children}</> : null;
 }
 
-/** "휴지통으로 옮겼어요 · 되돌리기" (최소 5초 보임) */
-export function toastUndo(message: string, undo: () => void) {
-  toast(message, { duration: 6000, action: { label: "되돌리기", onClick: undo } });
+/** 지우기·고치기 알림. 되돌리기는 팝업 대신 사이드바 아래 작업 기록에서(D-077) */
+export function toastDone(message: string) {
+  toast(message, { description: "작업 기록에서 되돌릴 수 있어요" });
 }

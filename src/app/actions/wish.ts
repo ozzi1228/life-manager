@@ -6,7 +6,6 @@ import { budgetEffect } from "@/server/budget";
 import type { TxInput } from "@/server/finance";
 import { once } from "@/server/idempotency";
 import { addItemCategory, removeItemCategory, renameItemCategory, reorderItemCategories, setItemCategoryType, type Scope } from "@/server/item-categories";
-import { restore } from "@/server/repo";
 import { createWish, dropWish, purchaseWish, reopenWish, updateWish, wishRepo, type WishInput } from "@/server/wish";
 
 export async function addWish(key: string, input: WishInput) {
@@ -29,13 +28,6 @@ export async function buyWish(key: string, id: string, version: number, tx: TxIn
     return body as { id: string | null; restraint: boolean; budget: { category: string; over: number } | null };
   });
 }
-/** 구매 되돌리기(토스트): 방금 만든 지출도 휴지통으로 */
-export async function undoBuyWish(id: string) {
-  return action(async (ctx) => {
-    const w = await wishRepo.get(ctx, id);
-    await reopenWish(ctx, id, w.version, true);
-  });
-}
 export async function reopenWishAction(id: string, version: number, removeTx: boolean) {
   return action(async (ctx) => ({ version: (await reopenWish(ctx, id, version, removeTx)).version }));
 }
@@ -47,10 +39,6 @@ export async function deleteWish(id: string) {
     await wishRepo.remove(ctx, id);
   });
 }
-export async function restoreWish(id: string) {
-  return action((ctx) => restore(ctx, "wish_item", id));
-}
-
 // ── 위시·작품 분류(분류 편집 창) ──
 export async function addItemCat(scope: Scope, name: string) {
   return action(async (ctx) => void (await addItemCategory(ctx, scope, name)));

@@ -1,4 +1,4 @@
-// 결제 수단 서비스 (docs/planning/06 §6·§7, D-071): 카드·페이·계좌. 혜택·실적 계산은 하지 않음(혜택은 메모에 직접)
+// 자산(계좌·카드·페이) 서비스 (docs/planning/06 §6·§7, D-071): 카드·페이·계좌. 혜택·실적 계산은 하지 않음(혜택은 메모에 직접)
 // 셋 다 결제수단(payment_methods) + 1:1 설정 행(cards·pays·accounts). 설정은 처음 고칠 때 만듦 — 지출 입력에서 만든 것도 목록에 나옴
 import { and, asc, eq, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { z } from "zod";

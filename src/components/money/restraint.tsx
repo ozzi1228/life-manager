@@ -6,11 +6,11 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { addRestraint, deleteRestraint, editRestraint, excludeRestraint, resettleMonth, restoreRestraint } from "@/app/actions/restraint";
+import { addRestraint, deleteRestraint, editRestraint, excludeRestraint, resettleMonth } from "@/app/actions/restraint";
 import { InfoTip } from "@/components/app/help";
 import { AmountInput } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { toastUndo } from "@/components/app/states";
+import { toastDone } from "@/components/app/states";
 import { MonthNav } from "@/components/money/controls";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -148,10 +148,7 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
     const r = await deleteRestraint(e.id);
     if (!r.ok) return toast(r.error.message);
     refresh();
-    toastUndo("휴지통으로 옮겼어요", async () => {
-      await restoreRestraint(e.id);
-      refresh();
-    });
+    toastDone("휴지통으로 옮겼어요");
   }
   const pickNow = (c: View["candidates"][number]) => call(addRestraint(crypto.randomUUID(), { name: c.name, amount: c.price, date: today, reason: null, wishItemId: c.id }), "참은 것으로 기록했어요");
 

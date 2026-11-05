@@ -13,13 +13,12 @@ import {
   endRecurringNow,
   endRecurringOn,
   reactivateRecurring,
-  restoreRecurring,
   type RecurringIn,
 } from "@/app/actions/recurring";
 import { InfoTip } from "@/components/app/help";
 import { AmountInput } from "@/components/app/money";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastUndo } from "@/components/app/states";
+import { EmptyState, toastDone } from "@/components/app/states";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -155,15 +154,14 @@ function Detail({ item, today, payment, category, close, edit, done }: { item: R
   const dayBefore = item.next ? ymd(new Date(fromYmd(item.next).getTime() - 86_400_000)) : today;
   const [lastUse, setLastUse] = useState(dayBefore < today ? today : dayBefore);
   const [busy, setBusy] = useState(false);
-  const run = async (f: () => Promise<{ ok: boolean; error?: { message: string } }>, msg: string, undo?: () => Promise<unknown>) => {
+  const run = async (f: () => Promise<{ ok: boolean; error?: { message: string } }>, msg: string) => {
     setBusy(true);
     const r = await f();
     setBusy(false);
     if (!r.ok) return toast(r.error?.message ?? "잠시 후 다시 시도해 주세요");
     done();
     close();
-    if (undo) toastUndo(msg, async () => (await undo(), done()));
-    else toast(msg);
+    toastDone(msg);
   };
 
   // 겹친 서랍은 바깥 서랍을 닫아 버려서, 날짜 고르기는 상세 대신 띄움
@@ -176,7 +174,7 @@ function Detail({ item, today, payment, category, close, edit, done }: { item: R
         title="언제까지 이용하나요?"
         description="이 날 이후에는 결제 예정에서 빠져요"
         footer={
-          <Button disabled={busy} onClick={() => run(() => endRecurringOn(item.id, item.version, lastUse), `${md(lastUse)}에 해지돼요`, () => cancelRecurringEnd(item.id, item.version + 1))}>
+          <Button disabled={busy} onClick={() => run(() => endRecurringOn(item.id, item.version, lastUse), `${md(lastUse)}에 해지돼요`)}>
             해지 예정으로 바꾸기
           </Button>
         }
@@ -221,7 +219,7 @@ function Detail({ item, today, payment, category, close, edit, done }: { item: R
               다시 이용하기
             </Button>
           )}
-          <Button variant="ghost" className="text-destructive-text ml-auto" disabled={busy} onClick={() => run(() => deleteRecurring(item.id), "휴지통으로 옮겼어요", () => restoreRecurring(item.id))}>
+          <Button variant="ghost" className="text-destructive-text ml-auto" disabled={busy} onClick={() => run(() => deleteRecurring(item.id), "휴지통으로 옮겼어요")}>
             삭제
           </Button>
         </div>

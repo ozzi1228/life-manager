@@ -10,11 +10,11 @@ import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Cop
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { addEvent, colorEvent, editEvent, removeEvent, saveCalendarNote, hideCalendarIn, undoRemoveEvent } from "@/app/actions/calendar";
+import { addEvent, colorEvent, editEvent, removeEvent, saveCalendarNote, hideCalendarIn } from "@/app/actions/calendar";
 import { CalendarList } from "@/components/calendar/calendar-list";
 import { RichNote } from "@/components/calendar/rich-note";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
-import { toastUndo } from "@/components/app/states";
+import { toastDone } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -739,10 +739,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
     if (!r.ok) return toast(r.error.message);
     router.refresh();
     if (r.data.restoreId || r.data.exceptionId)
-      toastUndo("일정을 지웠어요", async () => {
-        await undoRemoveEvent(r.data);
-        router.refresh();
-      });
+      toastDone("일정을 지웠어요");
     else toast("이후 일정을 지웠어요");
   }
   async function setColor(e: Instance, hex: string | null) {

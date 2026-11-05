@@ -24,10 +24,9 @@ import {
   renameExpCat,
   reorderExpCats,
   setExpCat,
-  restoreExperience,
-} from "@/app/actions/career";
+  } from "@/app/actions/career";
 import { CategoryEditor } from "@/components/app/category-editor";
-import { EmptyState, toastUndo } from "@/components/app/states";
+import { EmptyState, toastDone } from "@/components/app/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -452,10 +451,7 @@ export function ExperienceEditor({
     if (!exp) return;
     await deleteExperience(exp.id);
     router.replace("/career"); // refresh를 붙이면 지운 경험 주소를 다시 불러와 404(일기 삭제와 같은 문제)
-    toastUndo("휴지통으로 옮겼어요", async () => {
-      await restoreExperience(exp.id);
-      router.refresh();
-    });
+    toastDone("휴지통으로 옮겼어요");
   }
 
   return (

@@ -6,7 +6,6 @@ import { budgetEffect } from "@/server/budget";
 import { createCategory, createPaymentMethod, removeCategory, renameCategory, reorderCategories, createTransaction, formData, txRepo, updateTransaction, type TxInput } from "@/server/finance";
 import { historyOf } from "@/server/history";
 import { once } from "@/server/idempotency";
-import { restore } from "@/server/repo";
 
 export async function expenseFormData() {
   return action((ctx) => formData(ctx));
@@ -36,10 +35,6 @@ export async function removeTransaction(id: string) {
     await txRepo.remove(ctx, id);
     return { id };
   });
-}
-
-export async function restoreTransaction(id: string) {
-  return action((ctx) => restore(ctx, "transaction", id));
 }
 
 export async function addCategory(kind: "expense" | "income", name: string) {

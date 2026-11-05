@@ -17,7 +17,6 @@ import {
   updateGoal,
   updateItem,
 } from "@/server/goals";
-import { restore } from "@/server/repo";
 
 export async function saveCell(input: { itemId: string; date: string; done: boolean; memo: string | null }) {
   return action((ctx) => setCell(ctx, input));
@@ -54,10 +53,6 @@ export async function deleteTrackerItem(id: string) {
   });
 }
 
-export async function restoreTrackerItem(id: string) {
-  return action((ctx) => restore(ctx, "tracker_item", id));
-}
-
 export async function startTrackerMonth(month: string, itemIds: string[]) {
   return action((ctx) => startMonthWith(ctx, month, itemIds.slice(0, 50)));
 }
@@ -92,6 +87,3 @@ export async function deleteGoal(id: string) {
   });
 }
 
-export async function restoreGoal(id: string) {
-  return action((ctx) => restore(ctx, "goal", id));
-}

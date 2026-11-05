@@ -4,7 +4,6 @@
 import { action } from "@/server/api";
 import { createHealth, healthRepo, updateHealth, type HealthInput } from "@/server/health";
 import { once } from "@/server/idempotency";
-import { restore } from "@/server/repo";
 
 export async function addHealth(key: string, input: HealthInput) {
   return action(async (ctx) => {
@@ -21,7 +20,4 @@ export async function deleteHealth(id: string) {
   return action(async (ctx) => {
     await healthRepo.remove(ctx, id);
   });
-}
-export async function restoreHealth(id: string) {
-  return action((ctx) => restore(ctx, "health_record", id));
 }

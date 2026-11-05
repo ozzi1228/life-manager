@@ -1,7 +1,7 @@
 "use client";
 
 // 앱 셸 (docs/planning/02 §5, 03 §3.6·§6): PC·태블릿 사이드바 / 모바일 상단바 + 펼치는 메뉴(같은 사이드바가 왼쪽 창으로) + 빠른 추가(+), 오프라인 띠, 펫
-import { LogOut, Menu, PanelLeftClose, PanelLeftOpen, PawPrint, Plus, Settings, UserRound } from "lucide-react";
+import { History, LogOut, Menu, PanelLeftClose, PanelLeftOpen, PawPrint, Plus, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
@@ -142,6 +142,14 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
                   <MenuLink href="/settings#pet">
                     <PawPrint />
                     <span>펫</span>
+                  </MenuLink>
+                </SidebarMenuButton>
+              </SidebarMenuItem>
+              <SidebarMenuItem>
+                <SidebarMenuButton asChild tooltip="작업 기록" isActive={path.startsWith("/activity")}>
+                  <MenuLink href="/activity">
+                    <History />
+                    <span>작업 기록</span>
                   </MenuLink>
                 </SidebarMenuButton>
               </SidebarMenuItem>

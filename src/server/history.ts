@@ -11,6 +11,28 @@ const FIELDS: Record<string, Record<string, string>> = {
 };
 const ACTION = { create: "만듦", update: "고침", delete: "휴지통으로", restore: "복구" } as const;
 
+type Names = Awaited<ReturnType<typeof nameMaps>>;
+const show = (names: Names, field: string, v: unknown) => {
+  if (v === null || v === undefined || v === "") return "없음";
+  if (field === "amount") return `${Number(v).toLocaleString("ko-KR")}원`;
+  if (field === "categoryId") return names.categories[String(v)] ?? "지운 분류";
+  if (field === "paymentMethodId" || field === "payId") return names.payments[String(v)] ?? "지운 결제수단";
+  if (field === "isRefund" || field === "restraint") return v ? "예" : "아니요";
+  if (Array.isArray(v)) return v.length ? v.map((t) => `#${t}`).join(" ") : "없음";
+  if (field === "type") return v === "income" ? "수입" : "지출";
+  if (field === "plannedExpenseId") return "연결됨";
+  return String(v);
+};
+
+/** 고친 필드를 화면 이름·값으로(라벨이 있는 영역만, 없으면 빈 배열) */
+export function changesOf(entity: string, before: unknown, after: unknown, names: Names) {
+  const labels = FIELDS[entity];
+  if (!labels) return [];
+  return Object.keys((after as Record<string, unknown>) ?? {})
+    .filter((f) => labels[f])
+    .map((f) => ({ label: labels[f], before: show(names, f, (before as Record<string, unknown> | null)?.[f]), after: show(names, f, (after as Record<string, unknown>)[f]) }));
+}
+
 export async function historyOf(ctx: Ctx, entity: keyof typeof FIELDS, id: string) {
   const [rows, names] = await Promise.all([
     db
@@ -21,29 +43,12 @@ export async function historyOf(ctx: Ctx, entity: keyof typeof FIELDS, id: strin
       .limit(100),
     nameMaps(ctx),
   ]);
-  const show = (field: string, v: unknown) => {
-    if (v === null || v === undefined || v === "") return "없음";
-    if (field === "amount") return `${Number(v).toLocaleString("ko-KR")}원`;
-    if (field === "categoryId") return names.categories[String(v)] ?? "지운 분류";
-    if (field === "paymentMethodId" || field === "payId") return names.payments[String(v)] ?? "지운 결제수단";
-    if (field === "isRefund" || field === "restraint") return v ? "예" : "아니요";
-    if (Array.isArray(v)) return v.length ? v.map((t) => `#${t}`).join(" ") : "없음";
-    if (field === "type") return v === "income" ? "수입" : "지출";
-    if (field === "plannedExpenseId") return "연결됨";
-    return String(v);
-  };
-  const labels = FIELDS[entity];
   return rows.map((r) => ({
     id: r.id,
     at: r.createdAt.toISOString(),
     action: ACTION[r.action as keyof typeof ACTION] ?? r.action,
     by: r.actor === "user" ? null : "자동",
-    changes:
-      r.action === "update"
-        ? Object.keys(r.after ?? {})
-            .filter((f) => labels[f])
-            .map((f) => ({ label: labels[f], before: show(f, (r.before as Record<string, unknown> | null)?.[f]), after: show(f, (r.after as Record<string, unknown>)[f]) }))
-        : [],
+    changes: r.action === "update" ? changesOf(entity, r.before, r.after, names) : [],
   }));
 }
 export type HistoryEntry = Awaited<ReturnType<typeof historyOf>>[number];

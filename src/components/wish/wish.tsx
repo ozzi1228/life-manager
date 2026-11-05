@@ -7,12 +7,12 @@ import { Check, ChevronDown, CircleAlert, ExternalLink, Eye, Heart, Link2, MoreH
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useRef, useState } from "react";
 import { toast } from "sonner";
-import { addWish, deleteWish, dropWishAction, editWish, reopenWishAction, restoreWish } from "@/app/actions/wish";
+import { addWish, deleteWish, dropWishAction, editWish, reopenWishAction } from "@/app/actions/wish";
 import { InfoTip } from "@/components/app/help";
 import { AmountInput } from "@/components/app/money";
 import { PhotoPicker, type Photo } from "@/components/app/photo-picker";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastUndo } from "@/components/app/states";
+import { EmptyState, toastDone } from "@/components/app/states";
 import { Cover, MediaForm } from "@/components/media/media";
 import { CategoryChips } from "@/components/wish/category-chips";
 import { useExpenseDialog } from "@/components/money/expense-dialog";
@@ -254,10 +254,7 @@ function ShopDetail({ w, today, close, edit, refresh }: { w: WishItem; today: st
     if (!r.ok) return toast(r.error.message);
     close();
     refresh();
-    toastUndo("휴지통으로 옮겼어요", async () => {
-      await restoreWish(w.id);
-      refresh();
-    });
+    toastDone("휴지통으로 옮겼어요");
   }
   const reopen = (removeTx: boolean) => run(reopenWishAction(w.id, w.version, removeTx), removeTx ? "담아둠으로 되돌리고 지출은 휴지통으로 옮겼어요" : "담아둠으로 되돌렸어요");
 
@@ -519,10 +516,7 @@ function MediaWishes({ items, today, add, edit }: { items: WishItem[]; today: st
     const r = await deleteWish(w.id);
     if (!r.ok) return toast(r.error.message);
     router.refresh();
-    toastUndo("휴지통으로 옮겼어요", async () => {
-      await restoreWish(w.id);
-      router.refresh();
-    });
+    toastDone("휴지통으로 옮겼어요");
   }
   async function reopen(w: WishItem) {
     const r = await reopenWishAction(w.id, w.version, false);

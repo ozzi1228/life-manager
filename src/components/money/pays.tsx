@@ -6,9 +6,9 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { addPay, editPay, removePaymentAction, restorePaymentAction } from "@/app/actions/cards";
+import { addPay, editPay, removePaymentAction } from "@/app/actions/cards";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastUndo } from "@/components/app/states";
+import { EmptyState, toastDone } from "@/components/app/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -92,10 +92,7 @@ function PayForm({ edit, sources, close }: { edit?: PayItem; sources: Source[]; 
     if (!r.ok) return setError(r.error.message);
     close();
     router.refresh();
-    toastUndo(`${edit.name}을(를) 휴지통으로 옮겼어요. 지난 지출의 이름은 그대로예요`, async () => {
-      await restorePaymentAction(edit.id);
-      router.refresh();
-    });
+    toastDone(`${edit.name}을(를) 휴지통으로 옮겼어요. 지난 지출의 이름은 그대로예요`);
   }
 
   return (

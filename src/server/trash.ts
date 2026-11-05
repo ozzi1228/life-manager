@@ -26,13 +26,14 @@ import "./restraint.ts";
 import "./wish.ts";
 
 export const RETENTION_DAYS = 90;
+const DETAIL = new Set(["card", "pay", "account"]); // 결제수단 설정 행(결제수단과 늘 한 묶음)
 
-type AnyRow = Record<string, unknown> & { id: string; deletedAt: Date; deleteBatchId: string | null };
+export type AnyRow = Record<string, unknown> & { id: string; deletedAt: Date; deleteBatchId: string | null };
 const won = (n: unknown) => `${Number(n).toLocaleString("ko-KR")}원`;
 
 // 목록에 보일 것: 영역 이름과 행 이름. 위에 있을수록 묶음의 대표(예: 캘린더를 지우면 일정보다 캘린더가 보임)
 // 여기 없는 테이블(사진, 반복 예외, 작품 정보 등)은 다른 것과 함께 지워진 부속물 — 목록엔 안 보이고 함께 복구·삭제됨
-const SHOWN: Record<string, { area: string; name: (r: AnyRow, batch: { entity: string; row: AnyRow }[]) => string }> = {
+export const SHOWN: Record<string, { area: string; name: (r: AnyRow, batch: { entity: string; row: AnyRow }[]) => string }> = {
   calendar: { area: "일정", name: (r) => `${r.name} 캘린더` },
   event: { area: "일정", name: (r) => String(r.title) },
   goal_category: { area: "목표", name: (r) => `${r.name} 분류` },
@@ -42,7 +43,11 @@ const SHOWN: Record<string, { area: string; name: (r: AnyRow, batch: { entity: s
   recurring_payment: { area: "고정 지출", name: (r) => `${r.name} · ${won(r.amount)}` },
   planned_expense: { area: "예산", name: (r) => `큰 지출 ${r.name}` },
   fin_category: { area: "지출", name: (r) => `${r.name} 분류` },
-  payment_method: { area: "결제 수단", name: (r) => `${r.name} ${({ card: "카드", pay: "페이", account: "계좌" } as Record<string, string>)[String(r.kind)] ?? "결제수단"}` },
+  payment_method: { area: "자산", name: (r) => `${r.name} ${({ card: "카드", pay: "페이", account: "계좌" } as Record<string, string>)[String(r.kind)] ?? "결제수단"}` },
+  // 카드·페이·계좌 설정 행: 휴지통에선 결제수단과 한 묶음이라 대표가 아님. 작업 기록에서 설정만 고쳤을 때의 이름(결제수단을 함께 넘겨 받음)
+  card: { area: "자산", name: (r, b) => `${b.find((x) => x.row.id === r.paymentMethodId)?.row.name ?? ""} 카드`.trim() },
+  pay: { area: "자산", name: (r, b) => `${b.find((x) => x.row.id === r.paymentMethodId)?.row.name ?? ""} 페이`.trim() },
+  account: { area: "자산", name: (r, b) => `${b.find((x) => x.row.id === r.paymentMethodId)?.row.name ?? ""} 계좌`.trim() },
   restraint_entry: { area: "참은 소비", name: (r) => `${r.name} · ${won(r.amount)}` },
   journal_topic: { area: "일기", name: (r) => `${r.name} 주제` },
   journal_entry: { area: "일기", name: (r) => String(r.title || `${r.date} 일기`) },
@@ -123,7 +128,7 @@ export async function trashView(ctx: Ctx, now = new Date()) {
       if (!main) return []; // 부속물만 남은 묶음(예: 글에서 뺀 사진)은 목록에 안 보임 — 보존 기간에 정리
       const deletedAt = main.row.deletedAt;
       const daysLeft = Math.max(0, RETENTION_DAYS - Math.floor((now.getTime() - deletedAt.getTime()) / 86_400_000));
-      const others = g.filter((x) => x !== main && SHOWN[x.entity]).length;
+      const others = g.filter((x) => x !== main && SHOWN[x.entity] && !DETAIL.has(x.entity)).length;
       return [{ batchId, entity: main.entity, id: main.row.id, area: SHOWN[main.entity].area, name: SHOWN[main.entity].name(main.row, g), others, deletedAt: deletedAt.toISOString(), daysLeft }];
     })
     .sort((a, b) => b.deletedAt.localeCompare(a.deletedAt));

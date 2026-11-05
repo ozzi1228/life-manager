@@ -7,7 +7,7 @@ export const MAIN_NAV: NavItem[] = [
   { href: "/", label: "홈", icon: House },
   { href: "/calendar", label: "일정", icon: CalendarDays },
   { href: "/goals", label: "목표", icon: Target },
-  { href: "/money", label: "자산", icon: Wallet },
+  { href: "/money", label: "금융", icon: Wallet },
   { href: "/records", label: "기록", icon: NotebookPen },
   { href: "/wish", label: "위시", icon: Heart },
   { href: "/career", label: "커리어", icon: BriefcaseBusiness },
@@ -23,9 +23,10 @@ export const QUICK_ADD: { label: string; href: string; icon: LucideIcon; dialog?
 
 const TITLES: [string, string][] = [
   ["/settings", "설정"],
+  ["/activity", "작업 기록"],
   ["/calendar", "일정"],
   ["/goals", "목표"],
-  ["/money", "자산"],
+  ["/money", "금융"],
   ["/records", "기록"],
   ["/wish", "위시"],
   ["/career", "커리어"],

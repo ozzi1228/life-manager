@@ -4,7 +4,6 @@
 import { action } from "@/server/api";
 import { once } from "@/server/idempotency";
 import { createMedia, removeMedia, updateMedia, type MediaInput } from "@/server/media";
-import { restore } from "@/server/repo";
 
 /** fromWish: 작품 위시에서 시작·완료 처리할 때(09 §7) */
 export async function addMedia(key: string, input: MediaInput, fromWish?: { id: string; version: number }) {
@@ -18,7 +17,4 @@ export async function editMedia(id: string, version: number, input: MediaInput) 
 }
 export async function deleteMedia(id: string) {
   return action((ctx) => removeMedia(ctx, id));
-}
-export async function restoreMedia(id: string) {
-  return action((ctx) => restore(ctx, "media_log", id));
 }

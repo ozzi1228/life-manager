@@ -1,4 +1,4 @@
-// 자산 · 한눈에 (SCR-FIN-01, 04 §6.1): 남은 예산(없으면 쓴 돈) → 7일 안 결제 예정 → 분류별 상위 5 → 최근 지출. 참은 소비는 M-22에서
+// 금융 · 한눈에 (SCR-FIN-01, 04 §6.1): 남은 예산(없으면 쓴 돈) → 7일 안 결제 예정 → 분류별 상위 5 → 최근 지출. 참은 소비는 M-22에서
 import { CircleAlert } from "lucide-react";
 import Link from "next/link";
 import { InfoTip } from "@/components/app/help";

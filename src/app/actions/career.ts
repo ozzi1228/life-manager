@@ -4,7 +4,6 @@
 import { action } from "@/server/api";
 import { addExpCategory, createDoc, createExp, removeExpCategory, renameExpCategory, reorderExpCategories, setExpCategory, expRepo, removeDoc, saveVersion, updateDoc, updateExp, versionRepo, type DocInput, type ExpInput, type VersionInput } from "@/server/career";
 import { once } from "@/server/idempotency";
-import { restore } from "@/server/repo";
 
 export async function addExperience(key: string, input: ExpInput) {
   return action(async (ctx) => {
@@ -20,10 +19,6 @@ export async function deleteExperience(id: string) {
     await expRepo.remove(ctx, id);
   });
 }
-export async function restoreExperience(id: string) {
-  return action((ctx) => restore(ctx, "career_experience", id));
-}
-
 export async function addDoc(input: DocInput) {
   return action(async (ctx) => ({ id: (await createDoc(ctx, input)).id }));
 }
@@ -35,10 +30,6 @@ export async function editDoc(id: string, version: number, input: DocInput) {
 export async function deleteDoc(id: string) {
   return action((ctx) => removeDoc(ctx, id));
 }
-export async function restoreDoc(id: string) {
-  return action((ctx) => restore(ctx, "career_doc", id));
-}
-
 export async function saveDocVersion(docId: string, id: string | null, version: number | null, input: VersionInput) {
   return action(async (ctx) => ({ id: (await saveVersion(ctx, docId, id, version, input)).id }));
 }
@@ -47,10 +38,6 @@ export async function deleteDocVersion(id: string) {
     await versionRepo.remove(ctx, id);
   });
 }
-export async function restoreDocVersion(id: string) {
-  return action((ctx) => restore(ctx, "career_doc_version", id));
-}
-
 // 분류 편집
 export async function addExpCat(name: string) {
   return action((ctx) => addExpCategory(ctx, name));

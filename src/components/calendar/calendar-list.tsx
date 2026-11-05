@@ -7,13 +7,13 @@ import { Check, Copy, Ellipsis, ExternalLink, Pencil, Plus, RefreshCw, Star, Unl
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { addCalendar, checkGoogleKeys, editCalendar, removeCalendar, reorderCalendar, restoreCalendar, setGoogleKeys, syncGoogleNow, unlinkGoogle } from "@/app/actions/calendar";
+import { addCalendar, checkGoogleKeys, editCalendar, removeCalendar, reorderCalendar, setGoogleKeys, syncGoogleNow, unlinkGoogle } from "@/app/actions/calendar";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@/components/ui/context-menu";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useDragSort } from "@/hooks/use-drag-sort";
 import { ColorPalettePicker } from "@/components/app/color-picker";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { toastUndo } from "@/components/app/states";
+import { toastDone } from "@/components/app/states";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -48,10 +48,7 @@ function CalendarEditor({ edit, calendars, close }: { edit: Edit; calendars: Cal
     if (!r.ok) return toast(r.error.message);
     close();
     router.refresh();
-    toastUndo(`${v.name} 캘린더와 일정을 휴지통으로 옮겼어요`, async () => {
-      await restoreCalendar(v.id!);
-      router.refresh();
-    });
+    toastDone(`${v.name} 캘린더와 일정을 휴지통으로 옮겼어요`);
   }
 
   return (

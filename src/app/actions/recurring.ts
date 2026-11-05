@@ -3,7 +3,6 @@
 // 고정 지출 추가·수정·해지 (SCR-FIN-06·07). 규칙은 src/server/recurring.ts
 import { action } from "@/server/api";
 import { cancelEnd, createRecurring, endNow, reactivate, recurringRepo, scheduleEnd, updateRecurring } from "@/server/recurring";
-import { restore } from "@/server/repo";
 
 export type RecurringIn = {
   name: string;
@@ -43,7 +42,4 @@ export async function deleteRecurring(id: string) {
   return action(async (ctx) => {
     await recurringRepo.remove(ctx, id);
   });
-}
-export async function restoreRecurring(id: string) {
-  return action((ctx) => restore(ctx, "recurring_payment", id));
 }

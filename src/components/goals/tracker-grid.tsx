@@ -13,14 +13,13 @@ import {
   hideTrackerItem,
   nextColor,
   reorderTrackerItems,
-  restoreTrackerItem,
   saveCell,
   startTrackerMonth,
 } from "@/app/actions/goals";
 import { ColorPalettePicker } from "@/components/app/color-picker";
 import { HowToTip } from "@/components/app/help";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastUndo } from "@/components/app/states";
+import { EmptyState, toastDone } from "@/components/app/states";
 import { MonthNav } from "@/components/money/controls";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -360,10 +359,7 @@ function ItemEditor({ month, item, preset, used, close, done }: { month: string;
     await deleteTrackerItem(item.id);
     done();
     close();
-    toastUndo("휴지통으로 옮겼어요", async () => {
-      await restoreTrackerItem(item.id);
-      done();
-    });
+    toastDone("휴지통으로 옮겼어요");
   }
 
   return (

@@ -8,7 +8,6 @@ import {
   deleteCalendar,
   deleteEvent,
   reorderCalendars,
-  exceptionRepo,
   saveNote,
   setCalendarHidden,
   setEventColor,
@@ -21,7 +20,6 @@ import {
 } from "@/server/calendar";
 import { disconnectGoogle, saveGoogleKeys, syncGoogle, testGoogleKeys } from "@/server/google-calendar";
 import { once } from "@/server/idempotency";
-import { restore } from "@/server/repo";
 
 export async function addEvent(key: string, input: EventInput) {
   return action(async (ctx) => {
@@ -37,14 +35,6 @@ export async function editEvent(id: string, version: number, input: EventInput, 
 export async function removeEvent(id: string, scope: Scope, occurrenceDate: string) {
   return action((ctx) => deleteEvent(ctx, id, scope, occurrenceDate));
 }
-/** 지우기 되돌리기: 휴지통 복구 또는 "이 일정만 지움" 예외 지우기 */
-export async function undoRemoveEvent(undo: { restoreId?: string; exceptionId?: string }) {
-  return action(async (ctx) => {
-    if (undo.restoreId) await restore(ctx, "event", undo.restoreId);
-    if (undo.exceptionId) await exceptionRepo.remove(ctx, undo.exceptionId);
-  });
-}
-
 /** 일정 배경색(null = 캘린더 색) */
 export async function colorEvent(id: string, version: number, colorHex: string | null) {
   return action(async (ctx) => {
@@ -83,10 +73,6 @@ export async function hideCalendarIn(id: string, version: number, hiddenIn: stri
 export async function removeCalendar(id: string) {
   return action((ctx) => deleteCalendar(ctx, id));
 }
-export async function restoreCalendar(id: string) {
-  return action((ctx) => restore(ctx, "calendar", id));
-}
-
 /** 기간 메모 저장(연·월·주·일) */
 export async function saveCalendarNote(scope: NoteScope, key: string, body: string, version: number | null) {
   return action((ctx) => saveNote(ctx, scope, key, body, version));

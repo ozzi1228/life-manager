@@ -8,8 +8,8 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useOptimistic, useState, useTransition } from "react";
 import { toast } from "sonner";
-import { addPeriodGoal, changeGoalStatus, deleteGoal, restoreGoal } from "@/app/actions/goals";
-import { toastUndo } from "@/components/app/states";
+import { addPeriodGoal, changeGoalStatus, deleteGoal } from "@/app/actions/goals";
+import { toastDone } from "@/components/app/states";
 import { type Goal, GoalDialog } from "@/components/goals/goal-list";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
@@ -38,10 +38,7 @@ function useGoals<G extends PeriodGoal>(goals: G[]) {
     const r = await deleteGoal(g.id);
     if (!r.ok) return toast.error(r.error.message);
     router.refresh();
-    toastUndo("휴지통으로 옮겼어요", async () => {
-      await restoreGoal(g.id);
-      router.refresh();
-    });
+    toastDone("휴지통으로 옮겼어요");
   }
   return { list, toggle, remove, refresh: () => router.refresh() };
 }

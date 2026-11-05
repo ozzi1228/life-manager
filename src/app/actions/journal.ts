@@ -4,7 +4,6 @@
 import { action } from "@/server/api";
 import { once } from "@/server/idempotency";
 import { createEntry, entryRepo, updateEntry } from "@/server/journal";
-import { restore } from "@/server/repo";
 
 type EntryIn = { date: string; topicId: string | null; title: string | null; bodyMd: string; photoIds: string[] };
 
@@ -25,6 +24,3 @@ export async function removeEntry(id: string) {
   });
 }
 
-export async function restoreEntry(id: string) {
-  return action((ctx) => restore(ctx, "journal_entry", id));
-}

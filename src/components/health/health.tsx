@@ -6,9 +6,9 @@ import { Lock, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { addHealth, deleteHealth, editHealth, restoreHealth } from "@/app/actions/health";
+import { addHealth, deleteHealth, editHealth } from "@/app/actions/health";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastUndo } from "@/components/app/states";
+import { EmptyState, toastDone } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
@@ -93,10 +93,7 @@ function HealthForm({ edit, kind, today, last, names, close, done }: { edit?: He
     const r = await deleteHealth(edit.id);
     if (!r.ok) return setError(r.error.message);
     done();
-    toastUndo("휴지통으로 옮겼어요", async () => {
-      await restoreHealth(edit.id);
-      done();
-    });
+    toastDone("휴지통으로 옮겼어요");
   }
 
   return (
