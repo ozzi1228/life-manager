@@ -227,7 +227,7 @@ export async function periodGoals(ctx: Ctx, scope: PeriodScope, key: string) {
   if (!validPeriodKey(scope, key)) throw new AppError("BAD_REQUEST", "잠시 후 다시 시도해 주세요");
   const where =
     scope === "year"
-      ? and(isNull(goals.periodScope), eq(goals.endYear, Number(key))) // 그 해 한 해짜리 + 그 해에 끝나는 큰 목표(여러 해 목표가 해마다 되풀이되지 않게)
+      ? and(isNull(goals.periodScope), eq(goals.startYear, Number(key)), eq(goals.endYear, Number(key))) // 그 해 한 해짜리만(여러 해 큰 목표는 되풀이하지 않음)
       : and(eq(goals.periodScope, scope), eq(goals.periodKey, key));
   const list = await goalRepo.list(ctx, { where: and(where, inArray(goals.status, ["active", "done"])), orderBy: [asc(goals.sort), asc(goals.createdAt)], limit: 500 });
   return list.map(toGoal);

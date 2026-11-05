@@ -2,7 +2,7 @@
 
 // 전체 목표 (SCR-GOAL-05) · 연도별 (SCR-GOAL-08) · 달성 모아 보기 · 목표 추가·수정 (SCR-GOAL-07)
 // 목표는 두 층: 큰 목표(여러 해) / 한 해 목표(+ 월·주·일은 기간별 탭). 단기·중기·장기는 고르지 않음(서버가 연도로 정함)
-// 연도별: 맨 위 '진행 중인 큰 목표'에 한 번만, 각 해 아래엔 그 해 한 해짜리만 + 그 해에 끝나는 큰 목표(마감). 모든 해를 이어 붙이고 올해로 스크롤(D-069)
+// 연도별: 맨 위 '진행 중인 큰 목표'에 한 번만, 각 해 아래엔 그 해 한 해짜리만. 해는 오름차순(지난해 → 올해 → 앞으로), 처음엔 올해로 스크롤(D-069)
 import { Check, ChevronDown, Ellipsis, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -77,10 +77,10 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
   const active = filtered.filter((g) => g.status === "active");
   const done = filtered.filter((g) => g.status === "done");
   const stopped = filtered.filter((g) => g.status === "paused" || g.status === "dropped");
-  // 연도별: 한 해 목표가 있는 해 + 큰 목표가 끝나는 해 + 올해, 최근 해가 위
-  const years = [...new Set([thisYear, ...goals.flatMap((g) => (g.endYear === null ? [] : [g.endYear]))])].sort((a, b) => b - a);
+  // 연도별: 한 해 목표가 있는 해 + 올해, 가까운 해가 위(오름차순 — 먼 미래가 올해보다 먼저 보이지 않게)
+  const years = [...new Set([thisYear, ...goals.flatMap((g) => (g.startYear === null || isBig(g) ? [] : [g.startYear]))])].sort((a, b) => a - b);
   // 연도별의 그 해 목록: 그 해 한 해짜리 + 그 해에 끝나는 큰 목표
-  const ofYear = (g: Goal, y: number) => (isBig(g) ? g.endYear === y : g.startYear === y);
+  const ofYear = (g: Goal, y: number) => !isBig(g) && g.startYear === y;
 
   // 연도별은 올해 칸이 맨 위에 오게(앞으로의 해가 위에 있을 때만 스크롤)
   useEffect(() => {
@@ -120,7 +120,6 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
           {[catName(g.categoryId), y !== undefined && !isBig(g) ? null : period(g, thisYear)].filter(Boolean).join(" · ")}
         </span>
       </button>
-      {y !== undefined && isBig(g) && g.endYear === y && <Badge variant="outline">마감</Badge>}
       {view === "done" && g.achievedAt && <span className="text-muted-foreground shrink-0 text-sm tabular-nums">{`${+g.achievedAt.slice(5, 7)}월 ${+g.achievedAt.slice(8, 10)}일`}</span>}
       {(g.status === "paused" || g.status === "dropped") && <Badge variant="secondary">{STATUS[g.status]}</Badge>}
       <DropdownMenu>
@@ -239,7 +238,7 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
                     <CollapsibleTrigger className="flex min-h-11 flex-1 items-center gap-1.5 px-3 text-left text-sm font-semibold md:min-h-9 [&>svg]:transition-transform [&[data-state=closed]>svg]:-rotate-90">
                       <ChevronDown className="size-4" /> 진행 중인 큰 목표 <span className="text-muted-foreground font-normal tabular-nums">{big.length}</span>
                     </CollapsibleTrigger>
-                    <InfoTip label="큰 목표">여러 해에 걸친 목표예요. 해마다 되풀이하지 않고 여기 한 번, 끝나는 해에 한 번 보여요.</InfoTip>
+                    <InfoTip label="큰 목표">여러 해에 걸친 목표예요. 해마다 되풀이하지 않고 여기에만 보여요.</InfoTip>
                   </div>
                   <CollapsibleContent>
                     <ul className="divide-y border-t">{big.map((g) => row(g))}</ul>
@@ -282,7 +281,7 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
             [
               ["큰 목표", active.filter(isBig).sort((a, b) => (a.endYear as number) - (b.endYear as number))],
               [`올해 목표 · ${thisYear}`, active.filter((g) => !isBig(g) && g.startYear === thisYear)],
-              ["다른 해 목표", active.filter((g) => !isBig(g) && g.startYear !== null && g.startYear !== thisYear).sort((a, b) => Math.abs((a.startYear as number) - thisYear) - Math.abs((b.startYear as number) - thisYear) || (b.startYear as number) - (a.startYear as number))],
+              ["다른 해 목표", active.filter((g) => !isBig(g) && g.startYear !== null && g.startYear !== thisYear).sort((a, b) => (a.startYear as number) - (b.startYear as number))], // 오름차순
               ["연도 미정", active.filter((g) => g.startYear === null)],
             ] as const
           ).map(
@@ -407,7 +406,7 @@ export function GoalDialog({ goal, preset, defaultYear, categories, close, done 
                   )}
                 </div>
               )}
-              {kind === "range" && <p className="text-muted-foreground text-caption">{end - start + 1}년짜리 큰 목표예요. 연도별 화면에선 맨 위와 끝나는 해에만 보여요</p>}
+              {kind === "range" && <p className="text-muted-foreground text-caption">{end - start + 1}년짜리 큰 목표예요. 연도별 화면에선 맨 위 “진행 중인 큰 목표”에만 보여요</p>}
             </Field>
           </>
         )}

@@ -62,10 +62,10 @@ try {
   const big = await createGoal(A, { title: "내 집 마련", horizon: "short", startYear: 2031, endYear: 2035 });
   assert.equal(big.horizon, "long", "5년이면 장기");
   assert.equal((await createGoal(A, { title: "이직", startYear: 2031, endYear: 2033 })).horizon, "mid", "3년까지 중기");
-  // 일정 화면 연 목표: 그 해 한 해짜리 + 그 해에 끝나는 큰 목표만(여러 해 목표를 해마다 되풀이하지 않음)
+  // 일정 화면 연 목표: 그 해 한 해짜리만(여러 해 큰 목표는 안 보임)
   await createGoal(A, { title: "2032 여행", startYear: 2032, endYear: 2032 });
   assert.deepEqual((await periodGoals(A, "year", "2032")).map((x) => x.title), ["2032 여행"], "진행 중인 큰 목표는 안 보임");
-  assert.ok((await periodGoals(A, "year", "2035")).some((x) => x.id === big.id), "끝나는 해엔 보임");
+  assert.equal((await periodGoals(A, "year", "2035")).some((x) => x.id === big.id), false, "끝나는 해에도 안 보임");
   const done = await setGoalStatus(A, g.id, g.version, "done");
   assert.equal(done.status, "done");
   assert.equal(done.achievedAt, today);
