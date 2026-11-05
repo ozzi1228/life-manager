@@ -17,7 +17,7 @@ import {
 } from "@/app/actions/recurring";
 import { InfoTip } from "@/components/app/help";
 import { MoneyInput, moneyWithForeign } from "@/components/app/money";
-import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
+import { ResponsiveModal } from "@/components/app/responsive";
 import { EmptyState, toastDone } from "@/components/app/states";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Badge } from "@/components/ui/badge";
@@ -186,7 +186,7 @@ function Detail({ item, today, payment, category, close, edit, done }: { item: R
     );
 
   return (
-    <ResponsiveDetail
+    <ResponsiveModal
       open
       onOpenChange={(o) => !o && close()}
       title={
@@ -257,7 +257,7 @@ function Detail({ item, today, payment, category, close, edit, done }: { item: R
         </dl>
       </div>
 
-    </ResponsiveDetail>
+    </ResponsiveModal>
   );
 }
 
