@@ -9,6 +9,13 @@ import { dayLabel, fromYmd, money } from "@/lib/format";
 export type TxRow = TxEdit;
 type Names = Record<string, string>;
 
+/** 결제수단 이름. 페이를 거쳤으면 "네이버페이 · 신한카드", 페이 머니면 "네이버페이 머니" */
+export const payLabel = (r: Pick<TxRow, "paymentMethodId" | "payId">, payments: Names) => {
+  const pm = r.paymentMethodId ? payments[r.paymentMethodId] : null;
+  if (!r.payId || !payments[r.payId]) return pm;
+  return r.payId === r.paymentMethodId ? `${payments[r.payId]} 머니` : [payments[r.payId], pm].filter(Boolean).join(" · ");
+};
+
 const signed = (r: TxRow) => (r.type === "income" || r.isRefund ? r.amount : -r.amount);
 
 export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; categories: Names; payments: Names; today: string }) {
@@ -40,7 +47,7 @@ export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; c
                         {date > today && <Badge variant="outline">예정</Badge>}
                       </span>
                       <span className="text-muted-foreground block truncate text-caption">
-                        {[r.title ? categories[r.categoryId] : null, r.paymentMethodId ? payments[r.paymentMethodId] : null].filter(Boolean).join(" · ")}
+                        {[r.title ? categories[r.categoryId] : null, payLabel(r, payments)].filter(Boolean).join(" · ")}
                       </span>
                     </span>
                     <span className="shrink-0 tabular-nums">

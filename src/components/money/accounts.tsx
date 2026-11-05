@@ -1,0 +1,340 @@
+"use client";
+
+// 계좌 목록(06 §7): 종류마다 다른 칸 — 입출금(잔액), 예금·적금(시작·만기·이율·예상 이자), 주식(원금·평가 금액·수익)
+// 모든 계좌에 연결된 카드(카드의 결제 계좌, 이번 달 쓴 돈)와 자동 결제(이 계좌·연결 카드로 나가는 고정 지출)
+import { Plus } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { useState } from "react";
+import { toast } from "sonner";
+import { addAccount, editAccount, hidePaymentAction } from "@/app/actions/cards";
+import { AmountInput, MoneyText } from "@/components/app/money";
+import { ResponsiveModal } from "@/components/app/responsive";
+import { EmptyState } from "@/components/app/states";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Spinner } from "@/components/ui/spinner";
+import { Textarea } from "@/components/ui/textarea";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { ACCOUNT_CATEGORY, TAX, daysUntil, expectedInterest, stockProfit, type AccountCategory, type Tax } from "@/lib/accounts";
+import { money } from "@/lib/format";
+import type { AccountInput, AccountItem } from "@/server/cards";
+
+const BANKS = ["KB국민", "신한", "우리", "하나", "NH농협", "IBK기업", "카카오뱅크", "토스뱅크", "케이뱅크", "SC제일", "새마을금고", "우체국", "키움증권", "미래에셋증권", "삼성증권", "한국투자증권", "토스증권"];
+const md = (s: string) => `${Number(s.slice(5, 7))}월 ${Number(s.slice(8))}일`;
+const input = "h-11 text-base md:h-9 md:text-sm";
+
+export function AccountGrid({ accounts, today }: { accounts: AccountItem[]; today: string }) {
+  const [form, setForm] = useState<AccountItem | "new" | null>(null);
+  const mobile = useIsMobile();
+  const add = (
+    <Button variant={mobile ? "outline" : "default"} onClick={() => setForm("new")}>
+      <Plus /> 계좌 추가
+    </Button>
+  );
+  return (
+    <div className="space-y-4">
+      {accounts.length > 0 && (
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-muted-foreground text-sm">계좌를 누르면 고칠 수 있어요</p>
+          {add}
+        </div>
+      )}
+      {accounts.length === 0 ? (
+        <EmptyState pet="komong" title="계좌를 등록해 보세요" description="예금·적금은 만기와 예상 이자를, 모든 계좌는 연결된 카드와 자동 결제를 한눈에 볼 수 있어요" action={add} />
+      ) : (
+        <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+          {accounts.map((a) => (
+            <li key={a.id}>
+              <AccountCard a={a} today={today} open={() => setForm(a)} />
+            </li>
+          ))}
+        </ul>
+      )}
+      {form && <AccountForm edit={form === "new" ? undefined : form} close={() => setForm(null)} />}
+    </div>
+  );
+}
+
+function AccountCard({ a, today, open }: { a: AccountItem; today: string; open: () => void }) {
+  const d = a.account;
+  const cat = d?.category ?? "checking";
+  const interest = d && expectedInterest(d);
+  const profit = d && cat === "stock" ? stockProfit(d.principal, d.balance) : null;
+  const left = d?.maturityDate ? daysUntil(d.maturityDate, today) : null;
+  return (
+    <button type="button" onClick={open} className="bg-card hover:bg-accent/40 flex h-full w-full flex-col justify-start space-y-3 rounded-xl border p-5 text-left shadow-sm">
+      <div className="space-y-1">
+        <div className="flex items-center gap-2">
+          <p className="min-w-0 truncate font-semibold">{a.name}</p>
+          <Badge variant="secondary" className="shrink-0">
+            {ACCOUNT_CATEGORY[cat]}
+          </Badge>
+        </div>
+        {(d?.bank || d?.number) && <p className="text-muted-foreground text-sm">{[d.bank, d.number].filter(Boolean).join(" · ")}</p>}
+      </div>
+
+      {(cat === "checking" || cat === "stock") && d?.balance != null && (
+        <p className="text-lg font-semibold">
+          <span className="text-muted-foreground mr-2 text-sm font-normal">{cat === "stock" ? "평가 금액" : "잔액"}</span>
+          <MoneyText amount={d.balance} />
+        </p>
+      )}
+      {profit && (
+        <p className={profit.profit < 0 ? "text-sm text-blue-600 dark:text-blue-400" : "text-destructive-text text-sm"}>
+          원금 {money(d!.principal!)} · {money(profit.profit, { sign: true })} ({profit.pct > 0 ? "+" : ""}
+          {profit.pct}%)
+        </p>
+      )}
+      {(cat === "deposit" || cat === "savings") && d && (
+        <div className="space-y-1 text-sm">
+          <p className="text-muted-foreground">
+            {[d.principal != null && `${cat === "savings" ? "매월 " : ""}${money(d.principal)}`, d.rate != null && `연 ${d.rate}%`, d.maturityDate && `${d.maturityDate.slice(0, 4)}년 ${md(d.maturityDate)} 만기`].filter(Boolean).join(" · ")}
+            {left !== null && <span className="text-foreground ml-1.5 font-medium whitespace-nowrap">{left > 0 ? `D-${left}` : left === 0 ? "오늘 만기" : "만기 지남"}</span>}
+          </p>
+          {interest ? (
+            <p>
+              예상 이자 <b className="font-semibold">{money(interest.net)}</b>
+              <span className="text-muted-foreground"> (세후) · 만기에 {money(interest.total)}</span>
+            </p>
+          ) : (
+            <p className="text-muted-foreground">금액·이율·기간을 적으면 예상 이자를 계산해 줘요</p>
+          )}
+        </div>
+      )}
+
+      {a.cards.length > 0 && (
+        <div className="space-y-1 border-t pt-3 text-sm">
+          <p className="text-muted-foreground text-caption">연결된 카드</p>
+          {a.cards.map((c) => (
+            <p key={c.id} className="flex justify-between gap-2">
+              <span className="truncate">{c.name}</span>
+              <span className="text-muted-foreground shrink-0">이번 달 {money(c.monthSpent)}</span>
+            </p>
+          ))}
+        </div>
+      )}
+      {a.autopays.length > 0 && (
+        <div className="space-y-1 border-t pt-3 text-sm">
+          <p className="text-muted-foreground text-caption">자동 결제 {a.autopays.length}건</p>
+          {a.autopays.map((r) => (
+            <div key={r.id} className="flex justify-between gap-2">
+              <span className="min-w-0">
+                <span className="block truncate">{r.name}</span>
+                <span className="text-muted-foreground text-caption block">{[r.label, r.next && `다음 ${md(r.next)}`, r.via && `${r.via}로`].filter(Boolean).join(" · ")}</span>
+              </span>
+              <span className="shrink-0">{r.variableAmount ? "약 " : ""}{money(r.amount)}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {d?.memo && <p className="line-clamp-4 text-sm whitespace-pre-line">{d.memo}</p>}
+    </button>
+  );
+}
+
+function AccountForm({ edit, close }: { edit?: AccountItem; close: () => void }) {
+  const router = useRouter();
+  const d = edit?.account;
+  const [v, setV] = useState<AccountInput & { category: AccountCategory }>({
+    name: edit?.name ?? "",
+    category: d?.category ?? "checking",
+    bank: d?.bank ?? null,
+    number: d?.number ?? null,
+    balance: d?.balance ?? null,
+    principal: d?.principal ?? null,
+    rate: d?.rate ?? null,
+    tax: d?.tax ?? "normal",
+    startDate: d?.startDate ?? null,
+    maturityDate: d?.maturityDate ?? null,
+    memo: d?.memo ?? null,
+  });
+  const [rateText, setRateText] = useState(d?.rate != null ? String(d.rate) : "");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const set = <K extends keyof AccountInput>(k: K, val: AccountInput[K]) => setV((s) => ({ ...s, [k]: val }));
+  const saving = v.category === "deposit" || v.category === "savings";
+  const interest = saving ? expectedInterest({ category: v.category, principal: v.principal ?? null, rate: v.rate ?? null, tax: (v.tax ?? "normal") as Tax, startDate: v.startDate ?? null, maturityDate: v.maturityDate ?? null }) : null;
+  const profit = v.category === "stock" ? stockProfit(v.principal ?? null, v.balance ?? null) : null;
+
+  async function save() {
+    setBusy(true);
+    const data = { ...v, bank: v.bank?.trim() || null, number: v.number?.trim() || null, memo: v.memo?.trim() || null };
+    const r = edit ? await editAccount(edit.id, edit.pmVersion, data) : await addAccount(data);
+    setBusy(false);
+    if (!r.ok) return setError(r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 수정했어요. 닫고 다시 열어 주세요" : (r.error.fields?.[0]?.message ?? r.error.message));
+    toast(edit ? "계좌를 고쳤어요" : "계좌를 추가했어요");
+    close();
+    router.refresh();
+  }
+
+  async function hide() {
+    if (!edit) return;
+    const r = await hidePaymentAction("account", edit.id, edit.pmVersion);
+    if (!r.ok) return setError(r.error.message);
+    toast("계좌를 숨겼어요. 지난 지출의 이름은 그대로예요");
+    close();
+    router.refresh();
+  }
+
+  return (
+    <ResponsiveModal
+      open
+      onOpenChange={(o) => !o && close()}
+      title={edit ? "계좌 수정" : "계좌 추가"}
+      footer={
+        <div className="flex w-full gap-2 max-md:flex-col-reverse">
+          {edit && (
+            <Button variant="ghost" className="text-destructive-text" onClick={hide}>
+              계좌 숨기기
+            </Button>
+          )}
+          <Button className="md:ml-auto" disabled={!v.name.trim() || busy} onClick={save}>
+            {busy && <Spinner />} {edit ? "저장" : "계좌 추가"}
+          </Button>
+        </div>
+      }
+    >
+      <FieldGroup className="gap-5">
+        <Field>
+          <FieldLabel>종류</FieldLabel>
+          <ToggleGroup type="single" variant="outline" className="w-full" value={v.category} onValueChange={(c) => c && set("category", c as AccountCategory)} aria-label="계좌 종류">
+            {Object.entries(ACCOUNT_CATEGORY).map(([k, label]) => (
+              <ToggleGroupItem key={k} value={k} className="flex-1 max-md:h-10">
+                {label}
+              </ToggleGroupItem>
+            ))}
+          </ToggleGroup>
+        </Field>
+        <Field>
+          <FieldLabel htmlFor="ac-name">계좌 이름</FieldLabel>
+          <Input id="ac-name" autoFocus={!edit} maxLength={20} placeholder={v.category === "stock" ? "예: 키움 주식" : saving ? "예: 1년 정기예금" : "예: 월급 통장"} className={input} value={v.name} onChange={(e) => set("name", e.target.value)} />
+        </Field>
+        <div className="grid grid-cols-2 gap-3">
+          <Field>
+            <FieldLabel htmlFor="ac-bank">{v.category === "stock" ? "증권사" : "은행"}</FieldLabel>
+            <Input id="ac-bank" list="ac-banks" maxLength={20} className={`${input} [&::-webkit-calendar-picker-indicator]:opacity-0`} value={v.bank ?? ""} onChange={(e) => set("bank", e.target.value)} />
+            <datalist id="ac-banks">
+              {BANKS.map((b) => (
+                <option key={b} value={b} />
+              ))}
+            </datalist>
+          </Field>
+          <Field>
+            <FieldLabel htmlFor="ac-number">계좌번호</FieldLabel>
+            <Input id="ac-number" inputMode="numeric" maxLength={40} placeholder="선택" className={input} value={v.number ?? ""} onChange={(e) => set("number", e.target.value)} />
+          </Field>
+        </div>
+
+        {v.category === "checking" && (
+          <Field>
+            <FieldLabel htmlFor="ac-balance">잔액</FieldLabel>
+            <AmountInput id="ac-balance" placeholder="선택" value={v.balance ?? null} onChange={(a) => set("balance", a)} />
+          </Field>
+        )}
+
+        {saving && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field>
+                <FieldLabel htmlFor="ac-principal">{v.category === "savings" ? "월 납입액" : "예치 금액"}</FieldLabel>
+                <AmountInput id="ac-principal" value={v.principal ?? null} onChange={(a) => set("principal", a)} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="ac-rate">연 이율</FieldLabel>
+                <div className="relative">
+                  <Input
+                    id="ac-rate"
+                    inputMode="decimal"
+                    placeholder="0.0"
+                    className={`${input} pr-8 text-right tabular-nums`}
+                    value={rateText}
+                    onChange={(e) => {
+                      const t = e.target.value.replace(/[^\d.]/g, "");
+                      setRateText(t);
+                      set("rate", t && Number.isFinite(Number(t)) ? Number(t) : null);
+                    }}
+                  />
+                  <span className="text-muted-foreground pointer-events-none absolute top-1/2 right-3 -translate-y-1/2 text-sm">%</span>
+                </div>
+              </Field>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <Field>
+                <FieldLabel htmlFor="ac-start">시작일</FieldLabel>
+                <Input id="ac-start" type="date" className={input} value={v.startDate ?? ""} onChange={(e) => set("startDate", e.target.value || null)} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="ac-end">만기일</FieldLabel>
+                <Input id="ac-end" type="date" className={input} value={v.maturityDate ?? ""} onChange={(e) => set("maturityDate", e.target.value || null)} />
+              </Field>
+            </div>
+            <Field>
+              <FieldLabel>이자 과세</FieldLabel>
+              <Select value={v.tax ?? "normal"} onValueChange={(t) => set("tax", t as Tax)}>
+                <SelectTrigger aria-label="이자 과세" className="w-full data-[size=default]:h-11 md:data-[size=default]:h-9">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {Object.entries(TAX).map(([k, t]) => (
+                    <SelectItem key={k} value={k}>
+                      {t.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </Field>
+            <div className="bg-muted/50 rounded-lg p-3 text-sm" aria-live="polite">
+              {interest ? (
+                <>
+                  <p className="flex justify-between">
+                    <span>예상 이자 (세후, 단리)</span>
+                    <b className="font-semibold">{money(interest.net)}</b>
+                  </p>
+                  <p className="text-muted-foreground mt-1">
+                    {interest.months}개월 · 세전 {money(interest.gross)} − 세금 {money(interest.tax)} · 만기에 {money(interest.total)}
+                  </p>
+                </>
+              ) : (
+                <p className="text-muted-foreground">금액·이율·시작일·만기일을 적으면 예상 이자를 계산해 줘요</p>
+              )}
+            </div>
+          </>
+        )}
+
+        {v.category === "stock" && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <Field>
+                <FieldLabel htmlFor="ac-principal">투자 원금</FieldLabel>
+                <AmountInput id="ac-principal" value={v.principal ?? null} onChange={(a) => set("principal", a)} />
+              </Field>
+              <Field>
+                <FieldLabel htmlFor="ac-balance">평가 금액</FieldLabel>
+                <AmountInput id="ac-balance" value={v.balance ?? null} onChange={(a) => set("balance", a)} />
+              </Field>
+            </div>
+            {profit && (
+              <p className="bg-muted/50 rounded-lg p-3 text-sm">
+                수익 {money(profit.profit, { sign: true })} ({profit.pct > 0 ? "+" : ""}
+                {profit.pct}%)
+              </p>
+            )}
+          </>
+        )}
+
+        <Field>
+          <FieldLabel htmlFor="ac-memo">메모</FieldLabel>
+          <Textarea id="ac-memo" maxLength={2000} className="field-sizing-content min-h-24 leading-7" placeholder={"예: 월급 들어오는 통장\n관리비·통신비 자동이체"} value={v.memo ?? ""} onChange={(e) => set("memo", e.target.value)} />
+        </Field>
+        {edit && (edit.cards.length > 0 || edit.autopays.length > 0) ? null : (
+          <p className="text-muted-foreground text-caption">카드 수정에서 결제 계좌를 고르면 연결된 카드와 자동 결제가 이 계좌에 보여요</p>
+        )}
+        {error && <FieldError>{error}</FieldError>}
+      </FieldGroup>
+    </ResponsiveModal>
+  );
+}

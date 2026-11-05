@@ -2,7 +2,7 @@
 import { and, arrayOverlaps, asc, desc, eq, gte, ilike, inArray, isNull, lt, lte, max, or, sql, type SQL } from "drizzle-orm";
 import { z } from "zod";
 import { db, type Tx } from "../db/index.ts";
-import { finCategories, paymentMethods, plannedExpenses, transactions } from "../db/schema.ts";
+import { finCategories, paymentMethods, pays, plannedExpenses, transactions } from "../db/schema.ts";
 import type { TxFilter } from "../lib/tx-search.ts";
 import { parse } from "./validate.ts";
 import { AppError } from "./errors.ts";
@@ -41,21 +41,31 @@ export async function formData(ctx: Ctx) {
       .from(transactions)
       .where(and(eq(transactions.userId, ctx.userId), isNull(transactions.deletedAt), gte(transactions.date, since)))
       .groupBy(col);
-  const [cats, pms, pmUse, planned, tags] = await Promise.all([
+  const [cats, pms, pmUse, planned, tags, payRows, paySrc] = await Promise.all([
     categoryRepo.list(ctx, { where: eq(finCategories.isHidden, false), orderBy: [asc(finCategories.sort)] }),
     paymentRepo.list(ctx, { where: eq(paymentMethods.isHidden, false), orderBy: [asc(paymentMethods.sort), asc(paymentMethods.createdAt)] }),
     lastUse(transactions.paymentMethodId),
     plannedRepo.list(ctx, { where: gte(plannedExpenses.month, since.slice(0, 7)), orderBy: [asc(plannedExpenses.createdAt)] }),
     tagList(ctx),
+    db.select({ pmId: pays.paymentMethodId, sourceIds: pays.sourceIds }).from(pays).where(and(eq(pays.userId, ctx.userId), isNull(pays.deletedAt))),
+    // 페이마다 마지막으로 돈이 나간 곳(입력 창 기본값)
+    db.execute<{ pay_id: string; payment_method_id: string }>(sql`
+      select distinct on (pay_id) pay_id, payment_method_id from ${transactions}
+      where user_id = ${ctx.userId} and deleted_at is null and pay_id is not null and payment_method_id is not null
+      order by pay_id, created_at desc`),
   ]);
   const recent = (uses: { id: string | null; last: Date | null }[]) => new Map(uses.map((u) => [u.id, u.last?.getTime() ?? 0]));
   const byRecent = <T extends { id: string; sort: number }>(list: T[], use: Map<string | null, number>) =>
     [...list].sort((a, b) => (use.get(b.id) ?? 0) - (use.get(a.id) ?? 0) || a.sort - b.sort);
   const pmRecent = recent(pmUse);
   const orderedPm = byRecent(pms, pmRecent);
+  const alive = new Set(pms.map((p) => p.id));
+  const last = new Map(paySrc.rows.map((r) => [r.pay_id, r.payment_method_id]));
   return {
     categories: cats.map((c) => ({ id: c.id, kind: c.kind, name: c.name })),
     paymentMethods: orderedPm.map((p) => ({ id: p.id, kind: p.kind, name: p.name })),
+    /** 페이 id → 연결한 카드·계좌(숨긴 것 빼고)와 마지막으로 고른 곳 */
+    pays: Object.fromEntries(payRows.filter((r) => alive.has(r.pmId)).map((r) => [r.pmId, { sourceIds: r.sourceIds.filter((id) => alive.has(id)), last: last.get(r.pmId) ?? null }])),
     lastPaymentMethodId: pmRecent.size ? orderedPm[0]?.id ?? null : null,
     planned: planned.map((p) => ({ id: p.id, month: p.month, name: p.name })),
     tags,
@@ -86,20 +96,22 @@ export const txInput = z.object({
   memo: z.string().trim().max(1000).nullable().default(null),
   tags: z.array(z.string().max(100)).max(30).default([]).transform(cleanTags),
   plannedExpenseId: z.uuid().nullable().default(null),
+  payId: z.uuid().nullable().default(null),
 });
 export type TxInput = z.input<typeof txInput>;
 
 /** 분류·결제수단이 내 것이고 종류가 맞는지(교차 사용자 참조 방지, 14 §7) */
-async function checkRefs(ctx: Ctx, v: { type: string; categoryId: string; paymentMethodId: string | null; plannedExpenseId: string | null }) {
+async function checkRefs(ctx: Ctx, v: { type: string; categoryId: string; paymentMethodId: string | null; plannedExpenseId: string | null; payId: string | null }) {
   const cat = await categoryRepo.get(ctx, v.categoryId).catch(() => null);
   if (!cat || cat.kind !== v.type) throw new AppError("VALIDATION_FAILED", "분류를 골라 주세요", { fields: [{ path: "categoryId", rule: "exists", message: "분류를 골라 주세요" }] });
   if (v.paymentMethodId && !(await paymentRepo.get(ctx, v.paymentMethodId).catch(() => null)))
     throw new AppError("VALIDATION_FAILED", "결제수단을 다시 골라 주세요", { fields: [{ path: "paymentMethodId", rule: "exists", message: "결제수단을 다시 골라 주세요" }] });
   if (v.plannedExpenseId && !(await plannedRepo.get(ctx, v.plannedExpenseId).catch(() => null))) throw new AppError("VALIDATION_FAILED", "큰 지출을 다시 골라 주세요");
+  if (v.payId && (await paymentRepo.get(ctx, v.payId).catch(() => null))?.kind !== "pay") throw new AppError("VALIDATION_FAILED", "페이를 다시 골라 주세요");
   return cat;
 }
 
-const clean = (v: z.infer<typeof txInput>) => ({ ...v, title: v.title || null, memo: v.memo || null, isRefund: v.type === "expense" && v.isRefund, restraint: v.type === "expense" && v.restraint, plannedExpenseId: v.type === "expense" ? v.plannedExpenseId : null });
+const clean = (v: z.infer<typeof txInput>) => ({ ...v, title: v.title || null, memo: v.memo || null, isRefund: v.type === "expense" && v.isRefund, restraint: v.type === "expense" && v.restraint, plannedExpenseId: v.type === "expense" ? v.plannedExpenseId : null, payId: v.type === "expense" ? v.payId : null });
 
 export async function createTransaction(ctx: Ctx, input: unknown, tx?: Tx) {
   const v = clean(parse(txInput, input));
@@ -145,6 +157,7 @@ export async function searchTransactions(ctx: Ctx, f: TxFilter) {
         sql`array_to_string(${t.tags}, ' ') ilike ${like}`,
         cats.length ? inArray(t.categoryId, cats.map((c) => c.id)) : undefined,
         pms.length ? inArray(t.paymentMethodId, pms.map((p) => p.id)) : undefined,
+        pms.length ? inArray(t.payId, pms.map((p) => p.id)) : undefined,
       ),
     );
   }
@@ -152,7 +165,7 @@ export async function searchTransactions(ctx: Ctx, f: TxFilter) {
   if (f.type === "expense") w.push(eq(t.type, "expense"), eq(t.isRefund, false));
   if (f.type === "refund") w.push(eq(t.isRefund, true));
   if (f.cats.length) w.push(inArray(t.categoryId, f.cats));
-  if (f.pms.length) w.push(inArray(t.paymentMethodId, f.pms));
+  if (f.pms.length) w.push(or(inArray(t.paymentMethodId, f.pms), inArray(t.payId, f.pms))); // 페이를 고르면 그 페이로 쓴 것도
   if (f.tags.length) w.push(arrayOverlaps(t.tags, f.tags)); // 고른 태그 중 하나라도
   if (f.min !== undefined) w.push(gte(t.amount, f.min));
   if (f.max !== undefined) w.push(lte(t.amount, f.max));
@@ -245,4 +258,5 @@ export const toRow = (r: typeof transactions.$inferSelect) => ({
   memo: r.memo,
   tags: r.tags,
   plannedExpenseId: r.plannedExpenseId,
+  payId: r.payId,
 });

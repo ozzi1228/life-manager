@@ -156,6 +156,7 @@ export const transactions = pgTable(
     installmentMonths: integer("installment_months").notNull().default(1),
     tags: text("tags").array().notNull().default(sql`'{}'::text[]`), // 개인 태그(분류와 별개, 여러 개). 정리 규칙은 finance.ts cleanTags
     plannedExpenseId: uuid("planned_expense_id"), // 큰 지출에 연결되면 분류별 예산 사용에서 빠짐(06 §4.1)
+    payId: uuid("pay_id"), // 거친 페이(결제수단 kind=pay). payment_method_id는 언제나 돈이 실제로 나간 곳(연결 카드·계좌·페이 머니) — 카드별 합계가 두 번 잡히지 않게(06 §6.7)
   },
   (t) => [
     index("transactions_user_date").on(t.userId, t.date.desc()).where(sql`${t.deletedAt} is null`),
@@ -363,8 +364,42 @@ export const cards = pgTable(
     billingDay: integer("billing_day"),
     annualFee: bigint("annual_fee", { mode: "number" }),
     memo: text("memo"),
+    linkedAccountId: uuid("linked_account_id"), // 결제 계좌(결제수단 kind=account의 id). 계좌 화면의 연결 카드·카드 대금
   },
   (t) => [uniqueIndex("cards_payment_method").on(t.userId, t.paymentMethodId).where(sql`${t.deletedAt} is null`)],
+);
+
+// 페이 (06 §6.7). 결제수단(kind=pay)과 1:1. 페이에 연결한 카드·계좌(결제수단 id) — 지출 입력에서 "어디서 나갔나요?" 선택지
+export const pays = pgTable(
+  "pays",
+  {
+    ...userData(),
+    paymentMethodId: uuid("payment_method_id").notNull(),
+    sourceIds: uuid("source_ids").array().notNull().default(sql`'{}'::uuid[]`),
+    memo: text("memo"),
+  },
+  (t) => [uniqueIndex("pays_payment_method").on(t.userId, t.paymentMethodId).where(sql`${t.deletedAt} is null`)],
+);
+
+// 계좌 (06 §7). 결제수단(kind=account)과 1:1. 종류마다 쓰는 칸이 다름: 예금·적금은 시작·만기·이율·과세, 주식은 원금·평가 금액
+// ponytail: 잔액은 현재 값 하나. 추이 그래프가 필요해지면 스냅샷 테이블로
+export const accounts = pgTable(
+  "accounts",
+  {
+    ...userData(),
+    paymentMethodId: uuid("payment_method_id").notNull(),
+    category: text("category", { enum: ["checking", "deposit", "savings", "stock"] }).notNull().default("checking"),
+    bank: text("bank"),
+    number: text("number"),
+    balance: bigint("balance", { mode: "number" }), // 입출금 잔액 / 주식 평가 금액
+    principal: bigint("principal", { mode: "number" }), // 예금 예치 금액 / 적금 월 납입액 / 주식 투자 원금
+    rate: doublePrecision("rate"), // 연 이율(%)
+    tax: text("tax", { enum: ["normal", "preferential", "free"] }),
+    startDate: date("start_date"),
+    maturityDate: date("maturity_date"),
+    memo: text("memo"),
+  },
+  (t) => [uniqueIndex("accounts_payment_method").on(t.userId, t.paymentMethodId).where(sql`${t.deletedAt} is null`)],
 );
 
 // ── 작품 기록 (08 §3, 14 §4.6) ──

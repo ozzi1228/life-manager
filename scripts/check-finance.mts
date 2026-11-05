@@ -3,7 +3,7 @@
 import assert from "node:assert/strict";
 import { inArray } from "drizzle-orm";
 import { db } from "../src/db/index.ts";
-import { budgets, cards, finCategories, paymentMethods, plannedExpenses, recurringPayments, revisions, transactions } from "../src/db/schema.ts";
+import { accounts, budgets, cards, finCategories, paymentMethods, pays, plannedExpenses, recurringPayments, revisions, transactions } from "../src/db/schema.ts";
 import { AppError } from "../src/server/errors.ts";
 import { createTransaction, formData, monthTransactions, totals } from "../src/server/finance.ts";
 import type { Ctx } from "../src/server/repo.ts";
@@ -161,7 +161,7 @@ try {
   console.log("분류 편집 확인 통과");
 
   // 카드: 지출 입력에서 만든 카드도 목록에, 메모, 남의 카드 불가, 같은 이름 불가, 숨기면 목록에서 빠짐(D-071: 혜택 계산 없음)
-  const { createCard, cardList, updateCard, hideCard } = await import("../src/server/cards.ts");
+  const { createCard, cardList, updateCard, hidePaymentMethod } = await import("../src/server/cards.ts");
   const { createPaymentMethod } = await import("../src/server/finance.ts");
   const quick = await createPaymentMethod(A, { kind: "card", name: "빠른카드" });
   const pmA = await createCard(A, { name: "A카드", issuer: "우나카드", cardType: "credit", billingDay: 14, memo: "- 편의점 갈 때 최대 혜택" });
@@ -173,9 +173,37 @@ try {
   const renamed = await updateCard(A, quick.id, quick.version, { name: "B카드", billingDay: 1, memo: "주유" });
   assert.deepEqual([renamed.billingDay, renamed.memo], [1, "주유"], "설정이 없던 카드도 고치면 생김");
   const b2 = (await cardList(A)).find((c) => c.id === quick.id)!;
-  await hideCard(A, quick.id, b2.pmVersion);
+  await hidePaymentMethod(A, "card", quick.id, b2.pmVersion);
   assert.deepEqual((await cardList(A)).map((c) => c.name), ["A카드"], "숨긴 카드는 목록에서 빠짐");
   console.log("카드 규칙 확인 통과");
+
+  // 페이·계좌: 결제수단은 실제로 돈이 나간 곳, 페이는 pay_id로 따로 → 카드 합계 한 번만, 페이로 찾으면 다 나옴
+  const { createPay, payList, createAccount, updateAccount, accountList } = await import("../src/server/cards.ts");
+  const bank = await createAccount(A, { name: "월급 통장", category: "checking", bank: "국민", balance: 500000, rate: 3 });
+  assert.equal((await accountList(A))[0].account?.rate, null, "입출금은 이율 칸을 비움");
+  await updateCard(A, pmA.id, (await cardList(A))[0].pmVersion, { name: "A카드", linkedAccountId: bank.id });
+  assert.equal(await code(updateCard(A, pmA.id, 99, { name: "A카드", linkedAccountId: food.id })), "VALIDATION_FAILED", "결제 계좌는 내 계좌만");
+  const npay = await createPay(A, { name: "네이버페이", sourceIds: [pmA.id, bank.id] });
+  assert.equal(await code(createPay(B, { name: "x", sourceIds: [pmA.id] })), "VALIDATION_FAILED", "남의 카드 연결 불가");
+  assert.deepEqual((await payList(A))[0].sourceIds, [pmA.id, bank.id]);
+  const day = todayIn();
+  await createTransaction(A, { ...base, date: day, amount: 7000, paymentMethodId: pmA.id, payId: npay.id });
+  await createTransaction(A, { ...base, date: day, amount: 3000, paymentMethodId: pmA.id });
+  await createTransaction(A, { ...base, date: day, amount: 1500, paymentMethodId: npay.id, payId: npay.id }); // 페이 머니
+  assert.equal(await code(createTransaction(A, { ...base, amount: 1, paymentMethodId: pmA.id, payId: pmA.id })), "VALIDATION_FAILED", "페이 칸엔 페이만");
+  assert.equal((await formData(A)).pays[npay.id].last, npay.id, "페이마다 마지막으로 고른 곳");
+  const viaPay = await searchTransactions(A, readFilter({ period: "all", pm: npay.id }, day));
+  assert.equal(viaPay.length, 2, "페이로 찾으면 연결 카드·페이 머니 결제 모두");
+  const acc = (await accountList(A)).find((a) => a.id === bank.id)!;
+  assert.deepEqual(acc.cards, [{ id: pmA.id, name: "A카드", monthSpent: 10000 }], "카드 사용액은 페이 거친 것까지 한 번씩");
+  await createRecurring(A, { name: "넷플릭스", amount: 13500, cycle: "monthly", dayOfMonth: 5, startedAt: "2026-01-01", paymentMethodId: pmA.id });
+  await createRecurring(A, { name: "관리비", amount: 100000, cycle: "monthly", dayOfMonth: 25, startedAt: "2026-01-01", paymentMethodId: bank.id });
+  assert.deepEqual((await accountList(A))[0].autopays.map((r) => [r.name, r.via]).sort(), [["관리비", null], ["넷플릭스", "A카드"]], "자동 결제: 계좌에서 바로 + 연결 카드로");
+  const dep = await createAccount(A, { name: "정기예금", category: "deposit", principal: 10000000, rate: 3.5, startDate: "2026-01-01", maturityDate: "2027-01-01", balance: 1 });
+  const depRow = (await accountList(A)).find((a) => a.id === dep.id)!.account!;
+  assert.deepEqual([depRow.balance, depRow.tax], [null, "normal"], "예금은 잔액 칸 비우고 과세 기본 일반");
+  assert.equal(await code(updateAccount(A, dep.id, 1, { name: "정기예금", category: "deposit", startDate: "2027-01-01", maturityDate: "2026-01-01" })), "VALIDATION_FAILED", "만기일은 시작일 뒤");
+  console.log("페이·계좌 규칙 확인 통과");
 } catch (e) {
   // finally의 process.exit가 오류를 삼키지 않게 직접 알리고 실패로 끝냄
   console.error(e);
@@ -185,6 +213,8 @@ try {
   await db.delete(recurringPayments).where(inArray(recurringPayments.userId, users));
   await db.delete(budgets).where(inArray(budgets.userId, users));
   await db.delete(cards).where(inArray(cards.userId, users));
+  await db.delete(pays).where(inArray(pays.userId, users));
+  await db.delete(accounts).where(inArray(accounts.userId, users));
   await db.delete(plannedExpenses).where(inArray(plannedExpenses.userId, users));
   await db.delete(finCategories).where(inArray(finCategories.userId, users));
   await db.delete(paymentMethods).where(inArray(paymentMethods.userId, users));

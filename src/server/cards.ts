@@ -1,60 +1,191 @@
-// 카드 서비스 (docs/planning/06 §6, D-071): 내 결제수단 카드 목록 + 메모. 혜택·실적 계산은 하지 않음(혜택은 메모에 직접)
-// 카드 = 결제수단(kind=card). 카드 설정(cards 행)은 처음 고칠 때 만듦 — 지출 입력에서 만든 카드도 목록에 나옴
-import { and, asc, eq, inArray } from "drizzle-orm";
+// 결제 수단 서비스 (docs/planning/06 §6·§7, D-071): 카드·페이·계좌. 혜택·실적 계산은 하지 않음(혜택은 메모에 직접)
+// 셋 다 결제수단(payment_methods) + 1:1 설정 행(cards·pays·accounts). 설정은 처음 고칠 때 만듦 — 지출 입력에서 만든 것도 목록에 나옴
+import { and, asc, eq, gte, inArray, isNull, lt, ne, sql } from "drizzle-orm";
 import { z } from "zod";
-import { db } from "../db/index.ts";
-import { cards, paymentMethods } from "../db/schema.ts";
+import { db, type Tx } from "../db/index.ts";
+import { accounts, cards, paymentMethods, pays, transactions } from "../db/schema.ts";
 import { AppError, notFound } from "./errors.ts";
-import { createPaymentMethod, dup, paymentRepo } from "./finance.ts";
+import { createPaymentMethod, dup, paymentRepo, todayIn } from "./finance.ts";
+import { recurringList } from "./recurring.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
 import { parse } from "./validate.ts";
 
 export const cardRepo = defineRepo(cards, "card");
+export const payRepo = defineRepo(pays, "pay");
+export const accountRepo = defineRepo(accounts, "account");
 
-export const cardInput = z.object({
-  name: z.string().trim().min(1, "카드 이름을 입력해 주세요").max(20, "이름은 20자까지 쓸 수 있어요"),
-  issuer: z.string().trim().max(20).nullable().default(null),
-  cardType: z.enum(["credit", "check"]).nullable().default(null),
-  billingDay: z.number().int().min(1).max(31).nullable().default(null),
-  annualFee: z.number().int().min(0).max(10_000_000).nullable().default(null),
-  memo: z.string().trim().max(2000, "메모는 2000자까지 쓸 수 있어요").nullable().default(null),
-});
-export type CardInput = z.input<typeof cardInput>;
+type Kind = "card" | "pay" | "account";
+const detail = { card: { repo: cardRepo, table: cards }, pay: { repo: payRepo, table: pays }, account: { repo: accountRepo, table: accounts } };
+const name = (what: string) => z.string().trim().min(1, `${what} 이름을 입력해 주세요`).max(20, "이름은 20자까지 쓸 수 있어요");
+const memo = z.string().trim().max(2000, "메모는 2000자까지 쓸 수 있어요").nullable().default(null);
+const won = (max: number) => z.number().int().min(0).max(max).nullable().default(null);
+const ymd = z.string().regex(/^\d{4}-\d{2}-\d{2}$/).nullable().default(null);
 
-/** 카드 목록: 숨기지 않은 카드 결제수단 + 카드 설정(없으면 null) */
-export async function cardList(ctx: Ctx) {
-  const pms = await paymentRepo.list(ctx, { where: and(eq(paymentMethods.kind, "card"), eq(paymentMethods.isHidden, false)), orderBy: [asc(paymentMethods.sort), asc(paymentMethods.createdAt)] });
-  const rows = pms.length ? await cardRepo.list(ctx, { where: inArray(cards.paymentMethodId, pms.map((p) => p.id)) }) : [];
-  return pms.map((pm) => {
-    const c = rows.find((r) => r.paymentMethodId === pm.id);
-    return { id: pm.id, pmVersion: pm.version, name: pm.name, card: c ? { issuer: c.issuer, cardType: c.cardType, billingDay: c.billingDay, annualFee: c.annualFee, memo: c.memo } : null };
-  });
+/** 숨기지 않은 결제수단(kind) + 설정 행(없으면 null) */
+async function listOf<K extends Kind>(ctx: Ctx, kind: K) {
+  const pms = await paymentRepo.list(ctx, { where: and(eq(paymentMethods.kind, kind), eq(paymentMethods.isHidden, false)), orderBy: [asc(paymentMethods.sort), asc(paymentMethods.createdAt)] });
+  const { repo, table } = detail[kind];
+  const rows = pms.length ? await (repo as typeof cardRepo).list(ctx, { where: inArray(table.paymentMethodId, pms.map((p) => p.id)) }) : [];
+  return pms.map((pm) => ({ pm, row: (rows as (typeof detail)[K]["table"]["$inferSelect"][]).find((r) => r.paymentMethodId === pm.id) ?? null }));
 }
-export type CardItem = Awaited<ReturnType<typeof cardList>>[number];
 
-/** 새 카드: 결제수단(카드) + 카드 설정 */
-export async function createCard(ctx: Ctx, input: unknown) {
-  const { name, ...rest } = parse(cardInput, input);
-  const pm = await createPaymentMethod(ctx, { kind: "card", name });
-  await cardRepo.create(ctx, { ...rest, paymentMethodId: pm.id });
+/** 새로 만들기: 결제수단 + 설정 행 */
+async function createOf(ctx: Ctx, kind: Kind, pmName: string, values: object) {
+  const pm = await createPaymentMethod(ctx, { kind, name: pmName });
+  await (detail[kind].repo as typeof cardRepo).create(ctx, { ...values, paymentMethodId: pm.id } as typeof cards.$inferInsert);
   return pm;
 }
 
-/** 카드 고치기: 이름은 결제수단에, 나머지는 카드 설정에(없으면 만듦) */
-export async function updateCard(ctx: Ctx, pmId: string, pmVersion: number, input: unknown) {
-  const { name, ...rest } = parse(cardInput, input);
+/** 고치기: 이름은 결제수단에, 나머지는 설정 행에(없으면 만듦) */
+async function updateOf(ctx: Ctx, kind: Kind, pmId: string, pmVersion: number, pmName: string, values: object) {
   const pm = await paymentRepo.get(ctx, pmId);
-  if (pm.kind !== "card") throw notFound();
-  return db.transaction(async (tx) => {
-    if (pm.name !== name || pm.version !== pmVersion) await paymentRepo.update(ctx, pmId, pmVersion, { name }, { tx }).catch((e) => dup(e, "결제수단"));
-    const [row] = await tx.select().from(cards).where(and(eq(cards.userId, ctx.userId), eq(cards.paymentMethodId, pmId)));
-    return row && !row.deletedAt ? cardRepo.update(ctx, row.id, row.version, rest, { tx }) : cardRepo.create(ctx, { ...rest, paymentMethodId: pmId }, { tx });
+  if (pm.kind !== kind) throw notFound();
+  const { repo, table } = detail[kind];
+  const r = repo as typeof cardRepo;
+  return db.transaction(async (tx: Tx) => {
+    if (pm.name !== pmName || pm.version !== pmVersion) await paymentRepo.update(ctx, pmId, pmVersion, { name: pmName }, { tx }).catch((e) => dup(e, "결제수단"));
+    const [row] = await tx.select().from(table).where(and(eq(table.userId, ctx.userId), eq(table.paymentMethodId, pmId), isNull(table.deletedAt)));
+    return row ? r.update(ctx, row.id, row.version, values, { tx }) : r.create(ctx, { ...values, paymentMethodId: pmId } as typeof cards.$inferInsert, { tx });
   });
 }
 
-/** 카드 숨기기: 지난 지출의 결제수단 이름은 그대로(06 §10, 지우기보다 숨김) */
-export async function hideCard(ctx: Ctx, pmId: string, version: number) {
+/** 숨기기: 지난 지출의 결제수단 이름은 그대로(06 §10, 지우기보다 숨김) */
+export async function hidePaymentMethod(ctx: Ctx, kind: Kind, pmId: string, version: number) {
   const pm = await paymentRepo.get(ctx, pmId);
-  if (pm.kind !== "card") throw new AppError("NOT_FOUND", "찾을 수 없어요");
+  if (pm.kind !== kind) throw new AppError("NOT_FOUND", "찾을 수 없어요");
   return paymentRepo.update(ctx, pmId, version, { isHidden: true });
+}
+
+/** 연결할 결제수단이 내 것이고 종류가 맞는지 */
+async function checkKinds(ctx: Ctx, ids: string[], kinds: string[], message: string) {
+  if (!ids.length) return;
+  const rows = await paymentRepo.list(ctx, { where: inArray(paymentMethods.id, ids) });
+  if (rows.length !== new Set(ids).size || rows.some((r) => !kinds.includes(r.kind))) throw new AppError("VALIDATION_FAILED", message);
+}
+
+// ── 카드 ──
+export const cardInput = z.object({
+  name: name("카드"),
+  issuer: z.string().trim().max(20).nullable().default(null),
+  cardType: z.enum(["credit", "check"]).nullable().default(null),
+  billingDay: z.number().int().min(1).max(31).nullable().default(null),
+  annualFee: won(10_000_000),
+  memo,
+  linkedAccountId: z.uuid().nullable().default(null),
+});
+export type CardInput = z.input<typeof cardInput>;
+
+export async function cardList(ctx: Ctx) {
+  return (await listOf(ctx, "card")).map(({ pm, row: c }) => ({
+    id: pm.id,
+    pmVersion: pm.version,
+    name: pm.name,
+    card: c ? { issuer: c.issuer, cardType: c.cardType, billingDay: c.billingDay, annualFee: c.annualFee, memo: c.memo, linkedAccountId: c.linkedAccountId } : null,
+  }));
+}
+export type CardItem = Awaited<ReturnType<typeof cardList>>[number];
+
+export async function createCard(ctx: Ctx, input: unknown) {
+  const { name, ...rest } = parse(cardInput, input);
+  await checkKinds(ctx, rest.linkedAccountId ? [rest.linkedAccountId] : [], ["account"], "결제 계좌를 다시 골라 주세요");
+  return createOf(ctx, "card", name, rest);
+}
+export async function updateCard(ctx: Ctx, pmId: string, pmVersion: number, input: unknown) {
+  const { name, ...rest } = parse(cardInput, input);
+  await checkKinds(ctx, rest.linkedAccountId ? [rest.linkedAccountId] : [], ["account"], "결제 계좌를 다시 골라 주세요");
+  return updateOf(ctx, "card", pmId, pmVersion, name, rest);
+}
+
+// ── 페이 ──
+export const payInput = z.object({ name: name("페이"), sourceIds: z.array(z.uuid()).max(30).default([]), memo });
+export type PayInput = z.input<typeof payInput>;
+
+export async function payList(ctx: Ctx) {
+  return (await listOf(ctx, "pay")).map(({ pm, row }) => ({ id: pm.id, pmVersion: pm.version, name: pm.name, sourceIds: row?.sourceIds ?? [], memo: row?.memo ?? null }));
+}
+export type PayItem = Awaited<ReturnType<typeof payList>>[number];
+
+export async function createPay(ctx: Ctx, input: unknown) {
+  const { name, ...rest } = parse(payInput, input);
+  await checkKinds(ctx, rest.sourceIds, ["card", "account"], "연결할 카드·계좌를 다시 골라 주세요");
+  return createOf(ctx, "pay", name, rest);
+}
+export async function updatePay(ctx: Ctx, pmId: string, pmVersion: number, input: unknown) {
+  const { name, ...rest } = parse(payInput, input);
+  await checkKinds(ctx, rest.sourceIds, ["card", "account"], "연결할 카드·계좌를 다시 골라 주세요");
+  return updateOf(ctx, "pay", pmId, pmVersion, name, rest);
+}
+
+// ── 계좌 ──
+export const accountInput = z
+  .object({
+    name: name("계좌"),
+    category: z.enum(["checking", "deposit", "savings", "stock"]).default("checking"),
+    bank: z.string().trim().max(20).nullable().default(null),
+    number: z.string().trim().max(40, "계좌번호는 40자까지 쓸 수 있어요").nullable().default(null),
+    balance: won(100_000_000_000),
+    principal: won(100_000_000_000),
+    rate: z.number().min(0).max(100, "이율을 다시 확인해 주세요").nullable().default(null),
+    tax: z.enum(["normal", "preferential", "free"]).nullable().default(null),
+    startDate: ymd,
+    maturityDate: ymd,
+    memo,
+  })
+  .refine((v) => !v.startDate || !v.maturityDate || v.startDate < v.maturityDate, { message: "만기일은 시작일보다 뒤여야 해요", path: ["maturityDate"] })
+  // 종류에 안 쓰는 칸은 비움(종류를 바꿔도 이전 값이 남지 않게)
+  .transform((v) => {
+    const saving = v.category === "deposit" || v.category === "savings";
+    return { ...v, principal: v.category === "checking" ? null : v.principal, balance: saving ? null : v.balance, rate: saving ? v.rate : null, tax: saving ? (v.tax ?? "normal") : null, startDate: saving ? v.startDate : null, maturityDate: saving ? v.maturityDate : null };
+  });
+export type AccountInput = z.input<typeof accountInput>;
+
+/** 계좌 목록 + 연결된 카드(이번 달 쓴 돈)와 자동 결제(이 계좌에서 바로, 또는 연결 카드로 나가는 고정 지출) */
+export async function accountList(ctx: Ctx) {
+  const [list, cardRows, recurring] = await Promise.all([listOf(ctx, "account"), listOf(ctx, "card"), recurringList(ctx)]);
+  const linked = cardRows.filter((c) => c.row?.linkedAccountId);
+  const month = todayIn().slice(0, 7);
+  const [y, m] = month.split("-").map(Number);
+  const next = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`;
+  const spent = linked.length
+    ? await db
+        .select({ id: transactions.paymentMethodId, sum: sql<number>`sum(case when ${transactions.isRefund} then -${transactions.amount} else ${transactions.amount} end)::bigint`.mapWith(Number) })
+        .from(transactions)
+        .where(and(eq(transactions.userId, ctx.userId), isNull(transactions.deletedAt), eq(transactions.type, "expense"), gte(transactions.date, `${month}-01`), lt(transactions.date, next), inArray(transactions.paymentMethodId, linked.map((c) => c.pm.id))))
+        .groupBy(transactions.paymentMethodId)
+    : [];
+  const live = recurring.filter((r) => r.status !== "ended");
+  return list.map(({ pm, row: a }) => {
+    const myCards = linked.filter((c) => c.row!.linkedAccountId === pm.id).map((c) => ({ id: c.pm.id, name: c.pm.name, monthSpent: spent.find((s) => s.id === c.pm.id)?.sum ?? 0 }));
+    const via = new Map(myCards.map((c) => [c.id, c.name]));
+    return {
+      id: pm.id,
+      pmVersion: pm.version,
+      name: pm.name,
+      account: a && { category: a.category, bank: a.bank, number: a.number, balance: a.balance, principal: a.principal, rate: a.rate, tax: a.tax, startDate: a.startDate, maturityDate: a.maturityDate, memo: a.memo },
+      cards: myCards,
+      autopays: live
+        .filter((r) => r.paymentMethodId === pm.id || via.has(r.paymentMethodId ?? ""))
+        .map((r) => ({ id: r.id, name: r.name, amount: r.amount, variableAmount: r.variableAmount, label: r.label, next: r.next, via: via.get(r.paymentMethodId ?? "") ?? null })),
+    };
+  });
+}
+export type AccountItem = Awaited<ReturnType<typeof accountList>>[number];
+
+export async function createAccount(ctx: Ctx, input: unknown) {
+  const { name, ...rest } = parse(accountInput, input);
+  return createOf(ctx, "account", name, rest);
+}
+export async function updateAccount(ctx: Ctx, pmId: string, pmVersion: number, input: unknown) {
+  const { name, ...rest } = parse(accountInput, input);
+  return updateOf(ctx, "account", pmId, pmVersion, name, rest);
+}
+
+/** 카드·계좌 고르기용 이름(페이 연결, 카드 결제 계좌). 예금·적금·주식 계좌는 빼고 입출금만 */
+export async function sourceOptions(ctx: Ctx) {
+  const [rows, notChecking] = await Promise.all([
+    paymentRepo.list(ctx, { where: and(inArray(paymentMethods.kind, ["card", "account"]), eq(paymentMethods.isHidden, false)), orderBy: [asc(paymentMethods.sort), asc(paymentMethods.createdAt)] }),
+    accountRepo.list(ctx, { where: ne(accounts.category, "checking") }),
+  ]);
+  const skip = new Set(notChecking.map((a) => a.paymentMethodId));
+  return rows.filter((r) => !skip.has(r.id)).map((r) => ({ id: r.id, kind: r.kind as "card" | "account", name: r.name }));
 }

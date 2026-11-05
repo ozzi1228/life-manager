@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
-import { addCard, editCard, hideCardAction } from "@/app/actions/cards";
+import { addCard, editCard, hidePaymentAction } from "@/app/actions/cards";
 import { AmountInput } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
 import { EmptyState } from "@/components/app/states";
@@ -24,7 +24,9 @@ import type { CardInput, CardItem } from "@/server/cards";
 const ISSUERS = ["신한", "삼성", "현대", "KB국민", "롯데", "하나", "우리", "BC", "NH농협", "IBK기업", "카카오뱅크", "토스뱅크"];
 const TYPE = { credit: "신용", check: "체크" } as const;
 
-export function CardGrid({ cards }: { cards: CardItem[] }) {
+type Opt = { id: string; name: string };
+
+export function CardGrid({ cards, accounts }: { cards: CardItem[]; accounts: Opt[] }) {
   const [form, setForm] = useState<CardItem | "new" | null>(null);
   const mobile = useIsMobile();
   const add = (
@@ -45,10 +47,10 @@ export function CardGrid({ cards }: { cards: CardItem[] }) {
       ) : (
         <ul className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           {cards.map((c) => {
-            const meta = [c.card?.issuer, c.card?.cardType && TYPE[c.card.cardType], c.card?.billingDay && `매월 ${c.card.billingDay}일 결제`, c.card?.annualFee && `연회비 ${money(c.card.annualFee)}`].filter(Boolean);
+            const meta = [c.card?.issuer, c.card?.cardType && TYPE[c.card.cardType], c.card?.billingDay && `매월 ${c.card.billingDay}일 결제`, c.card?.annualFee && `연회비 ${money(c.card.annualFee)}`, accounts.find((a) => a.id === c.card?.linkedAccountId)?.name].filter(Boolean);
             return (
               <li key={c.id}>
-                <button type="button" onClick={() => setForm(c)} className="bg-card hover:bg-accent/40 block h-full w-full space-y-2 rounded-xl border p-5 text-left shadow-sm">
+                <button type="button" onClick={() => setForm(c)} className="bg-card hover:bg-accent/40 flex h-full w-full flex-col justify-start space-y-2 rounded-xl border p-5 text-left shadow-sm">
                   <p className="truncate font-semibold">{c.name}</p>
                   {meta.length > 0 && <p className="text-muted-foreground text-sm">{meta.join(" · ")}</p>}
                   {c.card?.memo ? <p className="line-clamp-6 text-sm whitespace-pre-line">{c.card.memo}</p> : <p className="text-muted-foreground text-sm">혜택이나 쓰임새를 메모해 두세요</p>}
@@ -58,12 +60,12 @@ export function CardGrid({ cards }: { cards: CardItem[] }) {
           })}
         </ul>
       )}
-      {form && <CardForm edit={form === "new" ? undefined : form} close={() => setForm(null)} />}
+      {form && <CardForm edit={form === "new" ? undefined : form} accounts={accounts} close={() => setForm(null)} />}
     </div>
   );
 }
 
-function CardForm({ edit, close }: { edit?: CardItem; close: () => void }) {
+function CardForm({ edit, accounts, close }: { edit?: CardItem; accounts: Opt[]; close: () => void }) {
   const router = useRouter();
   const c = edit?.card;
   const [v, setV] = useState<CardInput>({
@@ -73,6 +75,7 @@ function CardForm({ edit, close }: { edit?: CardItem; close: () => void }) {
     billingDay: c?.billingDay ?? null,
     annualFee: c?.annualFee ?? null,
     memo: c?.memo ?? null,
+    linkedAccountId: c?.linkedAccountId ?? null,
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -91,7 +94,7 @@ function CardForm({ edit, close }: { edit?: CardItem; close: () => void }) {
 
   async function hide() {
     if (!edit) return;
-    const r = await hideCardAction(edit.id, edit.pmVersion);
+    const r = await hidePaymentAction("card", edit.id, edit.pmVersion);
     if (!r.ok) return setError(r.error.message);
     toast("카드를 숨겼어요. 지난 지출의 결제수단 이름은 그대로예요");
     close();
@@ -162,6 +165,22 @@ function CardForm({ edit, close }: { edit?: CardItem; close: () => void }) {
             <AmountInput id="cd-fee" value={v.annualFee ?? null} onChange={(a) => set("annualFee", a)} />
           </Field>
         </div>
+        <Field>
+          <FieldLabel>결제 계좌</FieldLabel>
+          <Select value={v.linkedAccountId ?? "none"} onValueChange={(a) => set("linkedAccountId", a === "none" ? null : a)}>
+            <SelectTrigger aria-label="결제 계좌" className="w-full data-[size=default]:h-11 md:data-[size=default]:h-9">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">{accounts.length ? "정하지 않음" : "계좌 탭에서 계좌를 먼저 추가해요"}</SelectItem>
+              {accounts.map((a) => (
+                <SelectItem key={a.id} value={a.id}>
+                  {a.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </Field>
         <Field>
           <FieldLabel htmlFor="cd-memo">메모</FieldLabel>
           <Textarea

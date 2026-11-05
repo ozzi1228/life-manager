@@ -53,6 +53,7 @@ export type TxEdit = {
   memo: string | null;
   tags?: string[];
   plannedExpenseId?: string | null;
+  payId?: string | null;
 };
 /** 위시 구매(09 §6, 04 §7.8): 가격·이름·쇼핑 분류로 채워 열고, 저장하면 지출 + 위시 구매함을 한 번에 */
 export type WishBuy = { id: string; version: number; name: string; price: number | null; notice?: string; done?: () => void };
@@ -92,7 +93,8 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
   const [restraint, setRestraint] = useState(edit?.restraint ?? false); // 참아서 갚기(20 §3)
   const [amount, setAmount] = useState<number | null>(edit?.amount ?? wish?.price ?? null);
   const [categoryId, setCategoryId] = useState<string | null>(edit?.categoryId ?? null); // 직전 선택 기억 안 함(오기록 방지, 04 §6.3)
-  const [paymentId, setPaymentId] = useState<string | null>(edit?.paymentMethodId ?? null);
+  const [paymentId, setPaymentId] = useState<string | null>(edit?.paymentMethodId ?? null); // 돈이 실제로 나간 곳
+  const [payId, setPayId] = useState<string | null>(edit?.payId ?? null); // 거친 페이(06 §6.7)
   const [date, setDate] = useState(edit?.date ?? ymd(new Date()));
   const [title, setTitle] = useState(edit?.title ?? wish?.name.slice(0, 60) ?? "");
   const [memo, setMemo] = useState(edit?.memo ?? "");
@@ -133,7 +135,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
     if (!categoryId) return setError({ field: "category", message: "분류를 골라 주세요" });
     setBusy(true);
     setError(null);
-    const input = { type, amount, isRefund: type === "expense" && refund, restraint: type === "expense" && restraint, date, categoryId, paymentMethodId: paymentId, title: title.trim() || null, memo: memo.trim() || null, tags, plannedExpenseId: linked };
+    const input = { type, amount, isRefund: type === "expense" && refund, restraint: type === "expense" && restraint, date, categoryId, paymentMethodId: paymentId, payId: type === "expense" ? payId : null, title: title.trim() || null, memo: memo.trim() || null, tags, plannedExpenseId: linked };
     // 연결이 끊기면 요청 자체가 실패함 → 입력은 그대로 두고 안내(같은 key로 다시 눌러도 한 건만 저장)
     const r = await (edit ? editTransaction(edit.id, edit.version, input) : wish ? buyWish(key, wish.id, wish.version, input) : addTransaction(key, input)).catch(() => null);
     setBusy(false);
@@ -224,6 +226,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
     if (!r.ok) return setError({ field: "payment", message: r.error.fields?.[0]?.message ?? r.error.message });
     setData((d) => d && { ...d, paymentMethods: [r.data, ...d.paymentMethods] });
     setPaymentId(r.data.id);
+    setPayId(null);
     setNewPm(null);
   }
 
@@ -383,19 +386,26 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
           <Field data-invalid={error?.field === "payment" || undefined}>
             <FieldLabel>결제</FieldLabel>
             <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="결제수단">
-              {data.paymentMethods.slice(0, 8).map((p) => (
-                <Button
-                  key={p.id}
-                  type="button"
-                  role="radio"
-                  aria-checked={paymentId === p.id}
-                  variant={paymentId === p.id ? "default" : "outline"}
-                  className={chip}
-                  onClick={() => setPaymentId(paymentId === p.id ? null : p.id)}
-                >
-                  {p.name}
-                </Button>
-              ))}
+              {data.paymentMethods.slice(0, 8).map((p) => {
+                const on = p.kind === "pay" ? payId === p.id : !payId && paymentId === p.id;
+                return (
+                  <Button
+                    key={p.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={on}
+                    variant={on ? "default" : "outline"}
+                    className={chip}
+                    onClick={() => {
+                      // 페이를 고르면 그 페이로 마지막에 고른 곳(없으면 페이 머니)이 돈이 나간 곳
+                      setPayId(!on && p.kind === "pay" ? p.id : null);
+                      setPaymentId(on ? null : p.kind === "pay" ? (data.pays[p.id]?.last ?? p.id) : p.id);
+                    }}
+                  >
+                    {p.name}
+                  </Button>
+                );
+              })}
               {newPm === null ? (
                 <Button type="button" variant="ghost" className={chip} onClick={() => setNewPm("")}>
                   <Plus /> 카드·계좌
@@ -414,6 +424,17 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
                 />
               )}
             </div>
+            {payId && (
+              <div className="flex flex-wrap items-center gap-2" role="radiogroup" aria-label="돈이 나간 곳">
+                <span className="text-muted-foreground w-full text-caption">어디서 나갔나요? 카드 사용액은 여기 고른 곳에만 잡혀요</span>
+                {[{ id: payId, name: "페이 머니" }, ...(data.pays[payId]?.sourceIds ?? []).flatMap((id) => data.paymentMethods.filter((p) => p.id === id))].map((s) => (
+                  <Button key={s.id} type="button" role="radio" aria-checked={paymentId === s.id} variant={paymentId === s.id ? "secondary" : "ghost"} className={cn(chip, paymentId === s.id && "ring-primary ring-1")} onClick={() => setPaymentId(s.id)}>
+                    {s.name}
+                  </Button>
+                ))}
+                {!data.pays[payId]?.sourceIds.length && <span className="text-muted-foreground text-caption">페이 탭에서 연결한 카드·계좌를 적어 두면 여기서 고를 수 있어요</span>}
+              </div>
+            )}
             {error?.field === "payment" && <FieldError>{error.message}</FieldError>}
           </Field>
         )}
