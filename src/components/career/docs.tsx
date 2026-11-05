@@ -7,7 +7,7 @@ import { useRef, useState } from "react";
 import { toast } from "sonner";
 import { addDoc, deleteDoc, deleteDocVersion, editDoc, saveDocVersion } from "@/app/actions/career";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastDone } from "@/components/app/states";
+import { EmptyState } from "@/components/app/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -213,13 +213,11 @@ function DocCard({ d, onVersion, onEdit }: { d: CareerDoc; onVersion: (v?: Versi
     const r = await deleteDoc(d.id);
     if (!r.ok) return toast(r.error.message);
     router.refresh();
-    toastDone(`${d.title}을(를) 휴지통으로 옮겼어요`);
   }
   async function removeVersion(v: Version) {
     const r = await deleteDocVersion(v.id);
     if (!r.ok) return toast(r.error.message);
     router.refresh();
-    toastDone(`${v.label}을(를) 휴지통으로 옮겼어요`);
   }
   const versionRow = (v: Version, main: boolean) => (
     <div key={v.id} className={main ? "space-y-2" : "space-y-1.5 border-t pt-2"}>

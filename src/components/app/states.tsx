@@ -2,7 +2,6 @@
 
 // 상태별 공통 화면 (docs/planning/03 §10): 빈 화면, 늦게 뜨는 Skeleton, 되돌리기 토스트
 import { useEffect, useState, type ReactNode } from "react";
-import { toast } from "sonner";
 import { Empty, EmptyContent, EmptyDescription, EmptyHeader, EmptyMedia, EmptyTitle } from "@/components/ui/empty";
 
 /** 빈 화면: 펫 그림(작게) + 한 줄 + 행동 버튼 하나 */
@@ -32,7 +31,4 @@ export function Delayed({ children, ms = 300 }: { children: ReactNode; ms?: numb
   return show ? <>{children}</> : null;
 }
 
-/** 지우기 알림(되돌릴 곳 안내). 추가·고치기·저장 같은 성공은 팝업을 띄우지 않음 — 화면에서 바로 보임. 되돌리기는 사이드바 아래 작업 기록에서(D-077) */
-export function toastDone(message: string) {
-  toast(message, { description: "작업 기록에서 되돌릴 수 있어요" });
-}
+// 지우기·추가·고치기·저장 같은 성공은 팝업을 띄우지 않음 — 화면에서 바로 보임. 되돌리기는 사이드바 아래 작업 기록에서(D-077)

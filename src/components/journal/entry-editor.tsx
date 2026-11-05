@@ -9,7 +9,6 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { addEntry, editEntry, removeEntry } from "@/app/actions/journal";
 import { PhotoPicker, type Photo } from "@/components/app/photo-picker";
-import { toastDone } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Input } from "@/components/ui/input";
@@ -103,7 +102,6 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
     localStorage.removeItem(draftKey(entry.id));
     // 이동만(목록은 이동하며 새로 불러옴). 바로 refresh하면 지운 일기 주소를 다시 불러와 404가 뜸
     router.replace(`/records?month=${entry.date.slice(0, 7)}`);
-    toastDone("휴지통으로 옮겼어요");
   }
 
   const empty = !title.trim() && !body.trim() && !photos.length;

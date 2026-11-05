@@ -10,7 +10,6 @@ import { addRestraint, deleteRestraint, editRestraint, excludeRestraint, resettl
 import { InfoTip } from "@/components/app/help";
 import { AmountInput } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { toastDone } from "@/components/app/states";
 import { MonthNav } from "@/components/money/controls";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -146,7 +145,6 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
     const r = await deleteRestraint(e.id);
     if (!r.ok) return toast(r.error.message);
     refresh();
-    toastDone("휴지통으로 옮겼어요");
   }
   const pickNow = (c: View["candidates"][number]) => call(addRestraint(crypto.randomUUID(), { name: c.name, amount: c.price, date: today, reason: null, wishItemId: c.id }));
 

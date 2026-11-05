@@ -14,7 +14,6 @@ import { addEvent, colorEvent, editEvent, removeEvent, saveCalendarNote, hideCal
 import { CalendarList } from "@/components/calendar/calendar-list";
 import { RichNote } from "@/components/calendar/rich-note";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
-import { toastDone } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
@@ -792,9 +791,6 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
     const r = await removeEvent(e.id, scope, e.occurrenceDate);
     if (!r.ok) return toast(r.error.message);
     router.refresh();
-    if (r.data.restoreId || r.data.exceptionId)
-      toastDone("일정을 지웠어요");
-    else toast("이후 일정을 지웠어요");
   }
   async function setColor(e: Instance, hex: string | null) {
     const r = await colorEvent(e.id, e.version, hex);

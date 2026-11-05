@@ -12,7 +12,7 @@ import { InfoTip } from "@/components/app/help";
 import { MoneyInput, moneyWithForeign } from "@/components/app/money";
 import { PhotoPicker, type Photo } from "@/components/app/photo-picker";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastDone } from "@/components/app/states";
+import { EmptyState } from "@/components/app/states";
 import { Cover, MediaForm } from "@/components/media/media";
 import { CategoryChips } from "@/components/wish/category-chips";
 import { useExpenseDialog } from "@/components/money/expense-dialog";
@@ -249,12 +249,11 @@ function ShopDetail({ w, today, close, edit, refresh }: { w: WishItem; today: st
   const [askTx, setAskTx] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  async function run(p: Promise<{ ok: boolean; error?: { message: string } }>, message?: string) {
+  async function run(p: Promise<{ ok: boolean; error?: { message: string } }>) {
     setBusy(true);
     const r = await p;
     setBusy(false);
     if (!r.ok) return toast(r.error?.message ?? "잠시 후 다시 시도해 주세요");
-    if (message) toast(message); // 다른 곳도 바뀐 경우만(지출 휴지통, 참은 소비 기록)
     close();
     refresh();
   }
@@ -263,9 +262,8 @@ function ShopDetail({ w, today, close, edit, refresh }: { w: WishItem; today: st
     if (!r.ok) return toast(r.error.message);
     close();
     refresh();
-    toastDone("휴지통으로 옮겼어요");
   }
-  const reopen = (removeTx: boolean) => run(reopenWishAction(w.id, w.version, removeTx), removeTx ? "담아둠으로 되돌리고 지출은 휴지통으로 옮겼어요" : undefined);
+  const reopen = (removeTx: boolean) => run(reopenWishAction(w.id, w.version, removeTx));
 
   const footer =
     w.status === "saved" ? (
@@ -285,7 +283,7 @@ function ShopDetail({ w, today, close, edit, refresh }: { w: WishItem; today: st
             <Button variant="ghost" onClick={() => setDropping(false)}>
               취소
             </Button>
-            <Button className="ml-auto" disabled={busy} onClick={() => run(dropWishAction(w.id, w.version, reason.trim() || null, record && !w.restrained), record && !w.restrained ? "그만두고 참은 소비로 기록했어요" : undefined)}>
+            <Button className="ml-auto" disabled={busy} onClick={() => run(dropWishAction(w.id, w.version, reason.trim() || null, record && !w.restrained))}>
               그만두기
             </Button>
           </div>
@@ -526,12 +524,10 @@ function MediaWishes({ items, today, add, edit }: { items: WishItem[]; today: st
     const r = await deleteWish(w.id);
     if (!r.ok) return toast(r.error.message);
     router.refresh();
-    toastDone("휴지통으로 옮겼어요");
   }
   async function reopen(w: WishItem) {
     const r = await reopenWishAction(w.id, w.version, false);
     if (!r.ok) return toast(r.error.message);
-    toast("위시로 되돌렸어요. 작품 기록은 그대로 있어요");
     router.refresh();
   }
 
@@ -605,7 +601,6 @@ function MediaWishes({ items, today, add, edit }: { items: WishItem[]; today: st
           done={() => {
             setForm(null);
             router.refresh();
-            toast("작품 기록으로 옮겼어요", { action: { label: form.start ? "기록 보기" : "감상 보기", onClick: () => router.push("/wish/media") } });
           }}
         />
       )}

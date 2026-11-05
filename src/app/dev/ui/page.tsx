@@ -6,7 +6,7 @@ import { GuideDialog, HowToTip, InfoTip } from "@/components/app/help";
 import { AmountInput, BudgetBar, MoneyText } from "@/components/app/money";
 import { MonthSwitcher, QuickChips } from "@/components/app/pickers";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastDone } from "@/components/app/states";
+import { EmptyState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field";
 import { dayLabel } from "@/lib/format";
@@ -97,9 +97,6 @@ export default function UiShowcase() {
           </Button>
           <Button variant="outline" onClick={() => setGuide(true)}>
             가이드
-          </Button>
-          <Button variant="outline" onClick={() => toastDone("휴지통으로 옮겼어요")}>
-            되돌리기 토스트
           </Button>
         </div>
         <ResponsiveModal

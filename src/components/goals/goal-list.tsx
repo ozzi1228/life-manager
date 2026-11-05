@@ -9,7 +9,7 @@ import { type ReactNode, useEffect, useState } from "react";
 import { addGoal, changeGoalStatus, deleteGoal, editGoal } from "@/app/actions/goals";
 import { InfoTip } from "@/components/app/help";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastDone } from "@/components/app/states";
+import { EmptyState } from "@/components/app/states";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -89,7 +89,6 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
   async function remove(g: Goal) {
     await deleteGoal(g.id);
     router.refresh();
-    toastDone("휴지통으로 옮겼어요");
   }
 
   // y: 연도별 화면에서 이 줄이 놓인 해

@@ -19,7 +19,7 @@ import {
 import { ColorPalettePicker } from "@/components/app/color-picker";
 import { HowToTip } from "@/components/app/help";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastDone } from "@/components/app/states";
+import { EmptyState } from "@/components/app/states";
 import { MonthNav } from "@/components/money/controls";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -358,7 +358,6 @@ function ItemEditor({ month, item, preset, used, close, done }: { month: string;
     await deleteTrackerItem(item.id);
     done();
     close();
-    toastDone("휴지통으로 옮겼어요");
   }
 
   return (

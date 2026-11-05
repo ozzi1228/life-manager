@@ -13,7 +13,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel,
 import { useDragSort } from "@/hooks/use-drag-sort";
 import { ColorPalettePicker } from "@/components/app/color-picker";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { toastDone } from "@/components/app/states";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -48,7 +47,6 @@ function CalendarEditor({ edit, calendars, close }: { edit: Edit; calendars: Cal
     if (!r.ok) return toast(r.error.message);
     close();
     router.refresh();
-    toastDone(`${v.name} 캘린더와 일정을 휴지통으로 옮겼어요`);
   }
 
   return (

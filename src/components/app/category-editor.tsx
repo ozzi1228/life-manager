@@ -79,12 +79,11 @@ export function CategoryEditor({
   // 표 칸 너비: 손잡이 · (색) · 이름 · 체크 칸들 · ⋯ (휴대폰은 --hw·--cw를 줄여 이름 칸을 남김)
   const grid = ["var(--hw)", ...(onColor ? ["var(--hw)"] : []), "minmax(0,1fr)", ...columns.map(() => "var(--cw)"), "var(--hw)"].join(" ");
 
-  async function run(p: Promise<Result>, done?: string) {
+  async function run(p: Promise<Result>) {
     setBusy(true);
     const r = await p;
     setBusy(false);
     if (!r.ok) return void toast.error(r.error.fields?.[0]?.message ?? r.error.message);
-    if (done) toast(done);
     router.refresh();
     return true;
   }
@@ -148,7 +147,7 @@ export function CategoryEditor({
                     <Button size="sm" variant="ghost" onClick={() => setConfirm(null)}>
                       취소
                     </Button>
-                    <Button size="sm" variant="destructive" disabled={busy} onClick={async () => (await run(onRemove(it), "분류를 지웠어요")) && setConfirm(null)}>
+                    <Button size="sm" variant="destructive" disabled={busy} onClick={async () => (await run(onRemove(it))) && setConfirm(null)}>
                       지우기
                     </Button>
                   </li>

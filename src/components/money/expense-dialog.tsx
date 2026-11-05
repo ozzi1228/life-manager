@@ -21,7 +21,6 @@ import { buyWish } from "@/app/actions/wish";
 import { CategoryEditor } from "@/components/app/category-editor";
 import { MoneyInput } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { toastDone } from "@/components/app/states";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
@@ -153,7 +152,6 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
     if (edit) return close();
     if (wish) return bought(r.data as { budget: { category: string; over: number } | null });
     if ("budget" in r.data && r.data.budget) toast.warning(`${r.data.budget.category} 예산을 ${money(r.data.budget.over)} 넘었어요 · 그만큼 참아야 할 금액에 더해져요`, { duration: 5000, description: "작업 기록에서 되돌릴 수 있어요" });
-    else if ("restraint" in r.data && r.data.restraint) toast(`참아서 갚을 지출을 기록했어요 · 이번 달 참아야 할 금액 +${money(amount)}`, { duration: 6000, description: "작업 기록에서 되돌릴 수 있어요" });
     if (repeat) {
       // 연속 입력: 비우고 다시 금액부터
       setAmount(null);
@@ -193,7 +191,6 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
     if (!r.ok) return setError({ message: r.error.message });
     router.refresh();
     close();
-    toastDone("휴지통으로 옮겼어요");
   }
 
   async function createCategory() {

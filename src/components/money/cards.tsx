@@ -8,7 +8,7 @@ import { useState } from "react";
 import { addCard, editCard, removePaymentAction, showCardSecret } from "@/app/actions/cards";
 import { AmountInput } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
-import { EmptyState, toastDone } from "@/components/app/states";
+import { EmptyState } from "@/components/app/states";
 import { Button } from "@/components/ui/button";
 import { Field, FieldError, FieldGroup, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
@@ -117,7 +117,6 @@ function CardForm({ edit, accounts, close }: { edit?: CardItem; accounts: Opt[];
     if (!r.ok) return setError(r.error.message);
     close();
     router.refresh();
-    toastDone(`${edit.name}을(를) 휴지통으로 옮겼어요. 지난 지출의 이름은 그대로예요`);
   }
 
   return (
