@@ -1,7 +1,6 @@
 "use client";
 
 // 지출 목록 (SCR-FIN-02, 04 §6.2): 날짜별 묶음 · 행 = 제목 #태그 / 분류·결제수단 · 금액. 행을 누르면 수정
-import { StickyNote } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { useExpenseDialog, type TxEdit } from "@/components/money/expense-dialog";
 import { dayLabel, fromYmd, money } from "@/lib/format";
@@ -49,12 +48,7 @@ export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; c
                         {[r.title ? categories[r.categoryId] : null, payLabel(r, payments)].filter(Boolean).join(" · ")}
                       </span>
                       {/* 메모가 있으면 첫 줄을 함께 */}
-                      {r.memo && (
-                        <span className="text-muted-foreground flex items-center gap-1 text-caption">
-                          <StickyNote className="size-3 shrink-0" aria-label="메모" />
-                          <span className="truncate">{r.memo.split("\n")[0]}</span>
-                        </span>
-                      )}
+                      {r.memo && <span className="text-muted-foreground block truncate text-caption">{r.memo.split("\n")[0]}</span>}
                     </span>
                     <span className="shrink-0 text-right tabular-nums">
                       {signed(r) > 0 ? `+${money(r.amount)}` : money(r.amount)}

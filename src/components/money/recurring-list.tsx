@@ -1,7 +1,7 @@
 "use client";
 
 // 고정 지출 목록·상세·추가·수정·해지 (SCR-FIN-06·07, 04 §6.6·6.7)
-import { ChevronDown, Plus, StickyNote } from "lucide-react";
+import { ChevronDown, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -75,12 +75,7 @@ export function RecurringList({ items, categories, payments, today }: { items: R
               ? `${i.endedAt ? dateLabel(i.endedAt, fromYmd(today)) : ""} 해지됨`
               : [i.label, i.next ? `다음 ${md(i.next)}` : null, i.status === "ending" && i.lastUseDate ? `${md(i.lastUseDate)}까지` : null, pmName(i.paymentMethodId)].filter(Boolean).join(" · ")}
           </span>
-          {i.memo && (
-            <span className="text-muted-foreground flex items-center gap-1 text-caption">
-              <StickyNote className="size-3 shrink-0" aria-label="메모" />
-              <span className="truncate">{i.memo.split("\n")[0]}</span>
-            </span>
-          )}
+          {i.memo && <span className="text-muted-foreground block truncate text-caption">{i.memo.split("\n")[0]}</span>}
         </span>
         <span className={i.status === "ended" ? "text-muted-foreground shrink-0 tabular-nums" : "shrink-0 tabular-nums"}>
           {i.variableAmount && "약 "}
