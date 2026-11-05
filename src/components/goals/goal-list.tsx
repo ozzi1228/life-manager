@@ -1,7 +1,8 @@
 "use client";
 
 // 전체 목표 (SCR-GOAL-05) · 연도별 (SCR-GOAL-08) · 달성 모아 보기 · 목표 추가·수정 (SCR-GOAL-07)
-// 연도별은 따로 저장하지 않고, 기간에 그 해가 든 목표를 모아 봄(05 §3.2). 모든 해를 한 줄로 이어 붙이고 올해로 스크롤(D-069)
+// 목표는 두 층: 큰 목표(여러 해) / 한 해 목표(+ 월·주·일은 기간별 탭). 단기·중기·장기는 고르지 않음(서버가 연도로 정함)
+// 연도별: 맨 위 '진행 중인 큰 목표'에 한 번만, 각 해 아래엔 그 해 한 해짜리만 + 그 해에 끝나는 큰 목표(마감). 모든 해를 이어 붙이고 올해로 스크롤(D-069)
 import { Check, ChevronDown, Ellipsis, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -29,7 +30,7 @@ export type Goal = {
   id: string;
   version: number;
   title: string;
-  horizon: "short" | "mid" | "long";
+  horizon: "short" | "mid" | "long"; // 예전 칸(화면에선 안 씀)
   startYear: number | null;
   endYear: number | null;
   categoryId: string | null;
@@ -40,10 +41,19 @@ export type Goal = {
   periodKey: string | null;
 };
 type Category = { id: string; name: string };
-const HORIZON = { short: "단기", mid: "중기", long: "장기" } as const;
 const STATUS = { paused: "보류", dropped: "포기", done: "달성", active: "진행 중" } as const;
 
-const period = (g: Goal, thisYear: number) => (g.periodScope && g.periodKey ? periodLabel(g.periodScope, g.periodKey, thisYear) : g.startYear === null ? "언젠가" : g.startYear === g.endYear ? `${g.startYear}` : `${g.startYear}~${g.endYear}`);
+/** 여러 해에 걸친 큰 목표인지 */
+const isBig = (g: Goal) => g.startYear !== null && g.endYear !== null && g.startYear !== g.endYear;
+/** 기간 글자. 큰 목표는 "2026~2030 · 5년 중 1년째"(시작 전이면 "2028년부터") */
+const period = (g: Goal, thisYear: number) => {
+  if (g.periodScope && g.periodKey) return periodLabel(g.periodScope, g.periodKey, thisYear);
+  if (g.startYear === null) return "언젠가";
+  if (!isBig(g)) return `${g.startYear}`;
+  const n = g.endYear! - g.startYear + 1;
+  const now = thisYear < g.startYear ? `${g.startYear}년부터` : thisYear <= g.endYear! ? `${n}년 중 ${thisYear - g.startYear + 1}년째` : `${n}년`;
+  return `${g.startYear}~${g.endYear} · ${now}`;
+};
 
 /** view: 없으면 전체 목표, years = 연도별(모든 해를 위에서 아래로), done = 달성한 목표를 달성한 해별로 */
 /** 달성 체크(홈 습관 체크와 같은 모양): 20px 네모, 달성하면 채우고 ✓. 누르는 칸은 감싼 버튼(40px) */
@@ -58,19 +68,19 @@ export function GoalCheck({ done, small }: { done: boolean; small?: boolean }) {
 export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[]; categories: Category[]; view?: "years" | "done"; thisYear: number }) {
   const router = useRouter();
   const mobile = useIsMobile();
-  const [horizon, setHorizon] = useState<"all" | Goal["horizon"]>("all");
   const [category, setCategory] = useState("all");
   const [editing, setEditing] = useState<Goal | "new" | null>(null);
   const [preset, setPreset] = useState("");
   const catName = (id: string | null) => categories.find((c) => c.id === id)?.name;
 
-  const inYear = (g: Goal, y: number) => g.startYear !== null && g.startYear <= y && y <= (g.endYear as number);
-  const filtered = view ? goals : goals.filter((g) => (horizon === "all" || g.horizon === horizon) && (category === "all" || g.categoryId === category));
+  const filtered = view ? goals : goals.filter((g) => category === "all" || g.categoryId === category);
   const active = filtered.filter((g) => g.status === "active");
   const done = filtered.filter((g) => g.status === "done");
   const stopped = filtered.filter((g) => g.status === "paused" || g.status === "dropped");
-  // 연도별: 목표가 걸친 모든 해 + 올해, 최근 해가 위
-  const years = [...new Set([thisYear, ...goals.flatMap((g) => (g.startYear === null ? [] : Array.from({ length: (g.endYear as number) - g.startYear + 1 }, (_, i) => (g.startYear as number) + i)))])].sort((a, b) => b - a);
+  // 연도별: 한 해 목표가 있는 해 + 큰 목표가 끝나는 해 + 올해, 최근 해가 위
+  const years = [...new Set([thisYear, ...goals.flatMap((g) => (g.endYear === null ? [] : [g.endYear]))])].sort((a, b) => b - a);
+  // 연도별의 그 해 목록: 그 해 한 해짜리 + 그 해에 끝나는 큰 목표
+  const ofYear = (g: Goal, y: number) => (isBig(g) ? g.endYear === y : g.startYear === y);
 
   // 연도별은 올해 칸이 맨 위에 오게(앞으로의 해가 위에 있을 때만 스크롤)
   useEffect(() => {
@@ -107,9 +117,10 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
         <span className={g.status === "done" && view !== "done" ? "text-muted-foreground line-through" : undefined}>{g.title}</span>
         <span className="text-muted-foreground block text-caption">
           {/* 연도별 화면에서 그 해 한 해짜리면 연도는 이미 보이니 뺌 */}
-          {[catName(g.categoryId), y !== undefined && g.startYear === g.endYear ? null : period(g, thisYear), view ? HORIZON[g.horizon] : null].filter(Boolean).join(" · ")}
+          {[catName(g.categoryId), y !== undefined && !isBig(g) ? null : period(g, thisYear)].filter(Boolean).join(" · ")}
         </span>
       </button>
+      {y !== undefined && isBig(g) && g.endYear === y && <Badge variant="outline">마감</Badge>}
       {view === "done" && g.achievedAt && <span className="text-muted-foreground shrink-0 text-sm tabular-nums">{`${+g.achievedAt.slice(5, 7)}월 ${+g.achievedAt.slice(8, 10)}일`}</span>}
       {(g.status === "paused" || g.status === "dropped") && <Badge variant="secondary">{STATUS[g.status]}</Badge>}
       <DropdownMenu>
@@ -161,13 +172,6 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
         <div className="flex flex-wrap items-center gap-2">
           {!view && (
             <>
-              <ToggleGroup type="single" variant="outline" size="sm" value={horizon} onValueChange={(v) => v && setHorizon(v as typeof horizon)} aria-label="기간 구분">
-                <ToggleGroupItem value="all" className="max-md:h-10 max-md:px-3.5">전체</ToggleGroupItem>
-                <ToggleGroupItem value="short" className="max-md:h-10 max-md:px-3.5">단기</ToggleGroupItem>
-                <ToggleGroupItem value="mid" className="max-md:h-10 max-md:px-3.5">중기</ToggleGroupItem>
-                <ToggleGroupItem value="long" className="max-md:h-10 max-md:px-3.5">장기</ToggleGroupItem>
-              </ToggleGroup>
-              <InfoTip label="단기·중기·장기">기준은 직접 정해요. 예: 단기 1년 이내, 중기 1~3년, 장기 3년 이상</InfoTip>
               <Select value={category} onValueChange={setCategory}>
                 <SelectTrigger size="sm" className="w-32" aria-label="카테고리">
                   <SelectValue />
@@ -225,9 +229,28 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
         />
       ) : view === "years" ? (
         <>
+          {/* 진행 중인 큰 목표: 해마다 되풀이하지 않고 여기 한 번만 */}
+          {(() => {
+            const big = active.filter((g) => isBig(g) && (g.endYear as number) >= thisYear);
+            return (
+              big.length > 0 && (
+                <Collapsible defaultOpen className="bg-card rounded-lg border">
+                  <div className="flex items-center pr-2">
+                    <CollapsibleTrigger className="flex min-h-11 flex-1 items-center gap-1.5 px-3 text-left text-sm font-semibold md:min-h-9 [&>svg]:transition-transform [&[data-state=closed]>svg]:-rotate-90">
+                      <ChevronDown className="size-4" /> 진행 중인 큰 목표 <span className="text-muted-foreground font-normal tabular-nums">{big.length}</span>
+                    </CollapsibleTrigger>
+                    <InfoTip label="큰 목표">여러 해에 걸친 목표예요. 해마다 되풀이하지 않고 여기 한 번, 끝나는 해에 한 번 보여요.</InfoTip>
+                  </div>
+                  <CollapsibleContent>
+                    <ul className="divide-y border-t">{big.map((g) => row(g))}</ul>
+                  </CollapsibleContent>
+                </Collapsible>
+              )
+            );
+          })()}
           {years.map((y) => {
-            const on = [...active, ...done].filter((g) => inYear(g, y));
-            const off = stopped.filter((g) => inYear(g, y));
+            const on = [...active, ...done].filter((g) => ofYear(g, y));
+            const off = stopped.filter((g) => ofYear(g, y));
             return (
               <section key={y} id={`y${y}`} className="scroll-mt-14 space-y-2">
                 {heading(`${y}년`)}
@@ -254,17 +277,23 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
       ) : (
         <>
           {active.length === 0 && <p className="text-muted-foreground rounded-lg border border-dashed p-6 text-center text-sm">진행 중인 목표가 없어요. 새 목표를 적어 보세요</p>}
-          {(["short", "mid", "long"] as const).map((h) => {
-            const list = active.filter((g) => g.horizon === h);
-            return (
+          {/* 큰 목표(여러 해) / 올해 / 다른 해(가까운 해부터) / 연도 미정 */}
+          {(
+            [
+              ["큰 목표", active.filter(isBig).sort((a, b) => (a.endYear as number) - (b.endYear as number))],
+              [`올해 목표 · ${thisYear}`, active.filter((g) => !isBig(g) && g.startYear === thisYear)],
+              ["다른 해 목표", active.filter((g) => !isBig(g) && g.startYear !== null && g.startYear !== thisYear).sort((a, b) => Math.abs((a.startYear as number) - thisYear) - Math.abs((b.startYear as number) - thisYear) || (b.startYear as number) - (a.startYear as number))],
+              ["연도 미정", active.filter((g) => g.startYear === null)],
+            ] as const
+          ).map(
+            ([label, list]) =>
               list.length > 0 && (
-                <section key={h} className="space-y-2">
-                  <h2 className="text-muted-foreground text-sm font-semibold">{HORIZON[h]}</h2>
-                  <ul className="divide-y rounded-lg border">{list.map((g) => row(g))}</ul>
+                <section key={label} className="space-y-2">
+                  <h2 className="text-muted-foreground text-sm font-semibold">{label}</h2>
+                  <ul className="divide-y rounded-lg border">{list.map((g) => row(g, label.startsWith("올해") ? thisYear : undefined))}</ul>
                 </section>
-              )
-            );
-          })}
+              ),
+          )}
           {fold(
             "달성한 목표",
             done,
@@ -294,7 +323,6 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
 /** 목표 추가·수정 창. 월·주·일 목표는 기간이 정해져 있어 연도·기간 구분을 묻지 않음 */
 export function GoalDialog({ goal, preset, defaultYear, categories, close, done }: { goal: Goal | null; preset: string; defaultYear: number; categories: Category[]; close: () => void; done: () => void }) {
   const [title, setTitle] = useState(goal?.title ?? preset);
-  const [horizon, setHorizon] = useState<Goal["horizon"]>(goal?.horizon ?? "short");
   const [kind, setKind] = useState<"none" | "one" | "range">(goal ? (goal.startYear === null ? "none" : goal.startYear === goal.endYear ? "one" : "range") : "one");
   const [start, setStart] = useState(goal?.startYear ?? defaultYear);
   const [end, setEnd] = useState(goal?.endYear ?? defaultYear + 2);
@@ -309,7 +337,6 @@ export function GoalDialog({ goal, preset, defaultYear, categories, close, done 
     setBusy(true);
     const input = {
       title,
-      horizon,
       startYear: kind === "none" ? null : start,
       endYear: kind === "none" ? null : kind === "one" ? start : end,
       categoryId: categoryId === "none" ? null : categoryId,
@@ -364,18 +391,10 @@ export function GoalDialog({ goal, preset, defaultYear, categories, close, done 
         {!fixed && (
           <>
             <Field>
-              <FieldLabel>기간 구분</FieldLabel>
-              <ToggleGroup type="single" variant="outline" aria-label="기간 구분" value={horizon} onValueChange={(v) => v && setHorizon(v as Goal["horizon"])}>
-                <ToggleGroupItem value="short">단기</ToggleGroupItem>
-                <ToggleGroupItem value="mid">중기</ToggleGroupItem>
-                <ToggleGroupItem value="long">장기</ToggleGroupItem>
-              </ToggleGroup>
-            </Field>
-            <Field>
-              <FieldLabel>연도</FieldLabel>
-              <ToggleGroup type="single" variant="outline" aria-label="연도" value={kind} onValueChange={(v) => v && setKind(v as typeof kind)}>
+              <FieldLabel>기간</FieldLabel>
+              <ToggleGroup type="single" variant="outline" aria-label="기간" value={kind} onValueChange={(v) => v && setKind(v as typeof kind)}>
                 <ToggleGroupItem value="one">한 해</ToggleGroupItem>
-                <ToggleGroupItem value="range">여러 해</ToggleGroupItem>
+                <ToggleGroupItem value="range">여러 해 (큰 목표)</ToggleGroupItem>
                 <ToggleGroupItem value="none">정하지 않음</ToggleGroupItem>
               </ToggleGroup>
               {kind !== "none" && (
@@ -388,6 +407,7 @@ export function GoalDialog({ goal, preset, defaultYear, categories, close, done 
                   )}
                 </div>
               )}
+              {kind === "range" && <p className="text-muted-foreground text-caption">{end - start + 1}년짜리 큰 목표예요. 연도별 화면에선 맨 위와 끝나는 해에만 보여요</p>}
             </Field>
           </>
         )}

@@ -58,7 +58,7 @@ export async function startTrackerMonth(month: string, itemIds: string[]) {
   return action((ctx) => startMonthWith(ctx, month, itemIds.slice(0, 50)));
 }
 
-type GoalIn = { title: string; horizon: "short" | "mid" | "long"; startYear: number | null; endYear: number | null; categoryId: string | null; memo: string | null; periodScope?: "month" | "week" | "day" | null; periodKey?: string | null };
+type GoalIn = { title: string; startYear: number | null; endYear: number | null; categoryId: string | null; memo: string | null; periodScope?: "month" | "week" | "day" | null; periodKey?: string | null };
 
 export async function addGoal(input: GoalIn) {
   return action(async (ctx) => ({ id: (await createGoal(ctx, input)).id }));

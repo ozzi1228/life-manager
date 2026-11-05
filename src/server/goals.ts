@@ -167,7 +167,7 @@ const goalTitle = z.string().trim().min(1, "목표를 입력해 주세요").max(
 export const goalInput = z
   .object({
     title: goalTitle,
-    horizon: z.enum(["short", "mid", "long"]),
+    horizon: z.enum(["short", "mid", "long"]).optional(), // 받지 않아도 됨 — 연도로 정함(아래 transform)
     startYear: year.nullable().default(null),
     endYear: year.nullable().default(null),
     categoryId: z.uuid().nullable().default(null),
@@ -183,7 +183,11 @@ export const goalInput = z
   .refine((g) => (g.periodScope === null ? g.periodKey === null : g.startYear === null && g.periodKey !== null && validPeriodKey(g.periodScope, g.periodKey)), {
     message: "기간을 다시 골라 주세요",
     path: ["periodKey"],
-  });
+  })
+  // 단기·중기·장기는 고르지 않고 연도로: 한 해(또는 미정) 단기, 3년까지 중기, 그 넘으면 장기. 화면은 '큰 목표(여러 해)'·'한 해'로만 나눔
+  .transform((g) => ({ ...g, horizon: horizonOf(g.startYear, g.endYear) }));
+
+export const horizonOf = (start: number | null, end: number | null) => (start === null || end === null || start === end ? "short" : end - start + 1 <= 3 ? "mid" : "long") as "short" | "mid" | "long";
 
 async function checkCategory(ctx: Ctx, categoryId: string | null) {
   if (categoryId && !(await goalCategoryRepo.get(ctx, categoryId).catch(() => null)))
@@ -215,7 +219,7 @@ export async function setGoalStatus(ctx: Ctx, id: string, version: number, statu
 export async function createPeriodGoal(ctx: Ctx, scope: PeriodScope, key: string, title: unknown) {
   if (!["year", "month", "week", "day"].includes(scope) || !validPeriodKey(scope, key)) throw new AppError("BAD_REQUEST", "잠시 후 다시 시도해 주세요");
   const y = scope === "year" ? Number(key) : null;
-  return createGoal(ctx, { title, horizon: "short", startYear: y, endYear: y, periodScope: scope === "year" ? null : scope, periodKey: scope === "year" ? null : key });
+  return createGoal(ctx, { title, startYear: y, endYear: y, periodScope: scope === "year" ? null : scope, periodKey: scope === "year" ? null : key });
 }
 
 /** 그 기간의 목표(일정 화면). 연은 기간에 그 해가 든 연 목표, 월·주·일은 그 기간 목표. 보류·포기는 뺌 */
@@ -223,7 +227,7 @@ export async function periodGoals(ctx: Ctx, scope: PeriodScope, key: string) {
   if (!validPeriodKey(scope, key)) throw new AppError("BAD_REQUEST", "잠시 후 다시 시도해 주세요");
   const where =
     scope === "year"
-      ? and(isNull(goals.periodScope), lte(goals.startYear, Number(key)), gte(goals.endYear, Number(key)))
+      ? and(isNull(goals.periodScope), eq(goals.endYear, Number(key))) // 그 해 한 해짜리 + 그 해에 끝나는 큰 목표(여러 해 목표가 해마다 되풀이되지 않게)
       : and(eq(goals.periodScope, scope), eq(goals.periodKey, key));
   const list = await goalRepo.list(ctx, { where: and(where, inArray(goals.status, ["active", "done"])), orderBy: [asc(goals.sort), asc(goals.createdAt)], limit: 500 });
   return list.map(toGoal);
