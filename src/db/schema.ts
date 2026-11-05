@@ -490,7 +490,7 @@ export const calendars = pgTable("calendars", {
   ...userData(),
   name: text("name").notNull(),
   colorHex: text("color_hex").notNull(),
-  isVisible: boolean("is_visible").notNull().default(true),
+  hiddenIn: text("hidden_in").array().notNull().default(sql`'{}'::text[]`), // 숨긴 보기(year·month·week·day) — 보기마다 다른 캘린더
   sort: integer("sort").notNull().default(0),
   externalId: text("external_id"),
 });

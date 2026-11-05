@@ -7,7 +7,7 @@ import { uuidv7 } from "../db/id.ts";
 import { calendarLinks, calendars, events } from "../db/schema.ts";
 import { addDays } from "../lib/calendar.ts";
 import { seal, unseal } from "../lib/ai/secret.ts";
-import { calendarRepo } from "./calendar.ts";
+import { calendarRepo, VIEWS } from "./calendar.ts";
 import { AppError } from "./errors.ts";
 import type { Ctx } from "./repo.ts";
 
@@ -142,7 +142,7 @@ export async function syncGoogle(ctx: Ctx, access?: string) {
     remote.map(
       async (r, i) =>
         local.find((c) => c.externalId === r.id) ??
-        calendarRepo.create(ctx, { name: (r.summaryOverride ?? r.summary).slice(0, 40), colorHex: (r.backgroundColor ?? "#5B8DEF").toUpperCase(), isVisible: !!r.selected, sort: 100 + i, externalId: r.id }, { source: "google" }),
+        calendarRepo.create(ctx, { name: (r.summaryOverride ?? r.summary).slice(0, 40), colorHex: (r.backgroundColor ?? "#5B8DEF").toUpperCase(), hiddenIn: r.selected ? [] : [...VIEWS], sort: 100 + i, externalId: r.id }, { source: "google" }),
     ),
   );
 

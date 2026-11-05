@@ -1,6 +1,6 @@
 "use client";
 
-// 캘린더 목록(일정 화면 왼쪽, 좁은 화면은 "캘린더" 창): 체크로 보이기, 내 캘린더 추가·고치기, 구글 캘린더 연동(07 §4 G1)
+// 캘린더 목록(일정 화면 왼쪽, 좁은 화면은 "캘린더" 창): 체크로 보이기(보기 연·월·주·일마다 따로), 내 캘린더 추가·고치기, 구글 캘린더 연동(07 §4 G1)
 // 내 캘린더는 끌어 순서 바꾸기(휴대폰은 길게 누른 뒤 끌기). 맨 위가 기본 캘린더 — 우클릭(길게 누르고 있기) "기본 캘린더로 지정"은 맨 위로 올림
 // 구글: 제목 옆 + → 연결 창(앱 키 만드는 법 → 키 넣고 연결 테스트 → 구글 계정 연결)
 import { Check, Copy, Ellipsis, ExternalLink, Pencil, Plus, RefreshCw, Star, Unlink } from "lucide-react";
@@ -247,7 +247,7 @@ const ago = (iso: string) => {
 };
 const STALE = 15 * 60_000;
 
-export function CalendarList({ calendars, hidden, toggle, google }: { calendars: CalendarItem[]; hidden: Set<string>; toggle: (c: CalendarItem, on: boolean) => void; google: GoogleStatus }) {
+export function CalendarList({ calendars, hidden, toggle, google, viewLabel }: { calendars: CalendarItem[]; hidden: Set<string>; toggle: (c: CalendarItem, on: boolean) => void; google: GoogleStatus; viewLabel: string }) {
   const router = useRouter();
   const [edit, setEdit] = useState<Edit | null>(null);
   const [syncing, setSyncing] = useState(false);
@@ -300,6 +300,7 @@ export function CalendarList({ calendars, hidden, toggle, google }: { calendars:
 
   return (
     <div className="space-y-5">
+      <p className="text-muted-foreground px-2 text-caption">체크는 {viewLabel} 보기에만 적용돼요</p>
       <section className="space-y-1">
         <div className="flex items-center justify-between pl-2">
           <h2 className="text-sm font-semibold">내 캘린더</h2>

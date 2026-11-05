@@ -197,6 +197,20 @@
       "when": 1793777715625,
       "tag": "0027_item_categories",
       "breakpoints": true
+    },
+    {
+      "idx": 28,
+      "version": "7",
+      "when": 1793836732773,
+      "tag": "0028_calendar_hidden_in",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1793836743381,
+      "tag": "0029_calendar_drop_visible",
+      "breakpoints": true
     }
   ]
 }

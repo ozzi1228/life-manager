@@ -175,7 +175,7 @@ users ─┬─ auth_identities (아이디/카카오/네이버)
 
 | 테이블 | 주요 열 | 비고 |
 |---|---|---|
-| `calendars` | user_id, name, color_hex, kind(`local`/`external`), external_calendar_id(null), is_visible, sort | |
+| `calendars` | user_id, name, color_hex, kind(`local`/`external`), external_calendar_id(null), hidden_in(숨긴 보기 year·month·week·day), sort | |
 | `events` | user_id, calendar_id, title, all_day, start_at, end_at, start_date, end_date(종일), tz, rrule(null), location, memo, reminders(jsonb: 분 단위 배열), external_id, external_etag, external_updated_at, sync_state(`synced`/`pending_push`/`push_failed`), naver_pushed_at | 외부 일정은 external_id로 대응 |
 | `event_exceptions` | event_id, original_start, kind(`modified`/`cancelled`), override(jsonb) | 반복 회차 예외 |
 | `external_calendar_connections` | user_id, provider(`google`/`naver_caldav`/`kakao`), account_label, mode(`import`/`two_way`), oauth_token_id / credential_enc, status, last_synced_at, error_code | |

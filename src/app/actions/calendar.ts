@@ -10,7 +10,7 @@ import {
   reorderCalendars,
   exceptionRepo,
   saveNote,
-  setCalendarVisible,
+  setCalendarHidden,
   setEventColor,
   updateCalendar,
   updateEvent,
@@ -75,9 +75,9 @@ export async function editCalendar(id: string, version: number, input: CalendarI
     await updateCalendar(ctx, id, version, input);
   });
 }
-export async function showCalendar(id: string, version: number, visible: boolean) {
+export async function hideCalendarIn(id: string, version: number, hiddenIn: string[]) {
   return action(async (ctx) => {
-    await setCalendarVisible(ctx, id, version, visible);
+    await setCalendarHidden(ctx, id, version, hiddenIn);
   });
 }
 export async function removeCalendar(id: string) {

@@ -62,7 +62,7 @@ export default async function Home() {
   const d = fromYmd(today);
   const dateLabel = `${d.getMonth() + 1}월 ${d.getDate()}일 ${WEEK[d.getDay()]}요일`;
 
-  const hidden = new Set(cal.calendars.filter((c) => !c.isVisible).map((c) => c.id));
+  const hidden = new Set(cal.calendars.filter((c) => c.hiddenIn.includes("day")).map((c) => c.id)); // 홈 = 오늘, 일 보기와 같은 캘린더
   const events = cal.instances.filter((e) => !hidden.has(e.calendarId));
   const color = (id: string) => cal.calendars.find((c) => c.id === id)?.colorHex ?? "#888";
 

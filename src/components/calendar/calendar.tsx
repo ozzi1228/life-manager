@@ -10,7 +10,7 @@ import { CalendarDays, Check, ChevronDown, ChevronLeft, ChevronRight, Clock, Cop
 import { useRouter } from "next/navigation";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { addEvent, colorEvent, editEvent, removeEvent, saveCalendarNote, showCalendar, undoRemoveEvent } from "@/app/actions/calendar";
+import { addEvent, colorEvent, editEvent, removeEvent, saveCalendarNote, hideCalendarIn, undoRemoveEvent } from "@/app/actions/calendar";
 import { CalendarList } from "@/components/calendar/calendar-list";
 import { RichNote } from "@/components/calendar/rich-note";
 import { ResponsiveDetail, ResponsiveModal } from "@/components/app/responsive";
@@ -672,7 +672,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
   const [detail, setDetail] = useState<Instance | null>(null);
   const writable = calendars.filter((c) => !c.google);
   // 빠른 추가(+ → 일정 추가, ?new=1)면 처음부터 추가 창
-  const [form, setForm] = useState<{ draft: Draft; edit?: Instance } | null>(() => (startNew ? { draft: newDraft(writable.find((c) => c.isVisible)?.id ?? writable[0]?.id ?? "", date) } : null));
+  const [form, setForm] = useState<{ draft: Draft; edit?: Instance } | null>(() => (startNew ? { draft: newDraft(writable.find((c) => !c.hiddenIn.includes(view))?.id ?? writable[0]?.id ?? "", date) } : null));
   useEffect(() => {
     if (startNew) router.replace(`/calendar?view=${view}&date=${date}`, { scroll: false });
   }, [startNew, router, view, date]);
@@ -685,7 +685,10 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
   }, [router, view, date]);
   const [scopeFor, setScopeFor] = useState<Instance | null>(null);
   const [listOpen, setListOpen] = useState(false);
-  const [hidden, setHidden] = useState(() => new Set(calendars.filter((c) => !c.isVisible).map((c) => c.id)));
+  // 캘린더 체크는 보기(연·월·주·일)마다 따로. 누른 즉시 반영하려고 서버 값 위에 덮어 둠
+  const [hiddenIn, setHiddenIn] = useState<Record<string, string[]>>({});
+  const hiddenOf = (c: CalendarItem) => hiddenIn[c.id] ?? c.hiddenIn;
+  const hidden = new Set(calendars.filter((c) => hiddenOf(c).includes(view)).map((c) => c.id));
   const [target, setTarget] = useState<Target>(null);
   const [dayOpen, setDayOpen] = useState<string | null>(null); // 그 날 일정 목록(월 보기 칸 누르기)
 
@@ -748,13 +751,9 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
     router.refresh();
   }
   async function toggleCal(c: CalendarItem, on: boolean) {
-    setHidden((h) => {
-      const n = new Set(h);
-      if (on) n.delete(c.id);
-      else n.add(c.id);
-      return n;
-    });
-    const r = await showCalendar(c.id, c.version, on);
+    const next = on ? hiddenOf(c).filter((v) => v !== view) : [...hiddenOf(c), view];
+    setHiddenIn((h) => ({ ...h, [c.id]: next }));
+    const r = await hideCalendarIn(c.id, c.version, next);
     if (r.ok) router.refresh();
   }
 
@@ -853,7 +852,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
   const goalLabel = view === "year" ? `${date.slice(0, 4)}년` : view === "month" ? `${+date.slice(5, 7)}월` : view === "week" ? label : md(date);
   const goalPanel = <PeriodGoals key={`goals-${view}-${note.key}`} scope={view} periodKey={note.key} label={goalLabel} goals={goals} />;
   const noteTitle = view === "year" ? `${date.slice(0, 4)}년 메모` : view === "month" ? `${+date.slice(5, 7)}월 메모` : view === "week" ? `${label} 메모` : `${md(date)} 메모`;
-  const list = <CalendarList calendars={calendars} hidden={hidden} toggle={toggleCal} google={google} />;
+  const list = <CalendarList calendars={calendars} hidden={hidden} toggle={toggleCal} google={google} viewLabel={({ year: "연", month: "월", week: "주", day: "일" } as const)[view]} />;
 
   return (
     // 넓은 화면(xl)은 왼쪽에 캘린더 목록이 늘 보이고, 좁으면 "캘린더" 버튼으로 엶

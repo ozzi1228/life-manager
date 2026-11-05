@@ -46,7 +46,9 @@ export async function reorderCalendars(ctx: Ctx, ids: string[]) {
     for (const [i, id] of ids.entries()) await tx.update(calendars).set({ sort: i, updatedAt: new Date() }).where(and(eq(calendars.id, id), eq(calendars.userId, ctx.userId), ne(calendars.source, "google")));
   });
 }
-export const setCalendarVisible =(ctx: Ctx, id: string, version: number, visible: boolean) => calendarRepo.update(ctx, id, version, { isVisible: visible });
+/** 보기(연·월·주·일)마다 숨길 캘린더 */
+export const VIEWS = ["year", "month", "week", "day"] as const;
+export const setCalendarHidden = (ctx: Ctx, id: string, version: number, hiddenIn: unknown) => calendarRepo.update(ctx, id, version, { hiddenIn: parse(z.array(z.enum(VIEWS)).max(4), hiddenIn) });
 
 /** 캘린더 지우기: 그 캘린더의 일정도 한 묶음으로 휴지통에(함께 복구). 마지막 하나는 못 지움 */
 export async function deleteCalendar(ctx: Ctx, id: string) {
@@ -224,7 +226,7 @@ export async function rangeView(ctx: Ctx, from: string, to: string) {
       })),
     )
     .sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
-  return { calendars: cals.map((c) => ({ id: c.id, version: c.version, name: c.name, colorHex: c.colorHex, isVisible: c.isVisible, google: c.source === "google" })), instances };
+  return { calendars: cals.map((c) => ({ id: c.id, version: c.version, name: c.name, colorHex: c.colorHex, hiddenIn: c.hiddenIn, google: c.source === "google" })), instances };
 }
 export type Instance = Awaited<ReturnType<typeof rangeView>>["instances"][number];
 export type CalendarItem = Awaited<ReturnType<typeof rangeView>>["calendars"][number];
