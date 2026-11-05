@@ -14,14 +14,15 @@
 
 ## 2. 백업 (16 §7)
 
-- **매일 03:00** 작업 스케줄러 `oona-backup`이 `scripts\backup.ps1` 실행. PC가 그 시각에 꺼져 있었으면 켜진 뒤 바로 실행.
+- **매일 자동 백업은 쓰지 않음**(사용자 결정 2026-11-05, 용량). 작업 스케줄러 `oona-backup`을 등록하지 않는다. 필요할 때만 `scripts\backup.ps1`을 직접 실행. 업데이트 스크립트는 반영 직전에 덤프 하나(`pre-update-*.dump`)를 남김.
+- `backup.ps1`을 직접 실행하면:
   - 운영 DB 덤프 → `BACKUP_DIR\db\daily`(30일) + 달마다 첫 덤프 `db\monthly`(12개월)
   - 데이터 폴더(사진·펫·로그 압축 파일) → `BACKUP_DIR\files`
   - 업데이트 직전 덤프 `pre-update-*.dump`는 최근 10개
 - **PC 밖 사본**(아직 연결 전 — 연결하면 `.env`에 적기만 하면 됨):
   - 외장 드라이브: `BACKUP_COPY_TO=E:\oona-backup` (연결 안 된 날은 건너뛰고 설정 > 운영에 표시)
   - 클라우드 드라이브: rclone을 설치하고 `rclone config`로 클라우드 원격 + 그 위에 **crypt(암호화) 원격**을 만든 뒤 `BACKUP_RCLONE_REMOTE=<crypt 원격 이름>:oona`. 동기화 폴더에 두지 않는다(랜섬웨어가 덮어쓸 수 있음). 클라우드 쪽 버전 기록·휴지통을 켠다.
-- 작업 다시 등록(새 PC 등):
+- (참고) 매일 자동 백업을 다시 켜려면:
   ```powershell
   $a = New-ScheduledTaskAction -Execute "powershell.exe" -Argument "-NoProfile -ExecutionPolicy Bypass -File `"$PWD\scripts\backup.ps1`"" -WorkingDirectory $PWD
   Register-ScheduledTask -TaskName "oona-backup" -Action $a -Trigger (New-ScheduledTaskTrigger -Daily -At 3am) -Settings (New-ScheduledTaskSettingsSet -StartWhenAvailable -ExecutionTimeLimit (New-TimeSpan -Hours 1)) -Force
@@ -47,7 +48,7 @@
 4. `docker compose up -d db` → 백업 덤프를 3번 방법으로 복원.
 5. 데이터 폴더(`OONA_FILES_DIR`)에 백업의 `files` 폴더 복사.
 6. `powershell -ExecutionPolicy Bypass -File scripts\update.ps1` → 앱·Tailscale 노드 시작. Tailscale은 같은 노드 이름(oona)으로 다시 로그인해 주소 유지(필요하면 `.env` TS_AUTHKEY 새로 발급).
-7. 2번 절의 백업 예약 작업 등록, 휴대폰에서 접속·로그인 확인.
+7. 휴대폰에서 접속·로그인 확인.
 
 ## 5. 꺼짐 감시 (16 §5.4)
 
