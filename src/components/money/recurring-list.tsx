@@ -68,7 +68,6 @@ export function RecurringList({ items, categories, payments, today }: { items: R
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-1.5">
             <span className={i.status === "ended" ? "text-muted-foreground truncate" : "truncate"}>{i.name}</span>
-            {i.memo && <StickyNote className="text-muted-foreground size-3.5 shrink-0" aria-label="메모 있음" />}
             {i.status === "ending" && <Badge className="bg-warning text-warning-foreground">해지 예정</Badge>}
           </span>
           <span className="text-muted-foreground block truncate text-caption">
@@ -76,7 +75,12 @@ export function RecurringList({ items, categories, payments, today }: { items: R
               ? `${i.endedAt ? dateLabel(i.endedAt, fromYmd(today)) : ""} 해지됨`
               : [i.label, i.next ? `다음 ${md(i.next)}` : null, i.status === "ending" && i.lastUseDate ? `${md(i.lastUseDate)}까지` : null, pmName(i.paymentMethodId)].filter(Boolean).join(" · ")}
           </span>
-          {i.memo && i.status !== "ended" && <span className="text-muted-foreground block truncate text-caption md:hidden">{i.memo.split("\n")[0]}</span>}
+          {i.memo && (
+            <span className="text-muted-foreground flex items-center gap-1 text-caption">
+              <StickyNote className="size-3 shrink-0" aria-label="메모" />
+              <span className="truncate">{i.memo.split("\n")[0]}</span>
+            </span>
+          )}
         </span>
         <span className={i.status === "ended" ? "text-muted-foreground shrink-0 tabular-nums" : "shrink-0 tabular-nums"}>
           {i.variableAmount && "약 "}

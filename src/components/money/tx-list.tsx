@@ -41,7 +41,6 @@ export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; c
                       <span className="flex items-center gap-1.5">
                         <span className="truncate">{r.title || categories[r.categoryId] || "분류 없음"}</span>
                         {!!r.tags?.length && <span className="text-accent-foreground min-w-0 truncate text-caption">{r.tags.map((t) => `#${t}`).join(" ")}</span>}
-                        {r.memo && <StickyNote className="text-muted-foreground size-3.5 shrink-0" aria-label="메모 있음" />}
                         {r.isRefund && <Badge variant="secondary">환불</Badge>}
                         {r.restraint && <Badge variant="outline">갚기</Badge>}
                         {date > today && <Badge variant="outline">예정</Badge>}
@@ -49,6 +48,13 @@ export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; c
                       <span className="text-muted-foreground block truncate text-caption">
                         {[r.title ? categories[r.categoryId] : null, payLabel(r, payments)].filter(Boolean).join(" · ")}
                       </span>
+                      {/* 메모가 있으면 첫 줄을 함께 */}
+                      {r.memo && (
+                        <span className="text-muted-foreground flex items-center gap-1 text-caption">
+                          <StickyNote className="size-3 shrink-0" aria-label="메모" />
+                          <span className="truncate">{r.memo.split("\n")[0]}</span>
+                        </span>
+                      )}
                     </span>
                     <span className="shrink-0 text-right tabular-nums">
                       {signed(r) > 0 ? `+${money(r.amount)}` : money(r.amount)}
