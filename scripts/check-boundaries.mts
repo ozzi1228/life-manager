@@ -18,7 +18,6 @@ const { parse } = await import("../src/server/validate.ts");
 const { saveImage } = await import("../src/server/files.ts");
 const { createEntry } = await import("../src/server/journal.ts");
 const { txInput } = await import("../src/server/finance.ts");
-const { mediaInput } = await import("../src/server/media.ts");
 const { wishInput } = await import("../src/server/wish.ts");
 const { eventInput } = await import("../src/server/calendar.ts");
 const { itemInput, cellInput } = await import("../src/server/goals.ts");
@@ -93,17 +92,9 @@ try {
   t("일기 사진", (await import("../src/server/journal.ts")).entryInput, { date: D, bodyMd: "x" }, { photoIds: Array.from({ length: 10 }, U) }, "ok");
   t("일기 사진", (await import("../src/server/journal.ts")).entryInput, { date: D, bodyMd: "x" }, { photoIds: Array.from({ length: 11 }, U) }, V);
 
-  // 작품: 제목·한 줄 평·감상·별점
-  const media = { kind: "book", title: "책", status: "done", endDate: D };
-  len3("작품 제목", mediaInput, media, "title", 100);
-  len3("작품 한 줄 평", mediaInput, media, "oneLiner", 100);
-  len3("작품 감상", mediaInput, media, "review", 50_000);
-  t("작품 제목", mediaInput, media, { title: "   " }, V);
-  for (const r of [0.5, 4.5, 5]) t("작품 별점", mediaInput, media, { rating: r }, "ok");
-  for (const r of [0, 5.5, 0.3]) t("작품 별점", mediaInput, media, { rating: r }, V);
 
   // 위시: 이름·가격·링크·사진
-  const wish = { kind: "shopping", name: "가방", price: 1000 };
+  const wish = { name: "가방", price: 1000 };
   len3("위시 이름", wishInput, wish, "name", 100);
   t("위시 이름", wishInput, wish, { name: " \t " }, V);
   amount3("위시 가격", wishInput, wish, "price");
@@ -183,10 +174,10 @@ try {
   amount3("참은 소비", restraintInput, res);
 
   // 글자 종류: zod 4 .max는 코드 포인트로 셈, 입력칸 maxLength는 UTF-16 칸으로 셈 → 서로 다름. 보이는 글자 수와도 다름. 기록만
-  const title = (s: string) => { try { parse(mediaInput, { ...media, title: s }); return "ok"; } catch (e) { return err(e); } };
-  info.push(`"${FAM}"는 보이는 글자 1·코드 포인트 ${[...FAM].length}·UTF-16 ${FAM.length}칸. 작품 제목(100자)에 13개(104칸) → ${title(FAM.repeat(13))}, 20개(코드 포인트 100) → ${title(FAM.repeat(20))}, 21개 → ${title(FAM.repeat(21))} (입력칸 maxLength=100이면 12개까지만 들어감)`);
+  const title = (s: string) => { try { parse(wishInput, { ...wish, name: s }); return "ok"; } catch (e) { return err(e); } };
+  info.push(`"${FAM}"는 보이는 글자 1·코드 포인트 ${[...FAM].length}·UTF-16 ${FAM.length}칸. 위시 이름(100자)에 13개(104칸) → ${title(FAM.repeat(13))}, 20개(코드 포인트 100) → ${title(FAM.repeat(20))}, 21개 → ${title(FAM.repeat(21))} (입력칸 maxLength=100이면 12개까지만 들어감)`);
   const nfd = "é".repeat(50);
-  info.push(`결합 문자 é(e+´) 50개(코드 포인트 100) → ${title(nfd)}, +1자 → ${title(nfd + "x")} (화면엔 50·51글자) · 정규화(NFC) 안 함: 저장값 길이 ${(out(mediaInput, { ...media, title: nfd }).title as string).length}`);
+  info.push(`결합 문자 é(e+´) 50개(코드 포인트 100) → ${title(nfd)}, +1자 → ${title(nfd + "x")} (화면엔 50·51글자) · 정규화(NFC) 안 함: 저장값 길이 ${(out(wishInput, { ...wish, name: nfd }).name as string).length}`);
 
   // 파일: 0바이트·20MB 정확히·20MB+1 (saveImage)
   n += 3;

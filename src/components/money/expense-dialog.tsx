@@ -505,7 +505,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
         </div>
         {wish && (
           <Button type="button" variant="link" className="w-full" disabled={busy} onClick={buyWithoutExpense}>
-            지출 없이 구매함으로
+            지출 없이 했어요로
           </Button>
         )}
       </div>

@@ -3,7 +3,7 @@
 // ponytail: 모바일에서도 위젯 데이터를 불러옴(CSS로만 숨김) — 느려지면 기기별로 나눠 불러오기
 // 건강 등 민감 정보는 홈에 내보내지 않음(10 §7)
 // ponytail: 홈 편집(위젯 켜기·끄기·순서, P1)·위젯별 따로 불러오기는 아직 — 한 번에 불러옴
-import { BookOpen, ChevronRight, Film, NotebookPen, StickyNote, Tv } from "lucide-react";
+import { ChevronRight, NotebookPen, StickyNote } from "lucide-react";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { BudgetBar } from "@/components/app/money";
@@ -12,13 +12,11 @@ import { HomeMenu } from "@/components/home/home-menu";
 import { TodayGoals } from "@/components/home/today-goals";
 import { Button } from "@/components/ui/button";
 import { dayLabel, fromYmd, money, soonLabel } from "@/lib/format";
-import { statusLabel } from "@/lib/media";
 import { budgetView } from "@/server/budget";
 import { rangeView } from "@/server/calendar";
 import { monthTransactions, totals } from "@/server/finance";
 import { trackerMonth } from "@/server/goals";
 import { recentEntries } from "@/server/journal";
-import { mediaList } from "@/server/media";
 import { upcoming } from "@/server/recurring";
 import { pageUser } from "@/server/session";
 import { todayIn } from "@/server/time";
@@ -47,14 +45,13 @@ export default async function Home() {
   const { ctx, name } = await pageUser();
   const today = todayIn();
   const month = today.slice(0, 7);
-  const [cal, tracker, view, txs, soon, entries, media] = await Promise.all([
+  const [cal, tracker, view, txs, soon, entries] = await Promise.all([
     rangeView(ctx, today, today),
     trackerMonth(ctx, month),
     budgetView(ctx, month),
     monthTransactions(ctx, month, "expense"),
     upcoming(ctx),
-    recentEntries(ctx, 2),
-    mediaList(ctx),
+    recentEntries(ctx, 3),
   ]);
 
   const hour = Number(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul", hour: "numeric", hourCycle: "h23" }));
@@ -70,16 +67,8 @@ export default async function Home() {
   const s = view.summary;
   const hasBudget = !!view.budget || view.planned.length > 0;
 
-  // 최근 기록: 일기·작품을 날짜 순으로 섞어 3개
-  const recent = [
-    ...entries.map((e) => ({ key: e.id, icon: NotebookPen, title: e.title || e.bodyMd.split("\n")[0].slice(0, 40) || "일기", sub: `일기 · ${dayLabel(e.date, d)}`, date: e.date, href: `/records/journal/${e.id}` })),
-    ...media.slice(0, 3).map((m) => {
-      const date = m.endDate ?? m.startDate ?? today;
-      return { key: m.id, icon: { book: BookOpen, movie: Film, drama: Tv }[m.kind], title: m.title, sub: `${statusLabel(m.kind, m.status)} · ${dayLabel(date, d)}`, date, href: "/wish/media" };
-    }),
-  ]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .slice(0, 3);
+  // 최근 기록: 일기 3개
+  const recent = entries.map((e) => ({ key: e.id, icon: NotebookPen, title: e.title || e.bodyMd.split("\n")[0].slice(0, 40) || "일기", sub: `일기 · ${dayLabel(e.date, d)}`, date: e.date, href: `/records/journal/${e.id}` }));
 
   // 위젯: 내용이 있으면 카드, 비어 있으면(empty) 아래 한 줄 목록으로
   type W = { title: string; href: string; body?: ReactNode; empty?: string; action?: { label: string; href: string } };

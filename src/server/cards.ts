@@ -86,7 +86,7 @@ export const cardInput = z.object({
   issuer: z.string().trim().max(20).nullable().default(null),
   cardType: z.enum(["credit", "check", "transit"]).nullable().default(null),
   billingDay: z.number().int().min(1).max(31).nullable().default(null),
-  annualFee: won(1_000_000_000), // currency의 가장 작은 단위
+  annualFee: won(10_000_000), // currency의 가장 작은 단위(1천만: 원 1천만 원, 달러 10만 달러)
   currency: z.enum(CURRENCY_CODES).default("KRW"),
   memo,
   linkedAccountId: z.uuid().nullable().default(null),

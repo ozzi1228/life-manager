@@ -6,10 +6,9 @@ import { and, asc, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import { z } from "zod";
 import { db, type Tx } from "../db/index.ts";
 import { restraintEntries, restraintMonths, wishItems } from "../db/schema.ts";
-import { autoEligible, restraintTarget } from "../lib/restraint.ts";
-import { budgetView, monthEnd, nextMonth, prevMonth } from "./budget.ts";
+import { restraintTarget } from "../lib/restraint.ts";
+import { budgetView, nextMonth, prevMonth } from "./budget.ts";
 import { AppError } from "./errors.ts";
-import { imagesOf } from "./files.ts";
 import { nameMaps } from "./finance.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
 import { todayIn } from "./time.ts";
@@ -19,7 +18,6 @@ export const restraintEntryRepo = defineRepo(restraintEntries, "restraint_entry"
 export const restraintMonthRepo = defineRepo(restraintMonths, "restraint_month");
 
 const isDup = (e: unknown) => (e as { cause?: { code?: string } })?.cause?.code === "23505" || (e as { code?: string })?.code === "23505";
-const kstDate = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
 const checkMonth = (m: string) => {
   if (!/^\d{4}-\d{2}$/.test(m)) throw new AppError("BAD_REQUEST", "잠시 후 다시 시도해 주세요");
 };
@@ -61,19 +59,8 @@ async function compute(ctx: Ctx, month: string, carriedIn: number) {
   return { ...d, filled, entries, later, hasBudget: Object.keys(view.budget?.lines ?? {}).length > 0 };
 }
 
-/** 월 정산(20 §6): 위시 자동 포함 → 계산 → 저장. row가 있으면 다시 정산(자동 포함은 새로 대상이 된 것만 더함) */
+/** 월 정산(20 §6): 계산 → 저장. row가 있으면 다시 정산. 위시 자동 포함은 없앰(참은 것은 직접 기록) */
 async function settle(ctx: Ctx, month: string, carriedIn: number, row?: typeof restraintMonths.$inferSelect | null) {
-  const counted = await countedWishes(ctx);
-  // 이 달에서 뺀 위시는 다시 정산해도 이 달에 다시 넣지 않음(다음 달부터 다시 대상)
-  const excluded = new Set((await entriesOf(ctx, month)).filter((e) => e.status === "excluded").map((e) => e.wishItemId));
-  for (const w of await shoppingWishes(ctx)) {
-    if (excluded.has(w.id) || !autoEligible({ ...w, createdDate: kstDate(w.createdAt), counted: counted.has(w.id) }, month)) continue;
-    await restraintEntryRepo
-      .create(ctx, { month, date: monthEnd(month), origin: "wish_auto", wishItemId: w.id, name: w.name, amount: w.price! }, { source: "job" })
-      .catch((e) => {
-        if (!isDup(e)) throw e; // 다른 요청이 먼저 넣음
-      });
-  }
   const c = await compute(ctx, month, carriedIn);
   const values = { month, target: c.target, filled: c.filled, carriedIn, carryOut: Math.max(0, c.target - c.filled), detail: { luxury: c.luxury, overage: c.overage, laterBought: c.laterBought } };
   if (row) return restraintMonthRepo.update(ctx, row.id, row.version, values);
@@ -112,15 +99,9 @@ export async function restraintView(ctx: Ctx, month: string) {
   const live = await compute(ctx, month, carriedIn);
   const shown = row ? { target: row.target, filled: row.filled, carriedIn: row.carriedIn, ...row.detail } : live;
 
-  // 이번 달 말에 들어갈 후보(20 §4.4)와 "위시에서 고르기" 목록
+  // "위시에서 고르기" 목록: 담아 둔 것 중 가격 있고 아직 안 센 것
   const [wishes, counted] = await Promise.all([shoppingWishes(ctx), countedWishes(ctx)]);
-  const saved = wishes.filter((w) => w.status === "saved" && !counted.has(w.id));
-  const candidates = month === cur ? saved.filter((w) => autoEligible({ ...w, createdDate: kstDate(w.createdAt), counted: false }, month)) : [];
-  const photos = await imagesOf(
-    ctx,
-    "wish_item",
-    candidates.map((w) => w.id),
-  );
+  const saved = wishes.filter((w) => w.status === "saved" && w.price && !counted.has(w.id));
 
   return {
     month,
@@ -134,7 +115,6 @@ export async function restraintView(ctx: Ctx, month: string) {
     hasBudget: live.hasBudget,
     entries: live.entries.map((e) => ({ id: e.id, version: e.version, date: e.date, origin: e.origin, wishItemId: e.wishItemId, name: e.name, amount: e.amount, reason: e.reason, status: e.status, boughtMonth: e.boughtMonth })),
     later: live.later.map((e) => ({ id: e.id, name: e.name, amount: e.amount, month: e.month })),
-    candidates: candidates.map((w) => ({ id: w.id, name: w.name, level: w.level, price: w.price!, photoId: photos.get(w.id)?.[0]?.id ?? null })),
     pickable: saved.map((w) => ({ id: w.id, name: w.name, price: w.price })),
   };
 }

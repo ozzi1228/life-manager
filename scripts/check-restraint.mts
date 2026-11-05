@@ -1,7 +1,7 @@
 // 참은 소비 계산(src/lib/restraint.ts) 확인: node scripts/check-restraint.mts
-// 20 §3: "참아서 갚기" 지출 이중 계산 제외, 환불 차감, 예산 없는 분류, 예정 지출 제외 / §4.2 위시 자동 포함 조건
+// 20 §3: "참아서 갚기" 지출 이중 계산 제외, 환불 차감, 예산 없는 분류, 예정 지출 제외(위시 자동 포함은 없앰)
 import assert from "node:assert/strict";
-import { autoEligible, fillState, restraintTarget } from "../src/lib/restraint.ts";
+import { fillState, restraintTarget } from "../src/lib/restraint.ts";
 
 // "lux" 분류에 넣은 것은 갚기 체크한 지출로 침
 const tx = (amount: number, categoryId: string, date = "2026-10-10", isRefund = false, restraint = categoryId === "lux") => ({ amount, categoryId, date, isRefund, restraint });
@@ -33,12 +33,4 @@ assert.equal(restraintTarget({ ...base, txs: [], categories: [], carriedIn: 3200
 
 assert.deepEqual([fillState(0, 0), fillState(100, 50), fillState(100, 100)], ["none", "progress", "done"]);
 
-// 위시 자동 포함: 그 달 1일 전에 담은 갖고 싶음·관심, 담아둠, 가격 있음, 센 적 없음
-const w = { kind: "shopping", status: "saved", level: "want", price: 89000, createdDate: "2026-09-20", counted: false };
-assert.equal(autoEligible(w, "2026-10"), true);
-assert.equal(autoEligible({ ...w, createdDate: "2026-10-01" }, "2026-10"), false, "월중에 담으면 다음 달부터");
-assert.equal(autoEligible({ ...w, level: "need" }, "2026-10"), false, "필요는 제외");
-assert.equal(autoEligible({ ...w, status: "bought" }, "2026-10"), false);
-assert.equal(autoEligible({ ...w, counted: true }, "2026-10"), false, "한 물건은 한 번만(D-039)");
-assert.equal(autoEligible({ ...w, kind: "media", level: null }, "2026-10"), false);
 console.log("참은 소비 계산 확인 통과");

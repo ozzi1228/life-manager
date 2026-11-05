@@ -13,7 +13,7 @@ const DESC: Record<string, string> = {
   "/goals": "습관·목표",
   "/money": "지출·예산·고정 지출",
   "/records": "일기·건강",
-  "/wish": "쇼핑·작품",
+  "/wish": "물건·작품",
   "/career": "경험·이력",
 };
 

@@ -1,20 +1,17 @@
-// 위시 · 위시 (SCR-WISH-01): 쇼핑 / 작품(?tab=media)
+// 위시 (SCR-WISH-01): 갖고 싶은 물건·보고 싶은 작품을 한 목록에. 분류는 이름만
 import { Page } from "@/components/app/page-shell";
-import { WishTabs } from "@/components/wish/wish-tabs";
 import { WishView } from "@/components/wish/wish";
 import { pageCtx } from "@/server/session";
 import { todayIn } from "@/server/time";
 import { wishList } from "@/server/wish";
 import { categoryList } from "@/server/item-categories";
 
-export default async function WishPage({ searchParams }: PageProps<"/wish">) {
-  const q = await searchParams;
+export default async function WishPage() {
   const ctx = await pageCtx();
-  const categories = await categoryList(ctx, "wish"); // 먼저: 처음이면 기본 분류를 만들고 항목을 채움
+  const categories = await categoryList(ctx); // 먼저: 처음이면 기본 분류를 만듦
   return (
     <Page>
-      <WishTabs />
-      <WishView items={await wishList(ctx)} categories={categories} today={todayIn()} initialTab={q.tab === "media" ? "media" : "shopping"} />
+      <WishView items={await wishList(ctx)} categories={categories} today={todayIn()} />
     </Page>
   );
 }

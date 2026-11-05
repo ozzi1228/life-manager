@@ -20,9 +20,3 @@ export type TargetDetail = ReturnType<typeof restraintTarget>;
 /** 참을 것 없음 / 진행 중 / 달성 (20 §4.4). 넘친 금액은 다음 달로 넘기지 않음 */
 export const fillState = (target: number, filled: number) => (target <= 0 ? "none" : filled >= target ? "done" : "progress");
 
-/**
- * 월말에 자동으로 들어갈 위시인지(20 §4.2): 쇼핑·담아둠·갖고 싶음/관심·가격 있음·그 달 1일 전에 담음·아직 참은 소비로 센 적 없음
- * createdDate: 담은 날(사용자 시간대 "YYYY-MM-DD")
- */
-export const autoEligible = (w: { kind: string; status: string; level: string | null; price: number | null; createdDate: string; counted: boolean }, month: string) =>
-  w.kind === "shopping" && w.status === "saved" && (w.level === "want" || w.level === "like") && !!w.price && w.createdDate < `${month}-01` && !w.counted;

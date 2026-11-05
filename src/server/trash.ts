@@ -20,7 +20,6 @@ import "./finance.ts";
 import "./goals.ts";
 import "./health.ts";
 import "./journal.ts";
-import "./media.ts";
 import "./recurring.ts";
 import "./restraint.ts";
 import "./wish.ts";
@@ -51,7 +50,6 @@ export const SHOWN: Record<string, { area: string; name: (r: AnyRow, batch: { en
   restraint_entry: { area: "참은 소비", name: (r) => `${r.name} · ${won(r.amount)}` },
   journal_topic: { area: "일기", name: (r) => `${r.name} 주제` },
   journal_entry: { area: "일기", name: (r) => String(r.title || `${r.date} 일기`) },
-  media_log: { area: "작품", name: (_, b) => String(b.find((x) => x.entity === "media_work")?.row.title ?? "작품 기록") },
   wish_item: { area: "위시", name: (r) => String(r.name) },
   health_record: { area: "건강", name: (r) => `${r.kind === "weight" ? "체중" : "혈당"} 기록 · ${r.date}` }, // 값은 풀지 않음
   pet: { area: "펫", name: (r) => String(r.name) },

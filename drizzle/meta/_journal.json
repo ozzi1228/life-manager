@@ -232,6 +232,13 @@
       "when": 1793849520530,
       "tag": "0032_currency_more",
       "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1793859390753,
+      "tag": "0033_wish_simple",
+      "breakpoints": true
     }
   ]
 }

@@ -23,8 +23,7 @@ const DETAIL = new Set(["card", "pay", "account"]);
 // 휴지통 목록엔 안 나오지만 혼자 바뀌는 것: 반복 일정의 "이 날만" 지우기·고치기, 예산, 위시·작품 분류, 작품 정보
 const EXTRA: typeof SHOWN = {
   budget: { area: "예산", name: (r) => `${Number(String(r.month).slice(5))}월 예산` },
-  item_category: { area: "위시·작품", name: (r) => `${r.name} 분류` },
-  media_work: { area: "작품", name: (r) => String(r.title) },
+  item_category: { area: "위시", name: (r) => `${r.name} 분류` },
   event_exception: { area: "일정", name: (r, all) => `${all.find((x) => x.row.id === r.eventId)?.row.title ?? "반복 일정"} · ${Number(String(r.originalDate).slice(5, 7))}월 ${Number(String(r.originalDate).slice(8))}일만` },
 };
 const nameOf = (e: string) => SHOWN[e] ?? EXTRA[e];

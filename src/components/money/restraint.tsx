@@ -30,7 +30,6 @@ import type { RestraintView as View } from "@/server/restraint";
 
 type Entry = View["entries"][number];
 const ORIGIN: Record<Entry["origin"], string> = { manual: "직접", wish_auto: "위시", wish_dropped: "그만둔 위시", wish_picked: "위시에서" };
-const LEVEL: Record<string, string> = { want: "갖고 싶음", like: "관심" };
 
 function EntryForm({ edit, pickable, today, close, done }: { edit?: Entry; pickable: View["pickable"]; today: string; close: () => void; done: () => void }) {
   const [name, setName] = useState(edit?.name ?? "");
@@ -131,7 +130,6 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
   const short = Math.max(0, v.target - v.filled);
   const pct = v.target > 0 ? Math.min(100, Math.round((v.filled / v.target) * 100)) : 0;
   const refresh = () => router.refresh();
-  const candSum = v.candidates.reduce((a, c) => a + c.price, 0);
   const mLabel = monthLabel(v.month, fromYmd(today));
 
   async function call(p: Promise<{ ok: boolean; error?: { message: string } }>) {
@@ -146,7 +144,6 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
     if (!r.ok) return toast(r.error.message);
     refresh();
   }
-  const pickNow = (c: View["candidates"][number]) => call(addRestraint(crypto.randomUUID(), { name: c.name, amount: c.price, date: today, reason: null, wishItemId: c.id }));
 
   const add = (
     <Button variant={mobile ? "outline" : "default"} onClick={() => setForm({})}>
@@ -167,7 +164,7 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
   ];
 
   return (
-    <div className="grid grid-cols-1 gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
+    <div className="grid grid-cols-1 gap-6">
       <div className="space-y-4">
         <MonthNav month={v.month} />
 
@@ -297,49 +294,6 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
         </section>
       </div>
 
-      {v.current && (
-        <aside className="space-y-2">
-          <h2 className="text-subtitle flex items-center gap-1 font-semibold">
-            이번 달 말에 들어갈 후보
-            <InfoTip label="후보">1일 전부터 담아 둔 갖고 싶음·관심 위시 중 이번 달에 사지 않은 것이 다음 달 1일에 자동으로 들어가요.</InfoTip>
-          </h2>
-          {v.candidates.length ? (
-            <>
-              <ul className="divide-y rounded-lg border">
-                {v.candidates.map((c) => (
-                  <li key={c.id} className="flex items-center gap-3 px-3 py-2">
-                    {c.photoId ? (
-                      // eslint-disable-next-line @next/next/no-img-element -- 로그인한 본인만 보는 사진(이 서버가 직접 보냄)
-                      <img src={`/api/v1/attachments/${c.photoId}?v=thumb`} alt="" className="size-10 shrink-0 rounded-md object-cover" />
-                    ) : (
-                      <span className="bg-muted size-10 shrink-0 rounded-md" />
-                    )}
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm">{c.name}</span>
-                      <span className="text-muted-foreground text-caption">
-                        {LEVEL[c.level ?? ""]} · {money(c.price)}
-                      </span>
-                    </span>
-                    <Button variant="link" size="sm" className="shrink-0 px-0" disabled={busy} onClick={() => pickNow(c)}>
-                      지금 기록
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-              <p className="text-sm tabular-nums">
-                지금 이대로 사지 않으면 <b>{money(candSum)}</b>이 채워져요
-              </p>
-            </>
-          ) : (
-            <div className="text-muted-foreground space-y-2 rounded-lg border border-dashed p-4 text-center text-sm">
-              <p>이번 달 말에 들어갈 위시가 없어요</p>
-              <Button variant="outline" size="sm" asChild>
-                <Link href="/wish">위시 보기</Link>
-              </Button>
-            </div>
-          )}
-        </aside>
-      )}
 
       {form && (
         <EntryForm
