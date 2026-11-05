@@ -352,7 +352,6 @@ function ItemEditor({ month, item, preset, used, close, done }: { month: string;
     await hideTrackerItem(item.id, month);
     done();
     close();
-    toast(`${item.name}을(를) 이번 달에서 뺐어요`);
   }
   async function remove() {
     if (!item) return;

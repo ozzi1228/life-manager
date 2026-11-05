@@ -5,7 +5,6 @@
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 import { addCard, editCard, removePaymentAction } from "@/app/actions/cards";
 import { AmountInput } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
@@ -87,7 +86,6 @@ function CardForm({ edit, accounts, close }: { edit?: CardItem; accounts: Opt[];
     const r = edit ? await editCard(edit.id, edit.pmVersion, input) : await addCard(input);
     setBusy(false);
     if (!r.ok) return setError(r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 수정했어요. 닫고 다시 열어 주세요" : (r.error.fields?.[0]?.message ?? r.error.message));
-    toast(edit ? "카드를 고쳤어요" : "카드를 추가했어요");
     close();
     router.refresh();
   }

@@ -575,8 +575,7 @@ export function MediaView({ items, categories, today }: { items: MediaItem[]; ca
           today={today}
           close={() => setForm(null)}
           done={() => {
-            toast(form.edit ? "고쳤어요" : "기록했어요");
-            setForm(null);
+                    setForm(null);
             router.refresh();
           }}
         />

@@ -145,15 +145,10 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
       return setError({ field: f?.path === "categoryId" ? "category" : f?.path === "amount" ? "amount" : undefined, message: f?.message ?? r.error.message });
     }
     router.refresh();
-    if (edit) {
-      toast("고쳤어요");
-      return close();
-    }
+    if (edit) return close();
     if (wish) return bought(r.data as { budget: { category: string; over: number } | null });
-    const label = type === "income" ? "수입을 기록했어요" : refund ? "환불을 기록했어요" : "지출을 기록했어요";
     if ("budget" in r.data && r.data.budget) toast.warning(`${r.data.budget.category} 예산을 ${money(r.data.budget.over)} 넘었어요 · 그만큼 참아야 할 금액에 더해져요`, { duration: 5000, description: "작업 기록에서 되돌릴 수 있어요" });
     else if ("restraint" in r.data && r.data.restraint) toast(`참아서 갚을 지출을 기록했어요 · 이번 달 참아야 할 금액 +${money(amount)}`, { duration: 6000, description: "작업 기록에서 되돌릴 수 있어요" });
-    else toastDone(label);
     if (repeat) {
       // 연속 입력: 비우고 다시 금액부터
       setAmount(null);
@@ -170,7 +165,6 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
   function bought(d: { budget: { category: string; over: number } | null }) {
     if (!wish) return;
     if (d.budget) toast.warning(`구매함으로 옮겼어요 · ${d.budget.category} 예산을 ${money(d.budget.over)} 넘었어요`, { duration: 5000, description: "작업 기록에서 되돌릴 수 있어요" });
-    else toastDone("구매함으로 옮겼어요");
     wish.done?.();
     close();
   }

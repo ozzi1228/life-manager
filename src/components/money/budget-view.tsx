@@ -40,7 +40,6 @@ export function BudgetView({ view, categories, lastActual, today }: { view: View
     const r = await copyLastMonthBudget(month);
     setBusy(false);
     if (!r.ok) return toast(r.error.message);
-    toast("지난달 분류별 예산을 가져왔어요");
     router.refresh();
   }
 
@@ -247,7 +246,6 @@ function BudgetEditor({ view, categories, lastActual, today, close, done }: { vi
     });
     setBusy(false);
     if (!r.ok) return setError(r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 저장했어요. 닫고 다시 열어 주세요" : (r.error.fields?.[0]?.message ?? r.error.message));
-    toast("예산을 저장했어요");
     done();
     close();
   }

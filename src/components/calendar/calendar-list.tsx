@@ -267,7 +267,6 @@ export function CalendarList({ calendars, hidden, toggle, google, viewLabel }: {
   function makeDefault(c: CalendarItem) {
     if (hidden.has(c.id)) toggle(c, true);
     saveOrder([c.id, ...drag.order.filter((id) => id !== c.id)]);
-    toast(`기본 캘린더: ${c.name}`);
   }
 
   async function sync(quiet = false) {
@@ -276,7 +275,6 @@ export function CalendarList({ calendars, hidden, toggle, google, viewLabel }: {
     setSyncing(false);
     if (!r.ok) return quiet || toast(r.error.message);
     router.refresh();
-    if (!quiet) toast("구글 일정을 새로 가져왔어요");
   }
   // 화면을 열 때 15분 넘게 지났으면 조용히 가져오기(한 번만)
   const auto = useRef(false);
@@ -291,7 +289,6 @@ export function CalendarList({ calendars, hidden, toggle, google, viewLabel }: {
     setUnlink(false);
     const r = await unlinkGoogle();
     if (!r.ok) return toast(r.error.message);
-    toast("구글 캘린더 연동을 해제했어요");
     router.refresh();
   }
 

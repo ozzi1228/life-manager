@@ -59,7 +59,6 @@ function EntryForm({ edit, pickable, today, close, done }: { edit?: Entry; picka
     const r = edit ? await editRestraint(edit.id, edit.version, input) : await addRestraint(key.current, input);
     setBusy(false);
     if (!r.ok) return setError(r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 수정했어요. 닫고 다시 열어 주세요" : (r.error.fields?.[0]?.message ?? r.error.message));
-    toast(edit ? "고쳤어요" : "참은 것을 기록했어요");
     done();
   }
 
@@ -136,12 +135,11 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
   const candSum = v.candidates.reduce((a, c) => a + c.price, 0);
   const mLabel = monthLabel(v.month, fromYmd(today));
 
-  async function call(p: Promise<{ ok: boolean; error?: { message: string } }>, message: string) {
+  async function call(p: Promise<{ ok: boolean; error?: { message: string } }>) {
     setBusy(true);
     const r = await p;
     setBusy(false);
     if (!r.ok) return toast(r.error?.message ?? "잠시 후 다시 시도해 주세요");
-    toast(message);
     refresh();
   }
   async function remove(e: Entry) {
@@ -150,7 +148,7 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
     refresh();
     toastDone("휴지통으로 옮겼어요");
   }
-  const pickNow = (c: View["candidates"][number]) => call(addRestraint(crypto.randomUUID(), { name: c.name, amount: c.price, date: today, reason: null, wishItemId: c.id }), "참은 것으로 기록했어요");
+  const pickNow = (c: View["candidates"][number]) => call(addRestraint(crypto.randomUUID(), { name: c.name, amount: c.price, date: today, reason: null, wishItemId: c.id }));
 
   const add = (
     <Button variant={mobile ? "outline" : "default"} onClick={() => setForm({})}>
@@ -235,7 +233,7 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
           {v.stale && (
             <div className="bg-warning/15 flex flex-wrap items-center gap-2 rounded-md p-2 text-sm">
               정산 뒤에 바뀐 지출·기록이 있어요
-              <Button size="sm" variant="outline" className="ml-auto" disabled={busy} onClick={() => call(resettleMonth(v.month), "다시 정산했어요")}>
+              <Button size="sm" variant="outline" className="ml-auto" disabled={busy} onClick={() => call(resettleMonth(v.month))}>
                 {busy && <Spinner />} 다시 정산
               </Button>
             </div>
@@ -273,7 +271,7 @@ export function RestraintView({ v, today }: { v: View; today: string }) {
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end">
                         {e.origin === "wish_auto" ? (
-                          <DropdownMenuItem onSelect={() => call(excludeRestraint(e.id, e.version, e.status !== "excluded"), e.status === "excluded" ? "다시 넣었어요" : "이 달에서 뺐어요")}>
+                          <DropdownMenuItem onSelect={() => call(excludeRestraint(e.id, e.version, e.status !== "excluded"))}>
                             {e.status === "excluded" ? "다시 넣기" : "이 달에서 빼기"}
                           </DropdownMenuItem>
                         ) : (

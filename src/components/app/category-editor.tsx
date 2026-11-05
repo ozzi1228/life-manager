@@ -73,7 +73,7 @@ export function CategoryEditor({
   }
   const sort = useDragSort(
     items.map((i) => i.key),
-    (keys) => void run(onReorder(keys), "순서를 바꿨어요"),
+    (keys) => void run(onReorder(keys)),
   );
   const byKey = new Map(items.map((i) => [i.key, i]));
   // 표 칸 너비: 손잡이 · (색) · 이름 · 체크 칸들 · ⋯ (휴대폰은 --hw·--cw를 줄여 이름 칸을 남김)
@@ -91,11 +91,11 @@ export function CategoryEditor({
   async function rename(item: CategoryItem, el: HTMLInputElement) {
     const name = el.value.trim();
     if (!name || name === item.name) return;
-    await run(onRename(item, name), "이름을 바꿨어요");
+    await run(onRename(item, name));
   }
   async function add() {
     const name = adding?.trim();
-    if (name && (await run(onAdd(name), "분류를 추가했어요"))) setAdding(""); // 이어서 더 넣을 수 있게 칸은 열어 둠
+    if (name && (await run(onAdd(name)))) setAdding(""); // 이어서 더 넣을 수 있게 칸은 열어 둠
   }
   async function toggle(item: CategoryItem, col: string, on: boolean) {
     const k = `${item.key}:${col}`;

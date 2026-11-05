@@ -86,7 +86,6 @@ function VersionForm({ doc, edit, close, done }: { doc: CareerDoc; edit?: Versio
     const r = await saveDocVersion(doc.id, edit?.id ?? null, edit?.version ?? null, input);
     setBusy(false);
     if (!r.ok) return setError(r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 수정했어요. 닫고 다시 열어 주세요" : (r.error.fields?.[0]?.message ?? r.error.message));
-    toast(edit ? "버전을 고쳤어요" : "버전을 추가했어요");
     done();
   }
 

@@ -7,7 +7,6 @@ import { ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
 import { addEntry, editEntry, removeEntry } from "@/app/actions/journal";
 import { PhotoPicker, type Photo } from "@/components/app/photo-picker";
 import { toastDone } from "@/components/app/states";
@@ -94,7 +93,6 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
       );
     }
     localStorage.removeItem(draftKey(entry?.id));
-    toast(entry ? "고쳤어요" : "기록했어요");
     router.push(`/records?month=${date.slice(0, 7)}`);
     router.refresh();
   }

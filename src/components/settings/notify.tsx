@@ -46,8 +46,7 @@ export function NotifySection() {
       const r = await subscribePush(JSON.parse(JSON.stringify(sub)), deviceName());
       if (!r.ok) throw new Error();
       setState("on");
-      toast("이 기기에서 알림을 받아요");
-    } catch {
+      } catch {
       setState(Notification.permission === "denied" ? "denied" : "off");
       toast("알림을 켜지 못했어요. 브라우저 알림 권한을 확인해 주세요");
     }

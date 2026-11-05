@@ -32,7 +32,7 @@ export function Delayed({ children, ms = 300 }: { children: ReactNode; ms?: numb
   return show ? <>{children}</> : null;
 }
 
-/** 지우기·고치기 알림. 되돌리기는 팝업 대신 사이드바 아래 작업 기록에서(D-077) */
+/** 지우기 알림(되돌릴 곳 안내). 추가·고치기·저장 같은 성공은 팝업을 띄우지 않음 — 화면에서 바로 보임. 되돌리기는 사이드바 아래 작업 기록에서(D-077) */
 export function toastDone(message: string) {
   toast(message, { description: "작업 기록에서 되돌릴 수 있어요" });
 }

@@ -86,12 +86,10 @@ function Devices({ current }: { current?: string }) {
   async function out(token: string) {
     await authClient.revokeSession({ token });
     load();
-    toast("그 기기에서 로그아웃했어요");
   }
   async function outOthers() {
     await authClient.revokeOtherSessions();
     load();
-    toast("다른 기기에서 모두 로그아웃했어요");
   }
   if (!list) return <Spinner />;
   const sorted = [...list].sort((a, b) => (a.token === current ? -1 : b.token === current ? 1 : +new Date(b.updatedAt) - +new Date(a.updatedAt)));
@@ -136,7 +134,6 @@ export function AccountSection() {
     setBusy(false);
     if (error) return toast(error.message ?? "바꾸지 못했어요");
     setName(null);
-    toast("이름을 바꿨어요");
   }
 
   return (

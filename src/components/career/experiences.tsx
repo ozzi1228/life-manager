@@ -14,7 +14,6 @@ import {
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useRef, useState, type ReactNode } from "react";
-import { toast } from "sonner";
 import {
   addExpCat,
   addExperience,
@@ -443,7 +442,6 @@ export function ExperienceEditor({
           ? "다른 기기에서 먼저 수정했어요. 새로 고침해 주세요"
           : (r.error.fields?.[0]?.message ?? r.error.message),
       );
-    toast(exp ? "고쳤어요" : "경험을 기록했어요");
     router.push("/career");
     router.refresh();
   }

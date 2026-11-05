@@ -85,8 +85,6 @@ export function GoalList({ goals, categories, view, thisYear }: { goals: Goal[];
     const r = await changeGoalStatus(g.id, g.version, status);
     if (!r.ok) return toast(r.error.message);
     router.refresh();
-    if (status === "done")
-      toastDone("목표를 달성했어요 🎉");
   }
   async function remove(g: Goal) {
     await deleteGoal(g.id);

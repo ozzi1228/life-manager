@@ -5,7 +5,6 @@
 import { Lock, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useRef, useState } from "react";
-import { toast } from "sonner";
 import { addHealth, deleteHealth, editHealth } from "@/app/actions/health";
 import { ResponsiveModal } from "@/components/app/responsive";
 import { EmptyState, toastDone } from "@/components/app/states";
@@ -85,7 +84,6 @@ function HealthForm({ edit, kind, today, last, names, close, done }: { edit?: He
     const r = edit ? await editHealth(edit.id, edit.version, input) : await addHealth(key.current, input);
     setBusy(false);
     if (!r.ok) return setError(r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 수정했어요. 닫고 다시 열어 주세요" : (r.error.fields?.[0]?.message ?? r.error.message));
-    toast(edit ? "고쳤어요" : `${NAME[v.kind]}${inj ? "를" : "을"} 기록했어요`);
     done();
   }
   async function remove() {

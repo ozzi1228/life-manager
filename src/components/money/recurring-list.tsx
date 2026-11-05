@@ -154,14 +154,14 @@ function Detail({ item, today, payment, category, close, edit, done }: { item: R
   const dayBefore = item.next ? ymd(new Date(fromYmd(item.next).getTime() - 86_400_000)) : today;
   const [lastUse, setLastUse] = useState(dayBefore < today ? today : dayBefore);
   const [busy, setBusy] = useState(false);
-  const run = async (f: () => Promise<{ ok: boolean; error?: { message: string } }>, msg: string) => {
+  const run = async (f: () => Promise<{ ok: boolean; error?: { message: string } }>, msg?: string) => {
     setBusy(true);
     const r = await f();
     setBusy(false);
     if (!r.ok) return toast(r.error?.message ?? "잠시 후 다시 시도해 주세요");
     done();
     close();
-    toastDone(msg);
+    if (msg) toastDone(msg); // 지우기만 알림(되돌릴 곳 안내)
   };
 
   // 겹친 서랍은 바깥 서랍을 닫아 버려서, 날짜 고르기는 상세 대신 띄움
@@ -206,16 +206,16 @@ function Detail({ item, today, payment, category, close, edit, done }: { item: R
             </Button>
           )}
           {item.status === "ending" && (
-            <Button variant="outline" disabled={busy} onClick={() => run(() => cancelRecurringEnd(item.id, item.version), "해지 예정을 취소했어요")}>
+            <Button variant="outline" disabled={busy} onClick={() => run(() => cancelRecurringEnd(item.id, item.version), undefined)}>
               해지 취소
             </Button>
           )}
           {item.status !== "ended" ? (
-            <Button variant="ghost" disabled={busy} onClick={() => run(() => endRecurringNow(item.id, item.version), "해지됨으로 옮겼어요")}>
+            <Button variant="ghost" disabled={busy} onClick={() => run(() => endRecurringNow(item.id, item.version), undefined)}>
               바로 해지됨으로
             </Button>
           ) : (
-            <Button variant="outline" disabled={busy} onClick={() => run(() => reactivateRecurring(item.id, item.version), "다시 이용 중으로 바꿨어요")}>
+            <Button variant="outline" disabled={busy} onClick={() => run(() => reactivateRecurring(item.id, item.version), undefined)}>
               다시 이용하기
             </Button>
           )}
@@ -289,7 +289,6 @@ function RecurringForm({ item, preset, categories, payments, today, close, done 
     const r = item ? await editRecurring(item.id, item.version, input) : await addRecurring(input);
     setBusy(false);
     if (!r.ok) return setError(r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 수정했어요. 닫고 다시 열어 주세요" : (r.error.fields?.[0]?.message ?? r.error.message));
-    toast(item ? "고쳤어요" : "고정 지출에 추가했어요");
     done();
     close();
   }

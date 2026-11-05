@@ -5,7 +5,6 @@
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 import { addAccount, editAccount, removePaymentAction } from "@/app/actions/cards";
 import { AmountInput, MoneyText } from "@/components/app/money";
 import { ResponsiveModal } from "@/components/app/responsive";
@@ -166,7 +165,6 @@ function AccountForm({ edit, close }: { edit?: AccountItem; close: () => void })
     const r = edit ? await editAccount(edit.id, edit.pmVersion, data) : await addAccount(data);
     setBusy(false);
     if (!r.ok) return setError(r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 수정했어요. 닫고 다시 열어 주세요" : (r.error.fields?.[0]?.message ?? r.error.message));
-    toast(edit ? "계좌를 고쳤어요" : "계좌를 추가했어요");
     close();
     router.refresh();
   }

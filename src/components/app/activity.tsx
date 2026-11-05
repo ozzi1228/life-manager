@@ -33,8 +33,7 @@ export function ActivityList({ items }: { items: ActivityItem[] }) {
     setBusy(null);
     if (!r) return toast("연결이 끊겨 되돌리지 못했어요. 연결되면 다시 눌러 주세요");
     if (!r.ok) return toast(r.error.message);
-    toast(`${i.name} ${i.verb}을(를) 되돌렸어요`);
-    router.refresh();
+      router.refresh();
   }
 
   const days = new Map<string, ActivityItem[]>();

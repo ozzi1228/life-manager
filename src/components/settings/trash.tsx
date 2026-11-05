@@ -40,7 +40,6 @@ export function TrashList({ items }: { items: TrashItem[] }) {
     for (const i of list) await restoreTrash(i.entity, i.id);
     setBusy(false);
     setPicked(new Set());
-    toast(list.length > 1 ? `${list.length}개를 복구했어요` : `${list[0].name}을(를) 복구했어요`);
     router.refresh();
   }
   async function purgeNow() {
@@ -51,7 +50,6 @@ export function TrashList({ items }: { items: TrashItem[] }) {
     setConfirm(null);
     setPicked(new Set());
     if (!r.ok) return toast(r.error.message);
-    toast("영구 삭제했어요");
     router.refresh();
   }
 

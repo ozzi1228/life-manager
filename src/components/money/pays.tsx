@@ -5,7 +5,6 @@
 import { Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 import { addPay, editPay, removePaymentAction } from "@/app/actions/cards";
 import { ResponsiveModal } from "@/components/app/responsive";
 import { EmptyState, toastDone } from "@/components/app/states";
@@ -81,7 +80,6 @@ function PayForm({ edit, sources, close }: { edit?: PayItem; sources: Source[]; 
     const r = edit ? await editPay(edit.id, edit.pmVersion, input) : await addPay(input);
     setBusy(false);
     if (!r.ok) return setError(r.error.code === "VERSION_CONFLICT" ? "다른 기기에서 먼저 수정했어요. 닫고 다시 열어 주세요" : (r.error.fields?.[0]?.message ?? r.error.message));
-    toast(edit ? "페이를 고쳤어요" : "페이를 추가했어요");
     close();
     router.refresh();
   }

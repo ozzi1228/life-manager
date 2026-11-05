@@ -126,7 +126,6 @@ function WishForm({ kind, edit, categories, initialCat, close, done }: { kind: "
       const f = r.error.fields?.[0];
       return setError({ field: f?.path.split(".")[0], message: f?.message ?? r.error.message });
     }
-    toast(edit ? "고쳤어요" : "위시에 담았어요");
     done();
   }
 
@@ -240,12 +239,12 @@ function ShopDetail({ w, today, close, edit, refresh }: { w: WishItem; today: st
   const [askTx, setAskTx] = useState(false);
   const [busy, setBusy] = useState(false);
 
-  async function run(p: Promise<{ ok: boolean; error?: { message: string } }>, message: string) {
+  async function run(p: Promise<{ ok: boolean; error?: { message: string } }>, message?: string) {
     setBusy(true);
     const r = await p;
     setBusy(false);
     if (!r.ok) return toast(r.error?.message ?? "잠시 후 다시 시도해 주세요");
-    toast(message);
+    if (message) toast(message); // 다른 곳도 바뀐 경우만(지출 휴지통, 참은 소비 기록)
     close();
     refresh();
   }
@@ -256,7 +255,7 @@ function ShopDetail({ w, today, close, edit, refresh }: { w: WishItem; today: st
     refresh();
     toastDone("휴지통으로 옮겼어요");
   }
-  const reopen = (removeTx: boolean) => run(reopenWishAction(w.id, w.version, removeTx), removeTx ? "담아둠으로 되돌리고 지출은 휴지통으로 옮겼어요" : "담아둠으로 되돌렸어요");
+  const reopen = (removeTx: boolean) => run(reopenWishAction(w.id, w.version, removeTx), removeTx ? "담아둠으로 되돌리고 지출은 휴지통으로 옮겼어요" : undefined);
 
   const footer =
     w.status === "saved" ? (
@@ -276,7 +275,7 @@ function ShopDetail({ w, today, close, edit, refresh }: { w: WishItem; today: st
             <Button variant="ghost" onClick={() => setDropping(false)}>
               취소
             </Button>
-            <Button className="ml-auto" disabled={busy} onClick={() => run(dropWishAction(w.id, w.version, reason.trim() || null, record && !w.restrained), record && !w.restrained ? "그만두고 참은 소비로 기록했어요" : "그만둠으로 옮겼어요")}>
+            <Button className="ml-auto" disabled={busy} onClick={() => run(dropWishAction(w.id, w.version, reason.trim() || null, record && !w.restrained), record && !w.restrained ? "그만두고 참은 소비로 기록했어요" : undefined)}>
               그만두기
             </Button>
           </div>
