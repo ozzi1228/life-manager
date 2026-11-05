@@ -47,10 +47,10 @@ const period = (g: Goal, thisYear: number) => (g.periodScope && g.periodKey ? pe
 
 /** view: 없으면 전체 목표, years = 연도별(모든 해를 위에서 아래로), done = 달성한 목표를 달성한 해별로 */
 /** 달성 체크(홈 습관 체크와 같은 모양): 20px 네모, 달성하면 채우고 ✓. 누르는 칸은 감싼 버튼(40px) */
-export function GoalCheck({ done }: { done: boolean }) {
+export function GoalCheck({ done, small }: { done: boolean; small?: boolean }) {
   return (
-    <span className={cn("flex size-5 items-center justify-center rounded-[5px] border-2 transition-colors duration-[120ms]", done ? "border-success bg-success text-success-foreground" : "border-input group-hover:border-muted-foreground")}>
-      {done && <Check className="size-3.5" strokeWidth={3} aria-hidden />}
+    <span className={cn("flex items-center justify-center transition-colors duration-[120ms]", small ? "size-4 rounded-[4px] border-[1.5px]" : "size-5 rounded-[5px] border-2", done ? "border-success bg-success text-success-foreground" : "border-input group-hover:border-muted-foreground")}>
+      {done && <Check className={small ? "size-3" : "size-3.5"} strokeWidth={3} aria-hidden />}
     </span>
   );
 }

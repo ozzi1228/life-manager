@@ -41,19 +41,20 @@ function useGoals<G extends PeriodGoal>(goals: G[]) {
   return { list, toggle, remove, refresh: () => router.refresh() };
 }
 
-function Row<G extends PeriodGoal>({ g, toggle, remove, edit, className }: { g: G; toggle: (g: G) => void; remove: (g: G) => void; edit?: (g: G) => void; className?: string }) {
+/** compact: 일정 화면 카드용 — 작은 글자·체크, 좁은 줄 */
+function Row<G extends PeriodGoal>({ g, toggle, remove, edit, className, compact }: { g: G; toggle: (g: G) => void; remove: (g: G) => void; edit?: (g: G) => void; className?: string; compact?: boolean }) {
   const done = g.status === "done";
-  const title = <span className={cn("break-words", done && "text-muted-foreground line-through")}>{g.title}</span>;
+  const title = <span className={cn("break-words", compact && "text-sm", done && "text-muted-foreground line-through")}>{g.title}</span>;
   return (
-    <li className={cn("flex min-h-11 items-center gap-1", className)}>
+    <li className={cn("flex items-center", compact ? "min-h-9 gap-0.5 md:min-h-8" : "min-h-11 gap-1", className)}>
       <button
         type="button"
         aria-label={done ? `${g.title} 달성 취소` : `${g.title} 달성`}
         aria-pressed={done}
         onClick={() => toggle(g)}
-        className="group -my-1 -ml-2 flex size-10 shrink-0 items-center justify-center rounded-md"
+        className={cn("group flex shrink-0 items-center justify-center rounded-md", compact ? "-ml-2 size-9 md:size-8" : "-my-1 -ml-2 size-10")}
       >
-        <GoalCheck done={done} />
+        <GoalCheck done={done} small={compact} />
       </button>
       {edit ? (
         <button type="button" onClick={() => edit(g)} className="min-w-0 flex-1 text-left">
@@ -64,7 +65,7 @@ function Row<G extends PeriodGoal>({ g, toggle, remove, edit, className }: { g: 
       )}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="ghost" size="icon" className="max-md:size-11" aria-label={`${g.title} 더 보기`}>
+          <Button variant="ghost" size="icon" className={compact ? "text-muted-foreground size-9 md:size-7" : "max-md:size-11"} aria-label={`${g.title} 더 보기`}>
             <Ellipsis />
           </Button>
         </DropdownMenuTrigger>
@@ -80,7 +81,7 @@ function Row<G extends PeriodGoal>({ g, toggle, remove, edit, className }: { g: 
 }
 
 /** "+ 목표 추가" → 입력 칸. Enter로 추가하고 칸은 열어 둠(여러 개 연달아), Esc로 닫기 */
-function QuickAdd({ scope, periodKey, label, added }: { scope: PeriodScope; periodKey: string; label: string; added: () => void }) {
+function QuickAdd({ scope, periodKey, label, added, compact }: { scope: PeriodScope; periodKey: string; label: string; added: () => void; compact?: boolean }) {
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
@@ -98,7 +99,7 @@ function QuickAdd({ scope, periodKey, label, added }: { scope: PeriodScope; peri
 
   if (!open)
     return (
-      <Button variant="ghost" size="sm" className="text-muted-foreground -ml-2 max-md:h-10" onClick={() => setOpen(true)}>
+      <Button variant="ghost" size="sm" className={cn("text-muted-foreground -ml-2", compact ? "h-8 text-caption max-md:h-9" : "max-md:h-10")} onClick={() => setOpen(true)}>
         <Plus /> 목표 추가
       </Button>
     );
@@ -109,7 +110,7 @@ function QuickAdd({ scope, periodKey, label, added }: { scope: PeriodScope; peri
       placeholder="목표를 적고 Enter"
       maxLength={60}
       readOnly={busy}
-      className="h-11 text-base md:h-9 md:text-sm"
+      className={compact ? "h-9 text-base md:h-8 md:text-sm" : "h-11 text-base md:h-9 md:text-sm"}
       value={text}
       onChange={(e) => setText(e.target.value)}
       onKeyDown={(e) => {
@@ -139,11 +140,11 @@ export function PeriodGoals({ scope, periodKey, label, goals }: { scope: PeriodS
       {list.length > 0 && (
         <ul>
           {doneLast(list).map((g) => (
-            <Row key={g.id} g={g} toggle={toggle} remove={remove} />
+            <Row key={g.id} g={g} toggle={toggle} remove={remove} compact />
           ))}
         </ul>
       )}
-      <QuickAdd scope={scope} periodKey={periodKey} label={label} added={refresh} />
+      <QuickAdd scope={scope} periodKey={periodKey} label={label} added={refresh} compact />
     </section>
   );
 }
