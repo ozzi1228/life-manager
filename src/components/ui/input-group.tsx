@@ -55,7 +55,8 @@ function InputGroupAddon({
       data-align={align}
       className={cn(inputGroupAddonVariants({ align }), className)}
       onClick={(e) => {
-        if ((e.target as HTMLElement).closest("button")) {
+        // 버튼·선택 상자(통화 고르기)는 그대로 — 입력 칸으로 포커스를 옮기면 열린 목록이 바로 닫힘
+        if ((e.target as HTMLElement).closest("button, select")) {
           return
         }
         e.currentTarget.parentElement?.querySelector("input")?.focus()
