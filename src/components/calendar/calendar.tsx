@@ -188,6 +188,60 @@ function MonthGrid({ from, month, selected, today, items, color, openDay, open, 
   );
 }
 
+// ── 주 보기: 요일별 칸 7개, 칸 안에 일정을 시간순으로 차곡차곡(시간표 아님) ──
+// 칸 빈 곳을 누르면 그 날 목록(월 보기와 같은 시트·서랍). PC는 일정을 바로 눌러 상세, 모바일은 칸을 눌러 목록에서
+
+function WeekGrid({ days, selected, today, items, color, openDay, open, mobile }: { days: string[]; selected: string; today: string; items: Instance[]; color: (e: Instance) => string; openDay: (d: string) => void; open: (e: Instance) => void; mobile: boolean }) {
+  return (
+    <div className="bg-card grid grid-cols-7 overflow-hidden rounded-lg border" role="grid" aria-label="주">
+      {days.map((d) => {
+        const list = items.filter((e) => onDay(e, d));
+        const w = dayOfWeek(d);
+        return (
+          <div
+            key={d}
+            role="gridcell"
+            data-day={d}
+            aria-label={`${dayTitle(d)}${list.length ? `, 일정 ${list.length}개` : ""}`}
+            aria-selected={d === selected}
+            tabIndex={d === selected ? 0 : -1}
+            onClick={() => openDay(d)}
+            onKeyDown={(ev) => ev.key === "Enter" && openDay(d)}
+            className={cn("hover:bg-accent/30 flex min-h-72 min-w-0 cursor-pointer flex-col border-r last:border-r-0 md:min-h-[28rem]", d === selected && "bg-accent/40")}
+          >
+            <div className="border-b py-1.5 text-center">
+              <span className={cn("block text-caption", w === 0 ? "text-destructive-text" : w === 6 ? "text-link" : "text-muted-foreground")}>{WEEK[w]}</span>
+              <span className={cn("mx-auto flex size-7 items-center justify-center rounded-full text-sm tabular-nums", d === today && "bg-primary text-primary-foreground font-semibold")}>{+d.slice(8)}</span>
+            </div>
+            <div className="space-y-1 p-0.5 md:p-1">
+              {list.map((e) =>
+                mobile ? (
+                  <span key={e.id + e.occurrenceDate} data-ev={evKey(e)} className="line-clamp-3 block rounded-[3px] px-0.5 text-[10px] leading-3.5 break-all" style={{ background: `${color(e)}33`, borderLeft: `2px solid ${color(e)}` }}>
+                    {e.title}
+                  </span>
+                ) : (
+                  <button
+                    key={e.id + e.occurrenceDate}
+                    type="button"
+                    data-ev={evKey(e)}
+                    onClick={(ev) => (ev.stopPropagation(), open(e))}
+                    title={`${e.title} · ${whenLabel(e)}`}
+                    className="block w-full rounded-sm px-1.5 py-1 text-left text-caption leading-snug hover:brightness-95"
+                    style={tint(color(e))}
+                  >
+                    {!e.allDay && e.startDate === d && <span className="text-muted-foreground block tabular-nums">{hmLabel(e.startTime!)}</span>}
+                    <span className="line-clamp-3 break-words">{e.title}</span>
+                  </button>
+                ),
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // ── 그 날 일정 목록(달력 칸을 누르면): PC 오른쪽 시트, 모바일 아래 서랍. 일정을 누르면 상세가 그 위에 ──
 
 function DaySheet({ day, today, items, color, open, add, close, wrap }: { day: string; today: string; items: Instance[]; color: (e: Instance) => string; open: (e: Instance) => void; add: () => void; close: () => void; wrap: (n: React.ReactNode) => React.ReactNode }) {
@@ -898,11 +952,13 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
           </>
         ) : view === "month" ? (
           menu(<MonthGrid from={from} month={date.slice(0, 7)} selected={selected} today={today} items={visible} color={colorOf} openDay={(d) => (setSelected(d), setDayOpen(d))} open={setDetail} mobile={mobile} />)
+        ) : view === "week" ? (
+          menu(<WeekGrid days={Array.from({ length: 7 }, (_, i) => addDays(from, i))} selected={selected} today={today} items={visible} color={colorOf} openDay={(d) => (setSelected(d), setDayOpen(d))} open={setDetail} mobile={mobile} />)
         ) : (
-          // 주·일 보기: 시간표 대신 날짜별 목록(시간 · 제목 · 장소, 시간순)
+          // 일 보기: 시간표 대신 그 날 목록(시간 · 제목 · 장소, 시간순)
           menu(
             <div className="bg-card divide-y rounded-lg border px-3">
-              {(view === "week" ? Array.from({ length: 7 }, (_, i) => addDays(from, i)) : [date]).map((d) => (
+              {[date].map((d) => (
                 <div key={d} className="py-2">
                   <DayList day={d} items={dayItems(d)} color={colorOf} open={setDetail} add={() => addAt(d)} today={today} compact />
                 </div>
@@ -912,7 +968,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
         )}
       </div>
 
-      {dayOpen && view === "month" && <DaySheet day={dayOpen} today={today} items={dayItems(dayOpen)} color={colorOf} open={setDetail} add={() => addAt(dayOpen)} close={() => setDayOpen(null)} wrap={menu} />}
+      {dayOpen && (view === "month" || view === "week") && <DaySheet day={dayOpen} today={today} items={dayItems(dayOpen)} color={colorOf} open={setDetail} add={() => addAt(dayOpen)} close={() => setDayOpen(null)} wrap={menu} />}
       {detail && <Detail e={detail} cal={calOf(detail)} close={() => setDetail(null)} edit={() => editOf(detail)} copy={() => copyOf(detail)} remove={() => askRemove(detail)} />}
       {scopeFor && <ScopeDialog title="반복 일정을 어떻게 지울까요?" close={() => setScopeFor(null)} pick={(s) => remove(scopeFor, s)} />}
       {form && <EventForm key={form.edit?.id ?? "new"} draft={form.draft} edit={form.edit} calendars={calendars} close={() => setForm(null)} done={done} />}
