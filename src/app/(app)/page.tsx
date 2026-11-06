@@ -1,5 +1,5 @@
 // 홈 (SCR-HOME, 04 §3.1): 인사 + 요약 한 줄 → "오늘"(오늘 일정·습관·이번 주·오늘 목표) · "돈"(남은 예산·이번 달 수입·지출·다가오는 결제) → 최근 기록
-// 휴대폰·PC 같은 구성(휴대폰은 위에서 아래로 쌓임). 비어 있는 칸은 카드 안에 한 줄 안내로 — 날마다 배치가 흔들리지 않게
+// 휴대폰은 대시보드 대신 메뉴 바로 가기(HomeMenu). 비어 있는 칸은 카드 안에 한 줄 안내로 — 날마다 배치가 흔들리지 않게
 // 건강 등 민감 정보는 홈에 내보내지 않음(10 §7)
 // ponytail: 홈 편집(위젯 켜기·끄기·순서, P1)·위젯별 따로 불러오기는 아직 — 한 번에 불러옴
 import { ChevronRight, Plus } from "lucide-react";
@@ -8,6 +8,7 @@ import type { ReactNode } from "react";
 import { BudgetBar } from "@/components/app/money";
 import { Page } from "@/components/app/page-shell";
 import { HomeGoals } from "@/components/goals/period-goals";
+import { HomeMenu } from "@/components/home/home-menu";
 import { TodayGoals } from "@/components/home/today-goals";
 import { Button } from "@/components/ui/button";
 import { dayLabel, fromYmd, money, moneyShort, signClass, signedMoney } from "@/lib/format";
@@ -101,7 +102,10 @@ export default async function Home() {
 
   return (
     <Page>
-      <div className="space-y-5 md:space-y-6">
+      <div className="md:hidden">
+        <HomeMenu date={dateLabel} greet={name ? `${greet},` : greet} name={name || null} />
+      </div>
+      <div className="space-y-6 max-md:hidden">
         <div className="space-y-2">
           <p className="text-muted-foreground text-sm">{dateLabel}</p>
           <h1 className="text-title font-semibold">
