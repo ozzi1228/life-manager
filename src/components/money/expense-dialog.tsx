@@ -382,7 +382,7 @@ function ExpenseForm({ edit, wish, close }: { edit?: TxEdit; wish?: WishBuy; clo
           <Field data-invalid={error?.field === "payment" || undefined}>
             <FieldLabel>결제</FieldLabel>
             <div className="flex flex-wrap gap-2" role="radiogroup" aria-label="결제수단">
-              {data.paymentMethods.slice(0, 8).map((p) => {
+              {data.paymentMethods.map((p) => {
                 const on = p.kind === "pay" ? payId === p.id : !payId && paymentId === p.id;
                 return (
                   <Button
