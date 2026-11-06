@@ -553,10 +553,11 @@ function EventForm({ draft, edit, calendars, close, done }: { draft: Draft; edit
 // ── 기간 메모(연·월·주·일) ──
 
 export type Note = { scope: NoteScope; key: string; id: string | null; version: number | null; body: string };
-const NOTE_HINT: Record<NoteScope, string> = { year: "올해 이루고 싶은 것, 큰 계획", month: "이번 달 안에 해야 할 일", week: "이번 주에 할 일", day: "오늘 메모" };
+const NOTE_HINT: Record<NoteScope, string> = { year: "올해 이루고 싶은 것, 큰 계획", month: "이번 달 안에 해야 할 일", week: "이번 주에 할 일", day: "오늘 메모", all: "기간과 상관없이 늘 보는 메모" };
 
 /** 쓰는 동안 잠깐 멈추면 저장(0.8초). 다른 기기에서 먼저 고쳤으면 알려 줌. 서식(굵게 등)은 RichNote */
-function NotePanel({ note, title }: { note: Note; title: string }) {
+/** bare: 창 안에서 쓸 때(창 제목이 있으니 카드·제목 없이) */
+function NotePanel({ note, title, onSaved, bare }: { note: Note; title: string; onSaved?: (body: string, version: number) => void; bare?: boolean }) {
   const text = useRef(note.body);
   const [state, setState] = useState<"idle" | "saving" | "saved" | "conflict">("idle");
   const version = useRef(note.version);
@@ -570,6 +571,7 @@ function NotePanel({ note, title }: { note: Note; title: string }) {
     if (!r.ok) return setState(r.error.code === "VERSION_CONFLICT" ? "conflict" : "idle");
     version.current = r.data.version;
     saved.current = body;
+    onSaved?.(body, r.data.version);
     setState("saved");
   }
   const change = (v: string) => {
@@ -577,12 +579,20 @@ function NotePanel({ note, title }: { note: Note; title: string }) {
     clearTimeout(timer.current);
     timer.current = setTimeout(() => save(v), 800);
   };
-  useEffect(() => () => clearTimeout(timer.current), []);
+  // 닫거나 다른 기간으로 넘어가며 사라질 때 아직 안 보낸 글은 바로 저장(창을 금방 닫아도 안 날아가게)
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current);
+      if (text.current !== saved.current) save(text.current);
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [],
+  );
 
   return (
-    <section className="bg-card space-y-1.5 rounded-lg border p-3">
-      <div className="flex items-center gap-2">
-        <h2 className="text-sm font-semibold">{title}</h2>
+    <section className={cn("space-y-1.5", !bare && "bg-card rounded-lg border p-3")}>
+      <div className="flex min-h-4 items-center gap-2">
+        {!bare && <h2 className="text-sm font-semibold">{title}</h2>}
         <span className="text-muted-foreground ml-auto text-caption" aria-live="polite">
           {state === "saving" ? "저장 중" : state === "saved" ? "저장됨" : state === "conflict" ? "다른 기기에서 먼저 고쳤어요. 새로 고침해 주세요" : ""}
         </span>
@@ -713,7 +723,7 @@ function newDraft(calendarId: string, d: string, time?: string): Draft {
 
 type Target = { kind: "day"; day: string; time?: string } | { kind: "ev"; e: Instance } | null;
 
-export function CalendarView({ view, date, from, today, calendars, instances, note, goals, google, startNew }: { view: View; date: string; from: string; today: string; calendars: CalendarItem[]; instances: Instance[]; note: Note; goals: PeriodGoal[]; google: GoogleStatus; startNew?: boolean }) {
+export function CalendarView({ view, date, from, today, calendars, instances, note, memo, goals, google, startNew }: { view: View; date: string; from: string; today: string; calendars: CalendarItem[]; instances: Instance[]; note: Note; memo: Note; goals: PeriodGoal[]; google: GoogleStatus; startNew?: boolean }) {
   const router = useRouter();
   const mobile = useIsMobile();
   const [selected, setSelected] = useState(date);
@@ -738,6 +748,10 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
   }, [router, view, date]);
   const [scopeFor, setScopeFor] = useState<Instance | null>(null);
   const [listOpen, setListOpen] = useState(false);
+  // 전체 메모: 넓은 화면은 왼쪽 목록 아래, 좁으면 "메모" 버튼으로 창을 엶. 창은 열 때마다 새로 그리므로 저장한 값을 여기 둠
+  const [memoOpen, setMemoOpen] = useState(false);
+  const [memoNow, setMemoNow] = useState(memo);
+  const keepMemo = (body: string, version: number) => setMemoNow((m) => ({ ...m, body, version }));
   // 캘린더 체크는 보기(연·월·주·일)마다 따로. 누른 즉시 반영하려고 서버 값 위에 덮어 둠
   const [hiddenIn, setHiddenIn] = useState<Record<string, string[]>>({});
   const hiddenOf = (c: CalendarItem) => hiddenIn[c.id] ?? c.hiddenIn;
@@ -905,7 +919,10 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
     // 넓은 화면(xl)은 왼쪽에 캘린더 목록이 늘 보이고, 좁으면 "캘린더" 버튼으로 엶
     <div className="xl:grid xl:grid-cols-[13rem_minmax(0,1fr)] xl:gap-6">
       <aside className="max-xl:hidden" aria-label="캘린더 목록">
-        <div className="sticky top-4">{list}</div>
+        <div className="sticky top-4 space-y-4">
+          {list}
+          <NotePanel key="all" note={memoNow} title="메모" onSaved={keepMemo} />
+        </div>
       </aside>
       <div className="min-w-0 space-y-4">
         <div className="flex flex-wrap items-center gap-2">
@@ -942,6 +959,13 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
           {goalPanel}
           <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
         </TopPanels>
+        {/* 전체 메모(넓은 화면은 왼쪽 목록 아래): 접힌 한 줄, 누르면 창 */}
+        <button type="button" className="bg-card flex h-11 w-full items-center gap-2 rounded-lg border px-3 text-left text-sm xl:hidden" onClick={() => setMemoOpen(true)}>
+          <StickyNote className="text-muted-foreground size-4 shrink-0" />
+          <span className="font-semibold">메모</span>
+          <span className="text-muted-foreground min-w-0 flex-1 truncate text-caption">{noteText(memoNow.body).trim().split("\n")[0] || "기간과 상관없이 늘 보는 메모"}</span>
+          <ChevronRight className="text-muted-foreground size-4 shrink-0" />
+        </button>
         {view === "year" ? (
           <>
             {menu(<YearPlanner key={date} year={date.slice(0, 4)} focus={date} today={today} items={visible} color={colorOf} open={setDetail} openDay={(d) => (setSelected(d), setDayOpen(d))} month={(d) => go("month", d)} mobile={mobile} />)}
@@ -971,6 +995,11 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
       {listOpen && (
         <ResponsiveModal open onOpenChange={(o) => !o && setListOpen(false)} title="캘린더" size="sm">
           {list}
+        </ResponsiveModal>
+      )}
+      {memoOpen && (
+        <ResponsiveModal open onOpenChange={(o) => !o && setMemoOpen(false)} title="메모" size="sm">
+          <NotePanel note={memoNow} title="메모" onSaved={keepMemo} bare />
         </ResponsiveModal>
       )}
     </div>

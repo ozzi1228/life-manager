@@ -658,7 +658,7 @@ export const periodNotes = pgTable(
   "period_notes",
   {
     ...userData(),
-    scope: text("scope", { enum: ["year", "month", "week", "day"] }).notNull(),
+    scope: text("scope", { enum: ["year", "month", "week", "day", "all"] }).notNull(), // all: 기간 없는 전체 메모(key "all")
     periodKey: text("period_key").notNull(),
     body: text("body").notNull().default(""),
   },

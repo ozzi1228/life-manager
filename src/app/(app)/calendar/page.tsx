@@ -19,11 +19,12 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
   const from = view === "year" ? `${date.slice(0, 4)}-01-01` : view === "day" ? date : addDays(first, -dayOfWeek(first));
   const to = view === "year" ? `${date.slice(0, 4)}-12-31` : view === "month" ? addDays(from, 41) : view === "week" ? addDays(from, 6) : date;
   const key = periodKey(view, date);
-  const [{ calendars, instances }, saved, goals, google] = await Promise.all([rangeView(ctx, from, to), getNote(ctx, view, key), periodGoals(ctx, view, key), googleStatus(ctx)]);
+  const [{ calendars, instances }, saved, goals, google, all] = await Promise.all([rangeView(ctx, from, to), getNote(ctx, view, key), periodGoals(ctx, view, key), googleStatus(ctx), getNote(ctx, "all", "all")]);
   const note = { scope: view, key, id: saved?.id ?? null, version: saved?.version ?? null, body: saved?.body ?? "" };
+  const memo = { scope: "all" as const, key: "all", id: all?.id ?? null, version: all?.version ?? null, body: all?.body ?? "" };
   return (
     <Page>
-      <CalendarView view={view} date={date} from={from} today={today} calendars={calendars} instances={instances} note={note} goals={goals} google={google} startNew={q.new === "1"} />
+      <CalendarView view={view} date={date} from={from} today={today} calendars={calendars} instances={instances} note={note} memo={memo} goals={goals} google={google} startNew={q.new === "1"} />
     </Page>
   );
 }

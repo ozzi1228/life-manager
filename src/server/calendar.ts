@@ -231,12 +231,12 @@ export async function rangeView(ctx: Ctx, from: string, to: string) {
 export type Instance = Awaited<ReturnType<typeof rangeView>>["instances"][number];
 export type CalendarItem = Awaited<ReturnType<typeof rangeView>>["calendars"][number];
 
-// ── 기간 메모(연·월·주·일, 일정 화면 위) ──
+// ── 기간 메모(연·월·주·일, 일정 화면 위) + 전체 메모 ──
 export const noteRepo = defineRepo(periodNotes, "period_note");
-export type NoteScope = "year" | "month" | "week" | "day";
+export type NoteScope = "year" | "month" | "week" | "day" | "all"; // all: 기간과 상관없는 메모 하나(key "all")
 /** 그 날이 든 기간의 key: 연 "2026" · 월 "2026-11" · 주는 그 주 일요일 · 일 */
 export const periodKey = (scope: NoteScope, date: string) => (scope === "year" ? date.slice(0, 4) : scope === "month" ? date.slice(0, 7) : scope === "week" ? addDays(date, -dayOfWeek(date)) : date);
-const KEY = { year: /^\d{4}$/, month: /^\d{4}-\d{2}$/, week: /^\d{4}-\d{2}-\d{2}$/, day: /^\d{4}-\d{2}-\d{2}$/ };
+const KEY = { year: /^\d{4}$/, month: /^\d{4}-\d{2}$/, week: /^\d{4}-\d{2}-\d{2}$/, day: /^\d{4}-\d{2}-\d{2}$/, all: /^all$/ };
 const checkKey = (scope: NoteScope, key: string) => {
   if (!KEY[scope]?.test(key)) throw new AppError("BAD_REQUEST", "잠시 후 다시 시도해 주세요");
 };
