@@ -10,7 +10,7 @@ import { EntryList } from "./entry-list";
 
 type Topic = { id: string; name: string; colorHex: string };
 
-export function JournalFeed({ first, more: firstMore, q, topic, topics, today }: { first: Entry[]; more: boolean; q: string; topic: string | null; topics: Topic[]; today: string }) {
+export function JournalFeed({ first, more: firstMore, q, topic, range, topics, today }: { first: Entry[]; more: boolean; q: string; topic: string | null; range: { from: string; to: string } | null; topics: Topic[]; today: string }) {
   const [items, setItems] = useState(first);
   const [more, setMore] = useState(firstMore);
   // 서버가 새 목록을 보내면(글 저장·삭제 뒤 새로 고침) 그걸로 다시 시작. 이 화면은 Next가 상태째 보관하므로
@@ -31,7 +31,7 @@ export function JournalFeed({ first, more: firstMore, q, topic, topics, today }:
     loading.current = true;
     setBusy(true);
     setFailed(false);
-    const r = await moreEntries(q, topic, items.length).catch(() => null);
+    const r = await moreEntries(q, topic, items.length, range?.from, range?.to).catch(() => null);
     loading.current = false;
     setBusy(false);
     if (!r?.ok) return setFailed(true);

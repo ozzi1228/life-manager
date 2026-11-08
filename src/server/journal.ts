@@ -1,9 +1,10 @@
 // 일기 서비스 (docs/planning/08 §2, 15 §8)
-import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, isNull, lte, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { uuidv7 } from "../db/id.ts";
 import { db } from "../db/index.ts";
 import { journalComments, journalEntries, journalTopics } from "../db/schema.ts";
+import { addDays } from "../lib/calendar.ts";
 import { GOAL_PALETTE } from "../lib/palette.ts";
 import { AppError } from "./errors.ts";
 import { imagesOf, linkImages } from "./files.ts";
@@ -97,8 +98,27 @@ export async function updateEntry(ctx: Ctx, id: string, version: number, input: 
 /** 일기 목록 한 쪽: 최신 날짜부터 옛날 순, 날짜 없는 글은 맨 끝. 검색어(제목·본문)·분류(id 또는 "none" = 분류 없음)로 거름
  * 무한 스크롤로 offset부터 PAGE개씩. ponytail: offset 방식 — 글이 수천 편 넘게 쌓여 느려지면 (date, created_at) 커서로 */
 export const ENTRY_PAGE = 30;
-export async function entryPage(ctx: Ctx, { q, topic, offset }: { q: string; topic: string | null; offset: number }) {
+
+/** 기간 거르기 창은 최대 3년(목록이 너무 길어지지 않게). 검색 자체는 기간 없이 모든 해에서 */
+export const RANGE_YEARS = 3;
+const realDay = (d: unknown): d is string => typeof d === "string" && /^\d{4}-\d{2}-\d{2}$/.test(d) && addDays(d, 0) === d;
+const shiftYears = (d: string, n: number) => `${+d.slice(0, 4) + n}${d.slice(4)}`; // 2월 29일은 문자열 비교라 그대로 둬도 됨
+/** 둘 다 없으면 null. 한쪽만 있으면 다른 쪽을 3년 거리로, 거꾸로면 바꾸고, 3년이 넘으면 시작일부터 3년으로 줄임(cut) */
+export function journalRange(fromRaw: unknown, toRaw: unknown) {
+  let from = realDay(fromRaw) ? fromRaw : null;
+  let to = realDay(toRaw) ? toRaw : null;
+  if (!from && !to) return null;
+  if (from && to && from > to) [from, to] = [to, from];
+  from ??= shiftYears(to!, -RANGE_YEARS);
+  to ??= shiftYears(from, RANGE_YEARS);
+  const max = shiftYears(from, RANGE_YEARS);
+  return to > max ? { from, to: max, cut: true } : { from, to, cut: false };
+}
+
+export async function entryPage(ctx: Ctx, { q, topic, offset, range }: { q: string; topic: string | null; offset: number; range?: { from: string; to: string } | null }) {
   const w = [
+    range ? gte(journalEntries.date, range.from) : undefined,
+    range ? lte(journalEntries.date, range.to) : undefined, // 기간을 고르면 날짜 없는 글은 빠짐
     q ? or(ilike(journalEntries.title, likePattern(q)), ilike(journalEntries.bodyMd, likePattern(q))) : undefined,
     topic === "none" ? isNull(journalEntries.topicId) : topic ? eq(journalEntries.topicId, topic) : undefined,
   ];

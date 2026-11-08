@@ -3,7 +3,7 @@
 // 일기 저장·삭제 (SCR-JRN-03). 규칙은 src/server/journal.ts
 import { action } from "@/server/api";
 import { once } from "@/server/idempotency";
-import { addComment, addTopic, colorTopic, createEntry, deleteEntry, entryPage, removeComment, removeTopic, renameTopic, reorderTopics, updateEntry } from "@/server/journal";
+import { addComment, addTopic, colorTopic, createEntry, deleteEntry, entryPage, journalRange, removeComment, removeTopic, renameTopic, reorderTopics, updateEntry } from "@/server/journal";
 
 type EntryIn = { date: string | null; topicId: string | null; title: string | null; bodyMd: string; photoIds: string[] };
 
@@ -49,6 +49,6 @@ export async function removeCommentAction(id: string) {
 
 
 /** 일기 목록 다음 쪽(무한 스크롤) */
-export async function moreEntries(q: string, topic: string | null, offset: number) {
-  return action((ctx) => entryPage(ctx, { q: String(q).trim().slice(0, 60), topic: topic && /^(none|[0-9a-f-]{36})$/.test(topic) ? topic : null, offset: Number(offset) || 0 }));
+export async function moreEntries(q: string, topic: string | null, offset: number, from: string | null = null, to: string | null = null) {
+  return action((ctx) => entryPage(ctx, { q: String(q).trim().slice(0, 60), topic: topic && /^(none|[0-9a-f-]{36})$/.test(topic) ? topic : null, offset: Number(offset) || 0, range: journalRange(from, to) }));
 }
