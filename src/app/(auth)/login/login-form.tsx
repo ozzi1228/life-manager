@@ -158,7 +158,9 @@ export function LoginForm({ providers }: { providers: Provider[] }) {
           돌아가기
         </Button>
       ) : (
-        <FieldDescription className="text-center">
+        <FieldDescription className="space-y-1 text-center">
+          <Link href="/forgot-password">비밀번호를 잊었어요</Link>
+          <br />
           처음이신가요? <Link href={next !== "/" ? `/signup?next=${encodeURIComponent(next)}` : "/signup"}>회원가입</Link>
         </FieldDescription>
       )}

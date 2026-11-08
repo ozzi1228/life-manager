@@ -4,6 +4,8 @@
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 import { userSettings } from "@/db/schema";
+import { internalEmail, isInternalEmail } from "@/lib/auth";
+import { pool } from "@/lib/db";
 import { action } from "@/server/api";
 import { AppError } from "@/server/errors";
 import { opsStatus } from "@/server/ops";
@@ -55,4 +57,18 @@ export async function setNotify(kind: NotifyKind, on: boolean) {
 /** 운영 상태(주인만, 아니면 null) */
 export async function loadOpsStatus() {
   return action((ctx) => opsStatus(ctx));
+}
+
+/** 비밀번호 찾기용 이메일 등록·바꾸기. 비우면 이메일 없는 계정(내부 주소)으로 */
+export async function saveRecoveryEmail(email: string) {
+  return action(async (ctx) => {
+    const v = email.trim().toLowerCase();
+    if (v && (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v) || v.length > 254 || isInternalEmail(v))) throw new AppError("VALIDATION_FAILED", "이메일을 다시 확인해 주세요");
+    const next = v || internalEmail("id", ctx.userId);
+    // ponytail: 확인 메일 없이 바로 저장 — 이 주소로는 비밀번호 찾기 링크만 감(다른 사람 주소를 넣어도 그 사람 계정엔 영향 없음)
+    await pool.query(`update "user" set email = $1, "emailVerified" = false, "updatedAt" = now() where id = $2`, [next, ctx.userId]).catch((e: { code?: string }) => {
+      if (e.code === "23505") throw new AppError("VALIDATION_FAILED", "이미 다른 계정에서 쓰는 이메일이에요");
+      throw e;
+    });
+  });
 }

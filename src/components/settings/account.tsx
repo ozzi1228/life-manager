@@ -1,7 +1,7 @@
 "use client";
 
 // 설정 > 계정 (SCR-SET-02, 04 §8.2): 표시 이름, 아이디, 비밀번호 변경, 로그인된 기기
-// ponytail: 카카오·네이버 연결·해제, 이메일, 탈퇴는 C-14
+// 이메일(비밀번호 찾기용). ponytail: 카카오·네이버 연결·해제, 탈퇴는 C-14
 import { ChevronRight } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Field, FieldDescription, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import { Spinner } from "@/components/ui/spinner";
+import { saveRecoveryEmail } from "@/app/actions/settings";
 import { authClient } from "@/lib/auth-client";
 import { timeLabel } from "@/lib/format";
 
@@ -121,9 +122,40 @@ function Devices({ current }: { current?: string }) {
   );
 }
 
+/** 비밀번호 찾기용 이메일. 내부 주소(이메일 없는 계정)는 빈 칸으로 보임 */
+function Email({ current: initial }: { current: string }) {
+  const [current, setCurrent] = useState(initial); // 저장한 값(세션은 바로 안 바뀜)
+  const [v, setV] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const shown = v ?? current;
+  async function save() {
+    setBusy(true);
+    setError("");
+    const r = await saveRecoveryEmail(shown).catch(() => null);
+    setBusy(false);
+    if (!r) return setError("연결이 끊겨 저장하지 못했어요");
+    if (!r.ok) return setError(r.error.message);
+    setCurrent(shown.trim().toLowerCase());
+    setV(null);
+  }
+  return (
+    <Field data-invalid={!!error || undefined}>
+      <FieldLabel htmlFor="acc-email">이메일 (비밀번호 찾기용)</FieldLabel>
+      <div className="flex gap-2">
+        <Input id="acc-email" type="email" autoComplete="email" placeholder="등록하지 않음" value={shown} onChange={(e) => setV(e.target.value)} />
+        <Button variant="outline" disabled={v === null || v.trim() === current || busy} onClick={save}>
+          {busy && <Spinner />} 저장
+        </Button>
+      </div>
+      {error ? <FieldError>{error}</FieldError> : <FieldDescription>비밀번호를 잊었을 때 이 주소로 링크를 보내요</FieldDescription>}
+    </Field>
+  );
+}
+
 export function AccountSection() {
   const { data } = authClient.useSession();
-  const user = data?.user as { name?: string; username?: string } | undefined;
+  const user = data?.user as { name?: string; username?: string; email?: string } | undefined;
   const [name, setName] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const shown = name ?? user?.name ?? "";
@@ -153,6 +185,7 @@ export function AccountSection() {
           <p className="text-muted-foreground flex h-9 items-center text-sm">{user ? (user.username ?? "간편 로그인") : ""}</p>
         </Field>
       </div>
+      {user && <Email current={user.email && !user.email.endsWith("@users.oona.invalid") ? user.email : ""} />}
       <div className="space-y-2">
         <h3 className="font-medium">로그인된 기기</h3>
         <Devices current={data?.session.token} />

@@ -7,6 +7,7 @@ import { APIError, createAuthMiddleware } from "better-auth/api";
 import { username } from "better-auth/plugins";
 import { hash, verify } from "@node-rs/argon2";
 import { audit } from "../server/audit.ts";
+import { sendMail } from "./mail.ts";
 import { pool } from "./db.ts"; // 확장자: scripts/*.mts(노드 직접 실행)도 이 파일을 불러옴
 import { passwordProblem } from "./password.ts";
 
@@ -60,6 +61,24 @@ export const auth = betterAuth({
       hash: (password) => hash(password, { memoryCost: 19456, timeCost: 2, parallelism: 1 }),
       verify: ({ hash: stored, password }) => verify(stored, password),
     },
+    // 비밀번호 찾기: 등록한 진짜 이메일로 링크(1시간). 이메일 없는 계정(내부 주소)은 보내지 않음. 바꾸면 모든 기기 로그아웃
+    resetPasswordTokenExpiresIn: 60 * 60,
+    revokeSessionsOnPasswordReset: true,
+    sendResetPassword: async ({ user, url }) => {
+      if (isInternalEmail(user.email)) return;
+      const id = (user as { username?: string }).username;
+      await sendMail(
+        user.email,
+        "[우나] 비밀번호 다시 정하기",
+        `${id ? `아이디: ${id}
+
+` : ""}아래 링크를 눌러 새 비밀번호를 정해 주세요. 링크는 1시간 동안만 쓸 수 있어요.
+
+${url}
+
+직접 요청하지 않았다면 이 메일은 무시해도 돼요.`,
+      );
+    },
   },
   plugins: [
     username({
@@ -83,12 +102,14 @@ export const auth = betterAuth({
     customRules: {
       "/sign-in/username": { window: 300, max: 10 },
       "/sign-up/email": { window: 300, max: 10 },
+      "/request-password-reset": { window: 300, max: 5 },
+      "/reset-password": { window: 300, max: 10 },
     },
   },
   hooks: {
     // 비밀번호 규칙은 화면이 아니라 여기서 최종 확인(신뢰 경계)
     before: createAuthMiddleware(async (ctx) => {
-      if (ctx.path === "/sign-up/email" || ctx.path === "/change-password") {
+      if (ctx.path === "/sign-up/email" || ctx.path === "/change-password" || ctx.path === "/reset-password") {
         const body = ctx.body as { password?: string; newPassword?: string; username?: string };
         const problem = passwordProblem(body.newPassword ?? body.password ?? "", body.username);
         if (problem) throw new APIError("BAD_REQUEST", { message: problem, code: "WEAK_PASSWORD" });
@@ -101,11 +122,12 @@ export const auth = betterAuth({
           ? "login.password"
           : ctx.path.startsWith("/callback/")
             ? `login.${ctx.params?.id ?? "social"}`
-            : (({ "/sign-up/email": "signup.password", "/sign-out": "logout", "/change-password": "password.change", "/revoke-session": "session.revoke", "/revoke-other-sessions": "session.revoke_others" }) as Record<string, string>)[ctx.path] ?? null;
+            : (({ "/sign-up/email": "signup.password", "/sign-out": "logout", "/change-password": "password.change", "/reset-password": "password.reset", "/request-password-reset": "password.reset_request", "/revoke-session": "session.revoke", "/revoke-other-sessions": "session.revoke_others" }) as Record<string, string>)[ctx.path] ?? null;
       if (!event) return;
       const userId = ctx.context.newSession?.user.id ?? ctx.context.session?.user.id ?? null;
       const failed = ctx.context.returned instanceof Error;
-      await audit(failed || (!userId && event !== "logout") ? `${event}.failed` : event, { userId, headers: ctx.request?.headers ?? (ctx.headers as Headers | undefined) });
+      const anonymous = event === "logout" || event.startsWith("password.reset"); // 로그인 전에 하는 일
+      await audit(failed || (!userId && !anonymous) ? `${event}.failed` : event, { userId, headers: ctx.request?.headers ?? (ctx.headers as Headers | undefined) });
     }),
   },
 });
