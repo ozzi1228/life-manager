@@ -13,6 +13,14 @@ type Topic = { id: string; name: string; colorHex: string };
 export function JournalFeed({ first, more: firstMore, q, topic, topics, today }: { first: Entry[]; more: boolean; q: string; topic: string | null; topics: Topic[]; today: string }) {
   const [items, setItems] = useState(first);
   const [more, setMore] = useState(firstMore);
+  // 서버가 새 목록을 보내면(글 저장·삭제 뒤 새로 고침) 그걸로 다시 시작. 이 화면은 Next가 상태째 보관하므로
+  // 처음 값만 쓰면 저장한 글이 목록에 안 보였음
+  const [seen, setSeen] = useState(first);
+  if (seen !== first) {
+    setSeen(first);
+    setItems(first);
+    setMore(firstMore);
+  }
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
   const end = useRef<HTMLDivElement>(null);
