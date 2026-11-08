@@ -17,11 +17,14 @@ function Calendar({
   className,
   classNames,
   showOutsideDays = true,
-  captionLayout = "label",
+  captionLayout = "dropdown", // 우나: 연·월을 드롭다운으로 바로 고름
   buttonVariant = "ghost",
   locale = ko, // 우나는 한국어만
   formatters,
   components,
+  // 연 드롭다운 범위: 2000년 ~ 10년 뒤(기본값은 올해 끝까지라 앞으로 올 날을 못 고름)
+  startMonth = new Date(2000, 0),
+  endMonth = new Date(new Date().getFullYear() + 10, 11),
   ...props
 }: React.ComponentProps<typeof DayPicker> & {
   buttonVariant?: React.ComponentProps<typeof Button>["variant"]
@@ -177,6 +180,10 @@ function Calendar({
         ...components,
       }}
       {...props}
+      startMonth={startMonth}
+      endMonth={endMonth}
+      // 이미 고른 날짜가 있으면 그 달부터 보여 줌(기본은 이번 달)
+      defaultMonth={props.defaultMonth ?? ("selected" in props && props.selected instanceof Date ? props.selected : undefined)}
     />
   )
 }
