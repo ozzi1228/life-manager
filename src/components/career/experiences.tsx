@@ -333,7 +333,13 @@ function Section({
 
 const grow = "field-sizing-content min-h-20 leading-7";
 
-export function ExperienceEditor({
+/** 새로 들어올 때마다 빈 편집기(Next가 지난 화면을 상태째 보관해서 — 일기 편집기와 같은 이유, entry-editor.tsx) */
+export function ExperienceEditor(props: { exp?: Experience; categories: Cat[] }) {
+  const { bfcacheId } = useRouter();
+  return <ExperienceForm key={bfcacheId} {...props} />;
+}
+
+function ExperienceForm({
   exp,
   categories,
 }: {

@@ -32,7 +32,16 @@ const readDraft = (id?: string): Draft | null => {
   }
 };
 
-export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: Topic[]; today: string }) {
+type Props = { entry?: Entry; topics: Topic[]; today: string };
+
+/** cacheComponents가 켜져 있어 Next가 지난 화면(최대 3개)을 상태째 숨겨 두었다가 다시 보여 줌 → '글 쓰기'를 다시 누르면 방금 쓴 글이 그대로 떴음
+ *  새로 들어올 때(링크·push)마다 bfcacheId가 바뀌므로 그걸 key로 편집기를 새로 만듦. 뒤로 가기엔 그대로(안 저장한 글은 이 기기 임시 저장으로도 남음) */
+export function EntryEditor(props: Props) {
+  const { bfcacheId } = useRouter();
+  return <Editor key={bfcacheId} {...props} />;
+}
+
+function Editor({ entry, topics, today }: Props) {
   const router = useRouter();
   const [date, setDate] = useState<string | null>(entry ? entry.date : today); // null = 날짜 없는 글
   const [topicId, setTopicId] = useState<string | null>(entry?.topicId ?? null);
@@ -98,8 +107,8 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
       );
     }
     localStorage.removeItem(draftKey(entry?.id));
-    // 고친 글은 그 글 보기로, 새 글은 목록으로(날짜 없는 글은 목록 맨 위 — 어느 달에서나)
-    router.push(entry ? `/records/journal/${entry.id}` : date ? `/records?month=${date.slice(0, 7)}` : "/records");
+    // 고친 글은 그 글 보기로, 새 글은 목록으로
+    router.push(entry ? `/records/journal/${entry.id}` : "/records");
     router.refresh();
   }
 
@@ -108,14 +117,14 @@ export function EntryEditor({ entry, topics, today }: { entry?: Entry; topics: T
     await removeEntry(entry.id);
     localStorage.removeItem(draftKey(entry.id));
     // 목록을 새로 받아 오도록 페이지째 이동(router.replace는 예전 목록을 보여 줌, refresh는 지운 일기 주소를 다시 불러와 404)
-    location.replace(entry.date ? `/records?month=${entry.date.slice(0, 7)}` : "/records");
+    location.replace("/records");
   }
 
   const empty = !title.trim() && !body.trim() && !photos.length;
   /** 분류 편집 뒤 목록 새로 불러오기 */
   const done = <R extends { ok: boolean }>(r: R) => (r.ok && router.refresh(), r);
   // 취소·뒤로: 고치던 글은 그 글 보기로, 새 글은 목록으로
-  const listHref = entry ? `/records/journal/${entry.id}` : `/records?month=${today.slice(0, 7)}`;
+  const listHref = entry ? `/records/journal/${entry.id}` : "/records";
 
   return (
     <div className="mx-auto w-full max-w-3xl space-y-4 px-4 py-4 md:px-8 md:py-6">
