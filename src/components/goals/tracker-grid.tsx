@@ -1,7 +1,7 @@
 "use client";
 
 // 습관 트래커 (SCR-GOAL-02, 04 §5.1): 항목 × 날짜 색 칸. 누르면 색이 채워지고, 메모는 칸 안 글자로
-// PC: 한 달 전체 · 모바일: 7일 창. 칸 메모는 PC 두 번 클릭(또는 Enter), 모바일 길게 누르기
+// PC·모바일 모두 한 달 전체(모바일은 옆으로 밀어 넘김, 처음엔 오늘이 보이게). 칸 메모는 PC 두 번 클릭(또는 Enter), 모바일 길게 누르기
 import { Check, GripVertical, Plus } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -58,10 +58,16 @@ export function TrackerGrid({ data }: { data: Data }) {
   const thisMonth = today.slice(0, 7) === month;
   const elapsed = month < today.slice(0, 7) ? days : thisMonth ? Number(today.slice(8)) : 0;
 
-  // 모바일 7일 창: 오늘이 든 주(이번 달), 아니면 첫 주
-  const weeks = Array.from({ length: Math.ceil(days / 7) }, (_, i) => [i * 7 + 1, Math.min(days, i * 7 + 7)] as const);
-  const [week, setWeek] = useState(thisMonth ? Math.floor((Number(today.slice(8)) - 1) / 7) : 0);
-  const shown = mobile ? dates.slice(weeks[week][0] - 1, weeks[week][1]) : dates;
+  const shown = dates;
+  // 옆으로 넘치면(모바일) 처음엔 오늘 칸이 보이게
+  const scroller = useRef<HTMLDivElement>(null);
+  const hasItems = items.length > 0; // 첫 항목을 넣어 표가 처음 생길 때도
+  useEffect(() => {
+    const el = scroller.current;
+    const cell = el?.querySelector<HTMLElement>('[aria-current="date"]');
+    if (!el || !cell) return;
+    el.scrollLeft += cell.getBoundingClientRect().left - el.getBoundingClientRect().left - el.clientWidth / 2;
+  }, [month, mobile, hasItems]);
 
   // 항목 순서: 손잡이로 끌면 화면에서 먼저 바꾸고 저장
   const sort = useDragSort(
@@ -110,6 +116,7 @@ export function TrackerGrid({ data }: { data: Data }) {
     },
     onPointerUp: () => press.current && clearTimeout(press.current.t),
     onPointerLeave: () => press.current && clearTimeout(press.current.t),
+    onPointerCancel: () => press.current && clearTimeout(press.current.t), // 옆으로 밀기 시작하면 길게 누르기 취소
     onClick: () => {
       if (press.current?.long) return void (press.current = null);
       toggle(item, date);
@@ -198,17 +205,7 @@ export function TrackerGrid({ data }: { data: Data }) {
   return (
     <div className="space-y-4">
       {header}
-      {mobile && (
-        <div className="grid auto-cols-fr grid-flow-col gap-1.5" role="tablist" aria-label="주">
-          {weeks.map(([a, b], i) => (
-            <Button key={a} role="tab" aria-selected={week === i} variant={week === i ? "default" : "outline"} className="h-10 min-w-0 rounded-full px-0 text-[13px]" onClick={() => setWeek(i)}>
-              {a}~{b}
-            </Button>
-          ))}
-        </div>
-      )}
-
-      <div className="overflow-x-auto rounded-lg border">
+      <div ref={scroller} className="overflow-x-auto overscroll-x-contain rounded-lg border">
         <div role="grid" aria-label={`${Number(month.slice(5))}월 트래커`} className="grid min-w-fit text-sm" style={{ gridTemplateColumns: cols }}>
           <div role="row" className="contents">
             <div role="columnheader" className="bg-card sticky left-0 z-[1] border-b" />
