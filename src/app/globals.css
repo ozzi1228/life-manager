@@ -261,3 +261,10 @@
     --cell-size: 2.5rem;
   }
 }
+/* 옆으로 미는 칩 줄 등: 스크롤은 되고 막대는 안 보이게 */
+@utility no-scrollbar {
+  scrollbar-width: none;
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}

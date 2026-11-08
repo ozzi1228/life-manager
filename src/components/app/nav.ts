@@ -23,6 +23,7 @@ export const QUICK_ADD: { label: string; href: string; icon: LucideIcon; dialog?
 
 const TITLES: [string, string][] = [
   ["/settings", "설정"],
+  ["/search", "검색"],
   ["/activity", "작업 기록"],
   ["/calendar", "일정"],
   ["/goals", "목표"],

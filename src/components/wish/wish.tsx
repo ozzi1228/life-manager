@@ -3,7 +3,7 @@
 // 위시: 갖고 싶은 물건·보고 싶은 작품을 한 목록에 (SCR-WISH-01~04, 09). 분류는 이름만(드라마·영화·옷…)
 // 담아둠 → 했어요(가격이 있으면 지출 기록도 함께, 없이도) / 그만둠(가격이 있으면 참은 소비로 기록할 수 있음) → 다시 담기
 // ponytail: 링크 미리보기·같은 링크 경고는 P1
-import { Check, ChevronDown, ExternalLink, Link2, MoreHorizontal, Plus, X } from "lucide-react";
+import { Check, ChevronDown, ExternalLink, Link2, MoreHorizontal, Plus, Search, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { createContext, useContext, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -365,7 +365,7 @@ function Folded({ label, children, count }: { label: string; count: number; chil
 
 type Sort = "new" | "old" | "price";
 
-export function WishView({ items, categories, today }: { items: WishItem[]; categories: ItemCategory[]; today: string }) {
+export function WishView({ items, categories, today, q: initialQ = "" }: { items: WishItem[]; categories: ItemCategory[]; today: string; q?: string }) {
   const router = useRouter();
   const mobile = useIsMobile();
   const refresh = () => router.refresh();
@@ -374,8 +374,10 @@ export function WishView({ items, categories, today }: { items: WishItem[]; cate
   const [detail, setDetail] = useState<WishItem | null>(null);
   const [sort, setSort] = useState<Sort>("new");
   const [cat, setCat] = useState("all");
+  const [q, setQ] = useState(initialQ); // 이름·메모에서 바로 거름(전체 검색에서 오면 ?q=)
   const names = new Map(categories.map((c) => [c.id, c.name]));
-  const inCat = items.filter((w) => cat === "all" || w.categoryId === cat);
+  const needle = q.trim().toLowerCase();
+  const inCat = items.filter((w) => (cat === "all" || w.categoryId === cat) && (!needle || `${w.name} ${w.seenWhere ?? ""}`.toLowerCase().includes(needle)));
   const saved = inCat
     .filter((w) => w.status === "saved")
     .sort((a, b) => (sort === "old" ? a.createdAt.localeCompare(b.createdAt) : sort === "price" ? (b.price ?? 0) - (a.price ?? 0) : b.createdAt.localeCompare(a.createdAt)));
@@ -393,6 +395,12 @@ export function WishView({ items, categories, today }: { items: WishItem[]; cate
     <CatNames value={names}>
       <div className="space-y-4">
         {/* 분류 칩은 한 줄 통째로(휴대폰에서 옆으로 밀어 봄), 그 아래 개수 · 정렬 · 담기 */}
+        {items.length > 0 && (
+          <div className="relative">
+            <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
+            <Input type="search" value={q} onChange={(e) => setQ(e.target.value)} placeholder="위시 검색 (이름·메모)" aria-label="위시 검색" className="h-11 pl-9 text-base md:h-9 md:text-sm" />
+          </div>
+        )}
         <CategoryChips categories={categories} value={cat} onChange={setCat} />
         <div className="flex items-center gap-2">
           <p className="text-muted-foreground mr-auto min-w-0 truncate text-sm tabular-nums">
@@ -417,7 +425,7 @@ export function WishView({ items, categories, today }: { items: WishItem[]; cate
         ) : saved.length ? (
           <ul className="bg-card divide-y rounded-lg border">{saved.map(row)}</ul>
         ) : (
-          <p className="text-muted-foreground py-8 text-center text-sm">{cat === "all" ? "지금 담아 둔 위시가 없어요" : `‘${names.get(cat)}’에 담아 둔 위시가 없어요`}</p>
+          <p className="text-muted-foreground py-8 text-center text-sm">{needle ? `‘${q.trim()}’(으)로 찾은 위시가 없어요` : cat === "all" ? "지금 담아 둔 위시가 없어요" : `‘${names.get(cat)}’에 담아 둔 위시가 없어요`}</p>
         )}
         <Folded label="했어요" count={done.length}>
           {done.map(row)}

@@ -49,7 +49,7 @@ export const SHOWN: Record<string, { area: string; name: (r: AnyRow, batch: { en
   account: { area: "자산", name: (r, b) => `${b.find((x) => x.row.id === r.paymentMethodId)?.row.name ?? ""} 계좌`.trim() },
   restraint_entry: { area: "참은 소비", name: (r) => `${r.name} · ${won(r.amount)}` },
   journal_topic: { area: "일기", name: (r) => `${r.name} 분류` },
-  journal_entry: { area: "일기", name: (r) => String(r.title || `${r.date} 일기`) },
+  journal_entry: { area: "일기", name: (r) => String(r.title || (r.date ? `${r.date} 일기` : "날짜 없는 일기")) },
   wish_item: { area: "위시", name: (r) => String(r.name) },
   health_record: { area: "건강", name: (r) => `${r.kind === "weight" ? "체중" : "혈당"} 기록 · ${r.date}` }, // 값은 풀지 않음
   pet: { area: "펫", name: (r) => String(r.name) },

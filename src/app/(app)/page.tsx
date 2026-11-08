@@ -218,7 +218,7 @@ export default async function Home() {
                       )}
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm">{e.title || text.split("\n")[0].slice(0, 40) || "사진"}</span>
-                        <span className="text-muted-foreground block text-caption">{dayLabel(e.date, d)}</span>
+                        <span className="text-muted-foreground block text-caption">{e.date ? dayLabel(e.date, d) : "날짜 없음"}</span>
                       </span>
                     </Link>
                   </li>

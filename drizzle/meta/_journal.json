@@ -246,6 +246,13 @@
       "when": 1793861762490,
       "tag": "0034_recurring_income",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1794153612808,
+      "tag": "0035_journal_undated",
+      "breakpoints": true
     }
   ]
 }

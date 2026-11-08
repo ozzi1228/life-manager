@@ -5,7 +5,7 @@ import { db, type Tx } from "../db/index.ts";
 import { finCategories, paymentMethods, pays, plannedExpenses, transactions } from "../db/schema.ts";
 import { CURRENCY_CODES, rateOf, type Currency } from "../lib/format.ts";
 import type { TxFilter } from "../lib/tx-search.ts";
-import { parse } from "./validate.ts";
+import { likePattern, parse } from "./validate.ts";
 import { AppError } from "./errors.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
 
@@ -170,7 +170,7 @@ export async function searchTransactions(ctx: Ctx, f: TxFilter) {
   const t = transactions;
   const w: (SQL | undefined)[] = [f.from ? gte(t.date, f.from) : undefined, f.to ? lte(t.date, f.to) : undefined];
   if (f.q) {
-    const like = `%${f.q.replace(/[\\%_]/g, "\\$&")}%`; // % _ \ 는 글자 그대로
+    const like = likePattern(f.q);
     const [cats, pms] = await Promise.all([
       db.select({ id: finCategories.id }).from(finCategories).where(and(eq(finCategories.userId, ctx.userId), ilike(finCategories.name, like))),
       db.select({ id: paymentMethods.id }).from(paymentMethods).where(and(eq(paymentMethods.userId, ctx.userId), ilike(paymentMethods.name, like))),

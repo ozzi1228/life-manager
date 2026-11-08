@@ -10,3 +10,6 @@ export function parse<S extends z.ZodType>(schema: S, input: unknown): z.infer<S
     fields: r.error.issues.map((i) => ({ path: i.path.join("."), rule: i.code, message: i.message })),
   });
 }
+
+/** 검색어 → ILIKE 패턴(% _ \ 는 글자 그대로) */
+export const likePattern = (q: string) => `%${q.replace(/[\\%_]/g, "\\$&")}%`;

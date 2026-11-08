@@ -1,7 +1,7 @@
 "use client";
 
 // 앱 셸 (docs/planning/02 §5, 03 §3.6·§6): PC·태블릿 사이드바 / 모바일 상단바 + 펼치는 메뉴(같은 사이드바가 왼쪽 창으로) + 빠른 추가(+), 오프라인 띠, 펫
-import { History, LogOut, Menu, PanelLeftClose, PanelLeftOpen, PawPrint, Plus, Settings, UserRound } from "lucide-react";
+import { History, LogOut, Menu, PanelLeftClose, PanelLeftOpen, PawPrint, Plus, Search, Settings, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState, type ComponentProps, type ReactNode } from "react";
@@ -162,6 +162,12 @@ function Frame({ menuOpen, name, seenHints, children }: Props) {
             <MenuButton />
             {/* PC 상단의 빠른 추가는 없앰(화면마다 추가 버튼이 있음). 모바일은 오른쪽 아래 + */}
             <h1 className="text-title flex-1 truncate font-semibold">{titleFor(path)}</h1>
+            {/* 전체 검색(일기·일정·지출·목표·메모·위시·커리어) */}
+            <Button variant="ghost" size="icon" className="max-md:size-11" aria-label="검색" title="검색" asChild>
+              <Link href="/search">
+                <Search />
+              </Link>
+            </Button>
             {profile}
           </header>
 

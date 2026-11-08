@@ -1,11 +1,11 @@
-// 일기 고치기 (SCR-JRN-03)
+// 일기 고치기 (SCR-JRN-03): 글 보기의 "수정" 버튼으로
 import { notFound } from "next/navigation";
 import { EntryEditor } from "@/components/journal/entry-editor";
 import { entryWithPhotos, topicList } from "@/server/journal";
 import { pageCtx } from "@/server/session";
 import { todayIn } from "@/server/time";
 
-export default async function EditEntryPage({ params }: PageProps<"/records/journal/[id]">) {
+export default async function EditEntryPage({ params }: PageProps<"/records/journal/[id]/edit">) {
   const { id } = await params;
   const ctx = await pageCtx();
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();

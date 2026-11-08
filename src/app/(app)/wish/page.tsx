@@ -6,12 +6,13 @@ import { todayIn } from "@/server/time";
 import { wishList } from "@/server/wish";
 import { categoryList } from "@/server/item-categories";
 
-export default async function WishPage() {
+export default async function WishPage({ searchParams }: PageProps<"/wish">) {
+  const { q } = await searchParams;
   const ctx = await pageCtx();
   const categories = await categoryList(ctx); // 먼저: 처음이면 기본 분류를 만듦
   return (
     <Page>
-      <WishView items={await wishList(ctx)} categories={categories} today={todayIn()} />
+      <WishView items={await wishList(ctx)} categories={categories} today={todayIn()} q={typeof q === "string" ? q.slice(0, 60) : ""} />
     </Page>
   );
 }

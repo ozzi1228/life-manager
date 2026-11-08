@@ -5,7 +5,7 @@ import { action } from "@/server/api";
 import { once } from "@/server/idempotency";
 import { addTopic, colorTopic, createEntry, entryRepo, removeTopic, renameTopic, reorderTopics, updateEntry } from "@/server/journal";
 
-type EntryIn = { date: string; topicId: string | null; title: string | null; bodyMd: string; photoIds: string[] };
+type EntryIn = { date: string | null; topicId: string | null; title: string | null; bodyMd: string; photoIds: string[] };
 
 export async function addEntry(key: string, input: EntryIn) {
   return action(async (ctx) => {

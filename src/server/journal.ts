@@ -1,5 +1,5 @@
 // 일기 서비스 (docs/planning/08 §2, 15 §8)
-import { and, asc, desc, eq, gte, lt } from "drizzle-orm";
+import { and, asc, desc, eq, gte, ilike, isNull, lt, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
 import { journalEntries, journalTopics } from "../db/schema.ts";
@@ -8,7 +8,7 @@ import { AppError } from "./errors.ts";
 import { imagesOf, linkImages } from "./files.ts";
 import { dup } from "./finance.ts";
 import { defineRepo, type Ctx } from "./repo.ts";
-import { parse } from "./validate.ts";
+import { likePattern, parse } from "./validate.ts";
 
 export const topicRepo = defineRepo(journalTopics, "journal_topic");
 export const entryRepo = defineRepo(journalEntries, "journal_entry");
@@ -56,7 +56,7 @@ export async function reorderTopics(ctx: Ctx, ids: string[]) {
 }
 
 export const entryInput = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜를 다시 선택해 주세요"),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "날짜를 다시 선택해 주세요").nullable().default(null), // null = 날짜 없는 글
   topicId: z.uuid().nullable().default(null),
   title: z.string().trim().max(100, "제목은 100자까지 쓸 수 있어요").nullable().default(null),
   bodyMd: z.string().max(50_000, "본문은 5만 자까지 쓸 수 있어요").default(""),
@@ -106,6 +106,32 @@ export async function monthEntries(ctx: Ctx, month: string) {
   return rows.map((r) => ({ id: r.id, version: r.version, date: r.date, topicId: r.topicId, title: r.title, bodyMd: r.bodyMd, photos: photos.get(r.id) ?? [] }));
 }
 
+/** 일기 검색·분류 거르기: 모든 달(날짜 없는 글 포함)에서. 검색어는 제목·본문, topic은 분류 id 또는 "none"(분류 없음). 최근 것부터 300개 */
+export async function searchEntries(ctx: Ctx, { q, topic }: { q: string; topic: string | null }) {
+  const w = [
+    q ? or(ilike(journalEntries.title, likePattern(q)), ilike(journalEntries.bodyMd, likePattern(q))) : undefined,
+    topic === "none" ? isNull(journalEntries.topicId) : topic ? eq(journalEntries.topicId, topic) : undefined,
+  ];
+  const rows = await entryRepo.list(ctx, { where: and(...w), orderBy: [sql`${journalEntries.date} desc nulls first`, desc(journalEntries.createdAt)], limit: 300 });
+  const photos = await imagesOf(
+    ctx,
+    OWNER,
+    rows.map((r) => r.id),
+  );
+  return rows.map((r) => ({ id: r.id, version: r.version, date: r.date, topicId: r.topicId, title: r.title, bodyMd: r.bodyMd, photos: photos.get(r.id) ?? [] }));
+}
+
+/** 날짜 없는 글(최근에 쓴 것부터) + 사진 */
+export async function undatedEntries(ctx: Ctx) {
+  const rows = await entryRepo.list(ctx, { where: isNull(journalEntries.date), orderBy: [desc(journalEntries.createdAt)], limit: 200 });
+  const photos = await imagesOf(
+    ctx,
+    OWNER,
+    rows.map((r) => r.id),
+  );
+  return rows.map((r) => ({ id: r.id, version: r.version, date: r.date, topicId: r.topicId, title: r.title, bodyMd: r.bodyMd, photos: photos.get(r.id) ?? [] }));
+}
+
 export async function entryWithPhotos(ctx: Ctx, id: string) {
   const r = await entryRepo.get(ctx, id);
   const photos = await imagesOf(ctx, OWNER, [id]);
@@ -114,7 +140,8 @@ export async function entryWithPhotos(ctx: Ctx, id: string) {
 
 /** 최근 글 n개(날짜 순) + 첫 사진 — 홈 "최근 기록" */
 export async function recentEntries(ctx: Ctx, n: number) {
-  const rows = await entryRepo.list(ctx, { orderBy: [desc(journalEntries.date), desc(journalEntries.createdAt)], limit: n });
+  // 날짜 없는 글은 쓴 날 기준으로 섞음
+  const rows = await entryRepo.list(ctx, { orderBy: [desc(sql`coalesce(${journalEntries.date}, (${journalEntries.createdAt} at time zone 'Asia/Seoul')::date)`), desc(journalEntries.createdAt)], limit: n });
   const photos = await imagesOf(
     ctx,
     OWNER,

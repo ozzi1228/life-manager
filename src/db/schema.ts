@@ -271,12 +271,12 @@ export const journalTopics = pgTable(
   (t) => [uniqueIndex("journal_topics_name").on(t.userId, t.name).where(sql`${t.deletedAt} is null`)],
 );
 
-// 글 하나 = 날짜 + 주제 + 제목(선택) + 본문(마크다운 텍스트, 5만 자) + 사진 0~10장. 같은 날 여러 글 가능
+// 글 하나 = 날짜(없어도 됨 — 날짜 없는 글) + 주제 + 제목(선택) + 본문(마크다운 텍스트, 5만 자) + 사진 0~10장. 같은 날 여러 글 가능
 export const journalEntries = pgTable(
   "journal_entries",
   {
     ...userData(),
-    date: date("date").notNull(),
+    date: date("date"),
     topicId: uuid("topic_id"),
     title: text("title"),
     bodyMd: text("body_md").notNull().default(""),

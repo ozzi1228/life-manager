@@ -1,4 +1,4 @@
-// 일기 목록 (SCR-JRN-01): 날짜별 묶음. 한 줄 = 분류·제목·본문 앞부분(왼쪽) + 첫 사진(오른쪽). 블로그 글 목록처럼 화면 폭을 다 씀. 누르면 고치기
+// 일기 목록 (SCR-JRN-01): 날짜별 묶음(날짜 없는 글은 "날짜 없음" 한 묶음). 한 줄 = 분류·제목·본문 앞부분(왼쪽) + 첫 사진(오른쪽). 블로그 글 목록처럼 화면 폭을 다 씀. 누르면 고치기
 import Link from "next/link";
 import { dayLabel, fromYmd } from "@/lib/format";
 import { textOnly } from "@/lib/journal-body";
@@ -8,13 +8,13 @@ type Topic = { id: string; name: string; colorHex: string };
 
 export function EntryList({ entries, topics, today }: { entries: Entry[]; topics: Topic[]; today: string }) {
   const days = new Map<string, Entry[]>();
-  for (const e of entries) days.set(e.date, [...(days.get(e.date) ?? []), e]);
+  for (const e of entries) days.set(e.date ?? "", [...(days.get(e.date ?? "") ?? []), e]);
   const topic = (id: string | null) => topics.find((t) => t.id === id);
   return (
     <div className="space-y-6">
       {[...days].map(([date, list]) => (
-        <section key={date} className="space-y-2">
-          <h3 className="text-muted-foreground text-sm">{dayLabel(date, fromYmd(today))}</h3>
+        <section key={date || "undated"} className="space-y-2">
+          <h3 className="text-muted-foreground text-sm">{date ? dayLabel(date, fromYmd(today)) : "날짜 없음"}</h3>
           <ul className="bg-card divide-y rounded-xl border">
             {list.map((e) => {
               const t = topic(e.topicId);
