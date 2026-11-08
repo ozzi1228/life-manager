@@ -6,20 +6,22 @@ import { Ellipsis, Plus } from "lucide-react";
 import { GoalCheck } from "@/components/goals/goal-list";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useOptimistic, useState, useTransition } from "react";
+import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { addPeriodGoal, changeGoalStatus, deleteGoal, renameGoalAction } from "@/app/actions/goals";
 import { type Goal, GoalDialog } from "@/components/goals/goal-list";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { periodLabel, type PeriodScope } from "@/lib/period";
+import { periodLabel, prevPeriodKey, type PeriodScope } from "@/lib/period";
 import { cn } from "@/lib/utils";
 
 export type PeriodGoal = Pick<Goal, "id" | "version" | "title" | "status">;
 const HREF: Record<PeriodScope, string> = { year: "/goals/year", month: "/goals/month", week: "/goals/week", day: "/goals/day" };
 const NOW: Record<PeriodScope, string> = { year: "올해", month: "이번 달", week: "이번 주", day: "오늘" };
-const doneLast = <G extends PeriodGoal>(list: G[]) => [...list].sort((a, b) => Number(a.status === "done") - Number(b.status === "done"));
+const PREV = { month: "지난 달", week: "지난 주", day: "지난 날" } as const;
+const MORE = { month: 3, week: 4, day: 7 } as const;
+const doneLast =<G extends PeriodGoal>(list: G[]) => [...list].sort((a, b) => Number(a.status === "done") - Number(b.status === "done"));
 
 function useGoals<G extends PeriodGoal>(goals: G[]) {
   const router = useRouter();
@@ -127,15 +129,22 @@ function QuickAdd({ scope, periodKey, label, added, compact }: { scope: PeriodSc
   const [open, setOpen] = useState(false);
   const [text, setText] = useState("");
   const [busy, setBusy] = useState(false);
+  const sending = useRef(false); // Enter와 칸 밖 누르기가 겹쳐도 한 번만
 
-  async function add() {
+  /** close: 칸 밖을 눌렀을 때 — 적은 글은 저장하고 칸을 닫음 */
+  async function add(close = false) {
     const title = text.trim();
-    if (!title || busy) return;
+    if (!title) return close && setOpen(false);
+    if (sending.current) return;
+    sending.current = true;
     setBusy(true);
-    const r = await addPeriodGoal(scope, periodKey, title);
+    const r = await addPeriodGoal(scope, periodKey, title).catch(() => null);
+    sending.current = false;
     setBusy(false);
+    if (!r) return toast.error("연결이 끊겨 저장하지 못했어요. 다시 눌러 주세요");
     if (!r.ok) return toast.error(r.error.fields?.[0]?.message ?? r.error.message);
     setText("");
+    if (close) setOpen(false);
     added();
   }
 
@@ -145,26 +154,33 @@ function QuickAdd({ scope, periodKey, label, added, compact }: { scope: PeriodSc
         <Plus /> 목표 추가
       </Button>
     );
+  // form 제출로 Enter를 받음: 휴대폰 한글 키보드는 Enter가 '조합 중'(keyCode 229)으로 와서 keydown으로는 놓침
   return (
-    <Input
-      autoFocus
-      aria-label={`${label} 목표 추가`}
-      placeholder="목표를 적고 Enter"
-      maxLength={60}
-      readOnly={busy}
-      className={compact ? "h-9 text-base md:h-8 md:text-sm" : "h-11 text-base md:h-9 md:text-sm"}
-      value={text}
-      onChange={(e) => setText(e.target.value)}
-      onKeyDown={(e) => {
-        if (e.nativeEvent.isComposing) return; // 한글 조합 중 Enter는 글자 확정
-        if (e.key === "Enter") add();
-        if (e.key === "Escape") {
-          setText("");
-          setOpen(false);
-        }
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        add();
       }}
-      onBlur={() => !text.trim() && setOpen(false)}
-    />
+    >
+      <Input
+        autoFocus
+        aria-label={`${label} 목표 추가`}
+        placeholder="목표를 적고 Enter"
+        maxLength={60}
+        enterKeyHint="done"
+        readOnly={busy}
+        className={compact ? "h-9 text-base md:h-8 md:text-sm" : "h-11 text-base md:h-9 md:text-sm"}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Escape") {
+            setText("");
+            setOpen(false);
+          }
+        }}
+        onBlur={() => add(true)}
+      />
+    </form>
   );
 }
 
@@ -229,7 +245,11 @@ export function PeriodGoalList({
 }) {
   const { list, toggle, remove, refresh } = useGoals(goals);
   const [editing, setEditing] = useState<Goal | null>(null);
-  const keys = [...new Set([current, ...goals.flatMap((g) => (g.periodKey ? [g.periodKey] : []))])].sort().reverse();
+  // 지난 기간: 목표가 없어도 바로 앞 기간은 보여 주고, 아래 버튼으로 더 펼쳐 지난 기간에도 추가
+  const [back, setBack] = useState(1);
+  const past = [current];
+  for (let i = 0; i < back; i++) past.push(prevPeriodKey(scope, past[i]));
+  const keys = [...new Set([...past, ...goals.flatMap((g) => (g.periodKey ? [g.periodKey] : []))])].sort().reverse();
 
   // 주소에 #p기간이 있으면(일정 화면에서 옴) 그 기간, 아니면 이번 기간이 맨 위에
   useEffect(() => {
@@ -260,7 +280,10 @@ export function PeriodGoalList({
           </section>
         );
       })}
-      {editing && <GoalDialog goal={editing} preset="" defaultYear={thisYear} categories={categories} close={() => setEditing(null)} done={refresh} />}
+      <Button variant="outline" className="w-full max-md:h-11" onClick={() => setBack((b) => b + MORE[scope])}>
+        {PREV[scope]} 더 보기
+      </Button>
+      {editing &&<GoalDialog goal={editing} preset="" defaultYear={thisYear} categories={categories} close={() => setEditing(null)} done={refresh} />}
     </div>
   );
 }
