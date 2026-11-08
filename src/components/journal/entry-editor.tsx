@@ -211,7 +211,7 @@ function Editor({ entry, topics, today }: Props) {
 
       {error && <p className="text-destructive-text text-sm">{error}</p>}
 
-      <div data-pet-avoid className="bg-background/95 sticky bottom-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-2 border-t py-3 backdrop-blur">
+      <div data-pet-avoid data-editor-bar className="bg-background/95 sticky bottom-0 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex gap-2 border-t py-3 backdrop-blur">
         {entry && (
           <Button variant="ghost" className="text-destructive-text" onClick={remove}>
             삭제

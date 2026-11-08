@@ -68,6 +68,24 @@ const blockOf = (root: HTMLElement, node: Node | null) => {
   return n && n !== root ? (n as HTMLElement) : null;
 };
 
+/** 지금 커서가 화면에 보이게 스크롤(글이 길어져도 쓰는 줄을 따라감).
+ *  브라우저도 커서를 따라가지만 창 맨 끝까지만이라, 아래에 붙은 저장 줄·휴대폰 키보드에 가려졌음 */
+function followCaret(root: HTMLElement) {
+  const s = getSelection();
+  if (!s?.rangeCount || !root.contains(s.focusNode)) return;
+  const r = s.getRangeAt(0).cloneRange();
+  r.collapse(false);
+  let rect = r.getBoundingClientRect();
+  // 빈 줄·줄 첫머리는 크기가 0으로 나옴 → 그 줄 칸으로
+  if (!rect.height) rect = (blockOf(root, s.focusNode) ?? (s.focusNode instanceof HTMLElement ? s.focusNode : root)).getBoundingClientRect();
+  const vv = window.visualViewport;
+  const bar = document.querySelector("[data-editor-bar]")?.getBoundingClientRect().top ?? Infinity;
+  const top = (document.querySelector("header")?.getBoundingClientRect().bottom ?? 0) + 12;
+  const bottom = Math.min(vv ? vv.offsetTop + vv.height : innerHeight, bar) - 24; // 키보드·저장 줄 위로 조금 띄움
+  if (rect.bottom > bottom) scrollBy({ top: rect.bottom - bottom });
+  else if (rect.top < top) scrollBy({ top: rect.top - top });
+}
+
 export function JournalBody({ initial, photos: initialPhotos, onChange, onBusy, placeholder }: { initial: string; photos: Photo[]; onChange: (v: { body: string; photos: Photo[] }) => void; onBusy?: (b: boolean) => void; placeholder: string }) {
   const ref = useRef<HTMLDivElement>(null);
   const known = useRef(new Map(initialPhotos.map((p) => [p.id, p])));
@@ -105,7 +123,14 @@ export function JournalBody({ initial, photos: initialPhotos, onChange, onBusy, 
       if (s?.rangeCount && root.contains(s.anchorNode)) saved.current = s.getRangeAt(0).cloneRange();
     };
     document.addEventListener("selectionchange", keep);
-    return () => document.removeEventListener("selectionchange", keep);
+    // 휴대폰 키보드가 올라오면(보이는 칸이 줄면) 커서를 다시 보이게
+    const vv = window.visualViewport;
+    const onResize = () => document.activeElement === root && followCaret(root);
+    vv?.addEventListener("resize", onResize);
+    return () => {
+      document.removeEventListener("selectionchange", keep);
+      vv?.removeEventListener("resize", onResize);
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 처음 내용은 한 번만(다시 그리려면 부모가 key를 바꿈)
   }, []);
 
@@ -149,7 +174,11 @@ export function JournalBody({ initial, photos: initialPhotos, onChange, onBusy, 
           contentEditable
           suppressContentEditableWarning
           className="min-h-[28vh] text-base leading-7 break-words whitespace-pre-wrap outline-none md:min-h-[40vh] md:text-body"
-          onInput={emit}
+          onInput={() => {
+            emit();
+            requestAnimationFrame(() => followCaret(ref.current!)); // 새 줄이 그려진 뒤에 재기
+          }}
+          onKeyUp={(e) => /^(Arrow|Page|Home|End)/.test(e.key) && followCaret(ref.current!)}
           onClick={(e) => {
             // 사진 위 버튼: 위로·아래로·빼기
             const btn = (e.target as HTMLElement).closest<HTMLElement>("[data-act]");
