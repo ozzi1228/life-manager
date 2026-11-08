@@ -2,25 +2,23 @@
 
 // 기간 목표(D-072): 일정 화면의 "{기간} 목표" 카드(PeriodGoals)와 목표 > 기간별 > 월별·주간·일간 목록(PeriodGoalList)
 // 체크(달성↔진행 중)는 바로 화면에 반영(낙관적)하고 저장 뒤 새로 고침. 달성한 목표는 아래로, 흐리게
-import { Ellipsis, Plus } from "lucide-react";
+import { ChevronLeft, ChevronRight, Ellipsis, Plus } from "lucide-react";
 import { GoalCheck } from "@/components/goals/goal-list";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useOptimistic, useRef, useState, useTransition } from "react";
+import { useOptimistic, useRef, useState, useTransition } from "react";
 import { toast } from "sonner";
 import { addPeriodGoal, changeGoalStatus, deleteGoal, renameGoalAction } from "@/app/actions/goals";
 import { type Goal, GoalDialog } from "@/components/goals/goal-list";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Input } from "@/components/ui/input";
-import { periodLabel, prevPeriodKey, type PeriodScope } from "@/lib/period";
+import { periodLabel, stepPeriodKey, type PeriodScope } from "@/lib/period";
 import { cn } from "@/lib/utils";
 
 export type PeriodGoal = Pick<Goal, "id" | "version" | "title" | "status">;
 const HREF: Record<PeriodScope, string> = { year: "/goals/year", month: "/goals/month", week: "/goals/week", day: "/goals/day" };
 const NOW: Record<PeriodScope, string> = { year: "올해", month: "이번 달", week: "이번 주", day: "오늘" };
-const PREV = { month: "지난 달", week: "지난 주", day: "지난 날" } as const;
-const MORE = { month: 3, week: 4, day: 7 } as const;
 const doneLast =<G extends PeriodGoal>(list: G[]) => [...list].sort((a, b) => Number(a.status === "done") - Number(b.status === "done"));
 
 function useGoals<G extends PeriodGoal>(goals: G[]) {
@@ -213,7 +211,7 @@ export function PeriodGoals({ scope, periodKey, label, goals }: { scope: PeriodS
     <section className="bg-card space-y-1 rounded-lg border p-3">
       <div className="flex items-center gap-2">
         <h2 className="text-sm font-semibold">{label} 목표</h2>
-        <Link href={`${HREF[scope]}#${scope === "year" ? "y" : "p"}${periodKey}`} className="text-muted-foreground hover:text-foreground ml-auto text-caption">
+        <Link href={scope === "year" ? `${HREF.year}#y${periodKey}` : `${HREF[scope]}?p=${periodKey}`} className="text-muted-foreground hover:text-foreground ml-auto text-caption">
           목표에서 보기
         </Link>
       </div>
@@ -229,61 +227,59 @@ export function PeriodGoals({ scope, periodKey, label, goals }: { scope: PeriodS
   );
 }
 
-/** 목표 > 기간별 > 월별·주간·일간: 이번 기간 + 목표가 있는 기간을 최근(앞으로 올 기간)부터 이어서. 처음엔 이번 기간으로 스크롤 */
+/** 목표 > 기간별 > 월별·주간·일간: 한 기간씩, 화살표로 앞뒤 기간을 넘김(지난 기간에도 추가). 주소 ?p=기간(일정 화면에서 옴)이 있으면 그 기간부터 */
 export function PeriodGoalList({
   scope,
   goals,
   current,
+  start,
   thisYear,
   categories,
 }: {
   scope: "month" | "week" | "day";
   goals: Goal[];
   current: string;
+  start: string;
   thisYear: number;
   categories: { id: string; name: string }[];
 }) {
   const { list, toggle, remove, refresh } = useGoals(goals);
   const [editing, setEditing] = useState<Goal | null>(null);
-  // 지난 기간: 목표가 없어도 바로 앞 기간은 보여 주고, 아래 버튼으로 더 펼쳐 지난 기간에도 추가
-  const [back, setBack] = useState(1);
-  const past = [current];
-  for (let i = 0; i < back; i++) past.push(prevPeriodKey(scope, past[i]));
-  const keys = [...new Set([...past, ...goals.flatMap((g) => (g.periodKey ? [g.periodKey] : []))])].sort().reverse();
+  const [k, setK] = useState(start);
+  const go = (next: string) => {
+    setK(next);
+    history.replaceState(null, "", next === current ? location.pathname : `?p=${next}`); // 새로 고쳐도 그 기간
+  };
 
-  // 주소에 #p기간이 있으면(일정 화면에서 옴) 그 기간, 아니면 이번 기간이 맨 위에
-  useEffect(() => {
-    const el = (location.hash && document.getElementById(decodeURIComponent(location.hash.slice(1)))) || (keys[0] !== current ? document.getElementById(`p${current}`) : null);
-    el?.scrollIntoView({ block: "start" });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- 처음 열 때 한 번만
-  }, []);
-
+  const label = periodLabel(scope, k, thisYear);
+  const items = doneLast(list.filter((g) => g.periodKey === k));
   return (
-    <div className="space-y-5">
-      {keys.map((k) => {
-        const label = periodLabel(scope, k, thisYear);
-        const items = doneLast(list.filter((g) => g.periodKey === k));
-        return (
-          <section key={k} id={`p${k}`} className="scroll-mt-14 space-y-2">
-            <h2 className="bg-background/95 sticky top-14 z-[1] py-1.5 font-semibold backdrop-blur">
-              {label}
-              {k === current && <span className="text-muted-foreground ml-2 text-sm font-normal">{NOW[scope]}</span>}
-            </h2>
-            {items.length > 0 && (
-              <ul className="divide-y rounded-lg border">
-                {items.map((g) => (
-                  <Row key={g.id} g={g} toggle={toggle} remove={remove} edit={setEditing} className="px-3 py-1.5" />
-                ))}
-              </ul>
-            )}
-            <QuickAdd scope={scope} periodKey={k} label={label} added={refresh} />
-          </section>
-        );
-      })}
-      <Button variant="outline" className="w-full max-md:h-11" onClick={() => setBack((b) => b + MORE[scope])}>
-        {PREV[scope]} 더 보기
-      </Button>
-      {editing &&<GoalDialog goal={editing} preset="" defaultYear={thisYear} categories={categories} close={() => setEditing(null)} done={refresh} />}
-    </div>
+    <section className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Button variant="outline" size="icon" className="max-md:size-11" aria-label="이전" onClick={() => go(stepPeriodKey(scope, k, -1))}>
+          <ChevronLeft />
+        </Button>
+        <h2 className="min-w-0 text-center font-semibold tabular-nums">{label}</h2>
+        <Button variant="outline" size="icon" className="max-md:size-11" aria-label="다음" onClick={() => go(stepPeriodKey(scope, k, 1))}>
+          <ChevronRight />
+        </Button>
+        {k === current ? (
+          <span className="text-muted-foreground text-sm">{NOW[scope]}</span>
+        ) : (
+          <Button variant="outline" size="sm" className="max-md:h-11" onClick={() => go(current)}>
+            {NOW[scope]}
+          </Button>
+        )}
+      </div>
+      {items.length > 0 && (
+        <ul className="divide-y rounded-lg border">
+          {items.map((g) => (
+            <Row key={g.id} g={g} toggle={toggle} remove={remove} edit={setEditing} className="px-3 py-1.5" />
+          ))}
+        </ul>
+      )}
+      <QuickAdd key={k} scope={scope} periodKey={k} label={label} added={refresh} />
+      {editing && <GoalDialog goal={editing} preset="" defaultYear={thisYear} categories={categories} close={() => setEditing(null)} done={refresh} />}
+    </section>
   );
 }

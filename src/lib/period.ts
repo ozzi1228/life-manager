@@ -12,11 +12,12 @@ export function validPeriodKey(scope: PeriodScope, key: string) {
   return scope === "day" || dayOfWeek(key) === 0;
 }
 
-/** 바로 앞 기간 key(월·주·일) */
-export function prevPeriodKey(scope: "month" | "week" | "day", key: string) {
-  if (scope !== "month") return addDays(key, scope === "week" ? -7 : -1);
+/** n 기간 앞(+)·뒤(−) key(월·주·일) */
+export function stepPeriodKey(scope: "month" | "week" | "day", key: string, n: number) {
+  if (scope !== "month") return addDays(key, scope === "week" ? 7 * n : n);
   const [y, m] = key.split("-").map(Number);
-  return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+  const t = y * 12 + m - 1 + n;
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, "0")}`;
 }
 
 /** 화면 이름. 올해가 아니면 연도를 앞에 붙임. 예: "2026년 11월", "11월 1일 ~ 7일", "11월 2일 (월)" */
