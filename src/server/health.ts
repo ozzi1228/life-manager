@@ -65,7 +65,7 @@ export async function updateHealth(ctx: Ctx, id: string, version: number, input:
 
 /** 종류별 기록(최근 것부터), since 이후만. 값·메모를 풀어서 */
 export async function healthList(ctx: Ctx, kind: HealthKind, since: string) {
-  const rows = await healthRepo.list(ctx, { where: and(eq(healthRecords.kind, kind), gte(healthRecords.date, since)), orderBy: [desc(healthRecords.date), desc(healthRecords.time)], limit: 1000 });
+  const rows = await healthRepo.list(ctx, { where: and(eq(healthRecords.kind, kind), gte(healthRecords.date, since)), orderBy: [desc(healthRecords.date), desc(healthRecords.time)], limit: 20000 }); // 5년치(혈당 하루 여러 번)도 다 들어가게
   return rows.map((r) => {
     const plain = unseal(r.valueEnc);
     const injection = r.kind === "injection" ? (JSON.parse(plain) as Injection) : null;

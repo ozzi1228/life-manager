@@ -28,6 +28,8 @@ const PERIODS = [
   { v: "30", label: "1달" },
   { v: "90", label: "3달" },
   { v: "365", label: "1년" },
+  { v: "1096", label: "3년" },
+  { v: "1827", label: "5년" },
 ];
 const daysAgo = (today: string, n: number) => ymd(new Date(fromYmd(today).getTime() - n * 86_400_000));
 
