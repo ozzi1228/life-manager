@@ -3,7 +3,7 @@
 // 일기 저장·삭제 (SCR-JRN-03). 규칙은 src/server/journal.ts
 import { action } from "@/server/api";
 import { once } from "@/server/idempotency";
-import { addTopic, colorTopic, createEntry, entryPage, entryRepo, removeTopic, renameTopic, reorderTopics, updateEntry } from "@/server/journal";
+import { addComment, addTopic, colorTopic, createEntry, deleteEntry, entryPage, removeComment, removeTopic, renameTopic, reorderTopics, updateEntry } from "@/server/journal";
 
 type EntryIn = { date: string | null; topicId: string | null; title: string | null; bodyMd: string; photoIds: string[] };
 
@@ -36,9 +36,15 @@ export async function reorderTopicsAction(ids: string[]) {
 }
 
 export async function removeEntry(id: string) {
-  return action(async (ctx) => {
-    await entryRepo.remove(ctx, id);
-  });
+  return action((ctx) => deleteEntry(ctx, id));
+}
+
+export async function addCommentAction(entryId: string, body: string) {
+  return action(async (ctx) => ({ id: (await addComment(ctx, entryId, body)).id }));
+}
+
+export async function removeCommentAction(id: string) {
+  return action((ctx) => removeComment(ctx, id));
 }
 
 

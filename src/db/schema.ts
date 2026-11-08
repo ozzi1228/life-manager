@@ -284,6 +284,17 @@ export const journalEntries = pgTable(
   (t) => [index("journal_entries_user_date").on(t.userId, t.date.desc()).where(sql`${t.deletedAt} is null`)],
 );
 
+// 일기 댓글: 나중의 내가 지난 일기에 다는 한마디. 언제 달았는지는 created_at(화면에 꼭 보임). 일기를 지우면 같은 묶음으로 함께 휴지통에
+export const journalComments = pgTable(
+  "journal_comments",
+  {
+    ...userData(),
+    entryId: uuid("entry_id").notNull(),
+    body: text("body").notNull(),
+  },
+  (t) => [index("journal_comments_entry").on(t.userId, t.entryId, t.createdAt).where(sql`${t.deletedAt} is null`)],
+);
+
 // 고정 지출·수입 (06 §5, 14 §4.4). 해지해도 지우지 않고 상태로(이용 중 → 해지 예정(마지막 이용일) → 해지됨)
 export const recurringPayments = pgTable(
   "recurring_payments",

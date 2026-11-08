@@ -1,8 +1,9 @@
 // 일기 서비스 (docs/planning/08 §2, 15 §8)
 import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
+import { uuidv7 } from "../db/id.ts";
 import { db } from "../db/index.ts";
-import { journalEntries, journalTopics } from "../db/schema.ts";
+import { journalComments, journalEntries, journalTopics } from "../db/schema.ts";
 import { GOAL_PALETTE } from "../lib/palette.ts";
 import { AppError } from "./errors.ts";
 import { imagesOf, linkImages } from "./files.ts";
@@ -12,6 +13,7 @@ import { likePattern, parse } from "./validate.ts";
 
 export const topicRepo = defineRepo(journalTopics, "journal_topic");
 export const entryRepo = defineRepo(journalEntries, "journal_entry");
+export const commentRepo = defineRepo(journalComments, "journal_comment");
 const OWNER = "journal_entry";
 
 // 기본 주제(08 §2.2). 색은 트래커 팔레트 재사용
@@ -113,6 +115,35 @@ export async function entryPage(ctx: Ctx, { q, topic, offset }: { q: string; top
     page.map((r) => r.id),
   );
   return { items: page.map((r) => ({ id: r.id, version: r.version, date: r.date, topicId: r.topicId, title: r.title, bodyMd: r.bodyMd, photos: photos.get(r.id) ?? [] })), more: rows.length > ENTRY_PAGE };
+}
+
+/** 일기 지우기: 댓글도 같은 묶음으로(휴지통에서 함께 되살아남) */
+export async function deleteEntry(ctx: Ctx, id: string) {
+  await entryRepo.get(ctx, id);
+  const comments = await commentRepo.list(ctx, { where: eq(journalComments.entryId, id), limit: 5000 });
+  const batchId = uuidv7();
+  await db.transaction(async (tx) => {
+    await entryRepo.remove(ctx, id, { batchId, tx });
+    for (const c of comments) await commentRepo.remove(ctx, c.id, { batchId, tx });
+  });
+}
+
+// ── 댓글: 나중의 내가 지난 일기에 다는 한마디. 단 때(created_at)를 함께 보여 줌 ──
+const commentBody = z.string().trim().min(1, "댓글을 적어 주세요").max(2000, "댓글은 2000자까지 쓸 수 있어요");
+
+export async function commentList(ctx: Ctx, entryId: string) {
+  const rows = await commentRepo.list(ctx, { where: eq(journalComments.entryId, entryId), orderBy: [asc(journalComments.createdAt)], limit: 500 });
+  return rows.map((c) => ({ id: c.id, body: c.body, createdAt: c.createdAt }));
+}
+
+export async function addComment(ctx: Ctx, entryId: string, body: unknown) {
+  await entryRepo.get(ctx, entryId); // 내 일기인지(지운 일기엔 못 닮)
+  return commentRepo.create(ctx, { entryId, body: parse(commentBody, body) });
+}
+
+export async function removeComment(ctx: Ctx, id: string) {
+  await commentRepo.get(ctx, id);
+  await commentRepo.remove(ctx, id);
 }
 
 export async function entryWithPhotos(ctx: Ctx, id: string) {
