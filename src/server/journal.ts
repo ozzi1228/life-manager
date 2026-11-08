@@ -1,5 +1,5 @@
 // 일기 서비스 (docs/planning/08 §2, 15 §8)
-import { and, asc, desc, eq, gte, ilike, isNull, lt, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, isNull, or, sql } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "../db/index.ts";
 import { journalEntries, journalTopics } from "../db/schema.ts";
@@ -92,44 +92,27 @@ export async function updateEntry(ctx: Ctx, id: string, version: number, input: 
   });
 }
 
-/** 한 달 글 + 사진 */
-export async function monthEntries(ctx: Ctx, month: string) {
-  if (!/^\d{4}-\d{2}$/.test(month)) throw new AppError("BAD_REQUEST", "잠시 후 다시 시도해 주세요");
-  const [y, m] = month.split("-").map(Number);
-  const next = `${m === 12 ? y + 1 : y}-${String(m === 12 ? 1 : m + 1).padStart(2, "0")}-01`;
-  const rows = await entryRepo.list(ctx, { where: and(gte(journalEntries.date, `${month}-01`), lt(journalEntries.date, next)), orderBy: [desc(journalEntries.date), desc(journalEntries.createdAt)] });
-  const photos = await imagesOf(
-    ctx,
-    OWNER,
-    rows.map((r) => r.id),
-  );
-  return rows.map((r) => ({ id: r.id, version: r.version, date: r.date, topicId: r.topicId, title: r.title, bodyMd: r.bodyMd, photos: photos.get(r.id) ?? [] }));
-}
-
-/** 일기 검색·분류 거르기: 모든 달(날짜 없는 글 포함)에서. 검색어는 제목·본문, topic은 분류 id 또는 "none"(분류 없음). 최근 것부터 300개 */
-export async function searchEntries(ctx: Ctx, { q, topic }: { q: string; topic: string | null }) {
+/** 일기 목록 한 쪽: 최신 날짜부터 옛날 순, 날짜 없는 글은 맨 끝. 검색어(제목·본문)·분류(id 또는 "none" = 분류 없음)로 거름
+ * 무한 스크롤로 offset부터 PAGE개씩. ponytail: offset 방식 — 글이 수천 편 넘게 쌓여 느려지면 (date, created_at) 커서로 */
+export const ENTRY_PAGE = 30;
+export async function entryPage(ctx: Ctx, { q, topic, offset }: { q: string; topic: string | null; offset: number }) {
   const w = [
     q ? or(ilike(journalEntries.title, likePattern(q)), ilike(journalEntries.bodyMd, likePattern(q))) : undefined,
     topic === "none" ? isNull(journalEntries.topicId) : topic ? eq(journalEntries.topicId, topic) : undefined,
   ];
-  const rows = await entryRepo.list(ctx, { where: and(...w), orderBy: [sql`${journalEntries.date} desc nulls first`, desc(journalEntries.createdAt)], limit: 300 });
+  const rows = await entryRepo.list(ctx, {
+    where: and(...w),
+    orderBy: [sql`${journalEntries.date} desc nulls last`, desc(journalEntries.createdAt), desc(journalEntries.id)],
+    limit: ENTRY_PAGE + 1,
+    offset: Math.max(0, Math.floor(offset)),
+  });
+  const page = rows.slice(0, ENTRY_PAGE);
   const photos = await imagesOf(
     ctx,
     OWNER,
-    rows.map((r) => r.id),
+    page.map((r) => r.id),
   );
-  return rows.map((r) => ({ id: r.id, version: r.version, date: r.date, topicId: r.topicId, title: r.title, bodyMd: r.bodyMd, photos: photos.get(r.id) ?? [] }));
-}
-
-/** 날짜 없는 글(최근에 쓴 것부터) + 사진 */
-export async function undatedEntries(ctx: Ctx) {
-  const rows = await entryRepo.list(ctx, { where: isNull(journalEntries.date), orderBy: [desc(journalEntries.createdAt)], limit: 200 });
-  const photos = await imagesOf(
-    ctx,
-    OWNER,
-    rows.map((r) => r.id),
-  );
-  return rows.map((r) => ({ id: r.id, version: r.version, date: r.date, topicId: r.topicId, title: r.title, bodyMd: r.bodyMd, photos: photos.get(r.id) ?? [] }));
+  return { items: page.map((r) => ({ id: r.id, version: r.version, date: r.date, topicId: r.topicId, title: r.title, bodyMd: r.bodyMd, photos: photos.get(r.id) ?? [] })), more: rows.length > ENTRY_PAGE };
 }
 
 export async function entryWithPhotos(ctx: Ctx, id: string) {

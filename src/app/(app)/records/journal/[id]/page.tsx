@@ -32,7 +32,7 @@ export default async function EntryPage({ params }: PageProps<"/records/journal/
   return (
     <article className="mx-auto w-full max-w-3xl space-y-4 px-4 py-4 md:px-8 md:py-6">
       <div className="flex items-center justify-between gap-2">
-        <Link href={entry.date ? `/records?month=${entry.date.slice(0, 7)}` : "/records"} className="text-muted-foreground hover:text-foreground -ml-2 inline-flex h-10 items-center gap-1 px-2 text-sm">
+        <Link href="/records" className="text-muted-foreground hover:text-foreground -ml-2 inline-flex h-10 items-center gap-1 px-2 text-sm">
           <ChevronLeft className="size-4" />
           일기
         </Link>

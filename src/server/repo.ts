@@ -48,13 +48,14 @@ export function defineRepo<T extends AnyTable>(table: T, entity: string) {
     get: (ctx: Ctx, id: string) => get(ctx, id),
 
     /** 살아 있는 행 목록. where·orderBy는 영역별로(기본: 최신 생성 순) */
-    async list(ctx: Ctx, o: { where?: SQL; orderBy?: SQL[]; limit?: number } = {}): Promise<Row<T>[]> {
+    async list(ctx: Ctx, o: { where?: SQL; orderBy?: SQL[]; limit?: number; offset?: number } = {}): Promise<Row<T>[]> {
       return (await db
         .select()
         .from(table as PgTable)
         .where(alive(ctx, o.where))
         .orderBy(...(o.orderBy ?? [desc(table.id)]))
-        .limit(Math.min(o.limit ?? 200, 5000))) as Row<T>[];
+        .limit(Math.min(o.limit ?? 200, 5000))
+        .offset(o.offset ?? 0)) as Row<T>[];
     },
 
     async create(ctx: Ctx, values: Insert<T>, o: { source?: string; tx?: Tx } = {}): Promise<Row<T>> {
