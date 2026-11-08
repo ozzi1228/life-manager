@@ -27,12 +27,17 @@ export function TxList({ rows, categories, payments, today }: { rows: TxRow[]; c
   return (
     <div className="space-y-5">
       {[...days].map(([date, list]) => {
-        const sum = list.reduce((a, r) => a + signed(r), 0);
+        // 수입(+)과 지출(−)은 합치지 않고 따로
+        const plus = list.reduce((a, r) => a + Math.max(signed(r), 0), 0);
+        const minus = list.reduce((a, r) => a + Math.min(signed(r), 0), 0);
         return (
           <section key={date} aria-label={dayLabel(date, fromYmd(today))}>
-            <h3 className="bg-background/95 text-muted-foreground sticky top-14 z-[1] flex justify-between py-1.5 text-sm backdrop-blur">
+            <h3 className="bg-background/95 text-muted-foreground sticky top-14 z-[1] flex justify-between gap-3 py-1.5 text-sm backdrop-blur">
               <span>{dayLabel(date, fromYmd(today))}</span>
-              <span className={cn("tabular-nums", signClass(sum))}>{signedMoney(sum)}</span>
+              <span className="flex gap-3 tabular-nums">
+                {plus > 0 && <span className={signClass(plus)}>{signedMoney(plus)}</span>}
+                {(minus < 0 || plus === 0) && <span className={signClass(minus)}>{signedMoney(minus)}</span>}
+              </span>
             </h3>
             <ul className="divide-y rounded-lg border">
               {list.map((r) => (
