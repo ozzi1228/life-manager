@@ -189,7 +189,7 @@ export const goals = pgTable(
     achievedAt: date("achieved_at"),
     memo: text("memo"),
     sort: integer("sort").notNull().default(0),
-    // 월·주·일 목표(D-072): 일정 기간 메모와 같은 key(월 "2026-11" · 주는 그 주 일요일 · 일). 이때 연도는 비움
+    // 월·주·일 목표(D-072): 일정 기간 메모와 같은 key(월 "2026-11" · 주는 그 주 월요일 · 일). 이때 연도는 비움
     periodScope: text("period_scope", { enum: ["month", "week", "day"] }),
     periodKey: text("period_key"),
   },
@@ -293,6 +293,24 @@ export const journalComments = pgTable(
     body: text("body").notNull(),
   },
   (t) => [index("journal_comments_entry").on(t.userId, t.entryId, t.createdAt).where(sql`${t.deletedAt} is null`)],
+);
+
+// 리뷰(기록 > 리뷰): 달글처럼 주제 글타래 하나(예: 동네 카페, 읽은 책)를 만들고 그 안에 후기를 계속 이어 닮
+export const reviewThreads = pgTable("review_threads", {
+  ...userData(),
+  title: text("title").notNull(),
+  memo: text("memo"), // 한 줄 설명(선택)
+});
+
+// 리뷰 글타래 안의 후기 한 개. 언제 썼는지는 created_at(화면에 꼭 보임). 글타래를 지우면 같은 묶음으로 함께 휴지통에
+export const reviewPosts = pgTable(
+  "review_posts",
+  {
+    ...userData(),
+    threadId: uuid("thread_id").notNull(),
+    body: text("body").notNull(),
+  },
+  (t) => [index("review_posts_thread").on(t.userId, t.threadId, t.createdAt).where(sql`${t.deletedAt} is null`)],
 );
 
 // 고정 지출·수입 (06 §5, 14 §4.4). 해지해도 지우지 않고 상태로(이용 중 → 해지 예정(마지막 이용일) → 해지됨)
@@ -664,7 +682,7 @@ export const pushSubscriptions = pgTable(
   (t) => [uniqueIndex("push_subscriptions_endpoint").on(t.endpoint), index("push_subscriptions_user").on(t.userId)],
 );
 
-// 기간 메모(일정 화면): 연·월·주·일마다 하나. key: 연 "2026" · 월 "2026-11" · 주 그 주 일요일 "2026-11-01" · 일 "2026-11-02"
+// 기간 메모(일정 화면): 연·월·주·일마다 하나. key: 연 "2026" · 월 "2026-11" · 주 그 주 월요일 "2026-11-02" · 일 "2026-11-02"
 export const periodNotes = pgTable(
   "period_notes",
   {

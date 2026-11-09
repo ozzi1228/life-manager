@@ -104,3 +104,10 @@ export function soonLabel(d: string, today: string) {
   const diff = Math.round((fromYmd(d).getTime() - fromYmd(today).getTime()) / 86_400_000);
   return diff === 0 ? "오늘" : diff === 1 ? "내일" : diff === 2 ? "모레" : dayLabel(d, fromYmd(today));
 }
+
+/** 그때의 날짜·시간을 한국 시간으로(서버 시간대·언어 데이터와 상관없이 직접 만듦). 예: 2027년 3월 2일 (화) 오후 9:14 — 댓글·후기 */
+export function seoulWhen(d: Date) {
+  const s = d.toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }); // "2027-03-02 21:14:05"
+  const h = Number(s.slice(11, 13));
+  return `${+s.slice(0, 4)}년 ${+s.slice(5, 7)}월 ${+s.slice(8, 10)}일 (${WEEK[fromYmd(s.slice(0, 10)).getDay()]}) ${h < 12 ? "오전" : "오후"} ${h % 12 || 12}:${s.slice(14, 16)}`;
+}

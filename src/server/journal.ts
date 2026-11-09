@@ -149,7 +149,7 @@ export async function deleteEntry(ctx: Ctx, id: string) {
 }
 
 // ── 댓글: 나중의 내가 지난 일기에 다는 한마디. 단 때(created_at)를 함께 보여 줌 ──
-const commentBody = z.string().trim().min(1, "댓글을 적어 주세요").max(2000, "댓글은 2000자까지 쓸 수 있어요");
+const commentBody = z.string().trim().min(1, "댓글을 적어 주세요").max(5000, "댓글은 5000자까지 쓸 수 있어요");
 
 export async function commentList(ctx: Ctx, entryId: string) {
   const rows = await commentRepo.list(ctx, { where: eq(journalComments.entryId, entryId), orderBy: [asc(journalComments.createdAt)], limit: 500 });

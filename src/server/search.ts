@@ -1,8 +1,8 @@
-// 전체 검색(상단 돋보기 → /search): 일기·일정·수입·지출·목표·기간 메모·위시·커리어에서 한 번에
+// 전체 검색(상단 돋보기 → /search): 일기·리뷰·일정·수입·지출·목표·기간 메모·위시·커리어에서 한 번에
 // 건강 기록은 암호화해 두고 검색·AI에 안 보이기로 했으므로 넣지 않음(health.tsx 안내 문구)
 // ponytail: 종류마다 ILIKE로 최근 것 몇 개씩. 기록이 아주 많아지면 pg_trgm 인덱스로
 import { desc, ilike, or, sql } from "drizzle-orm";
-import { careerExperiences, events, goals, journalEntries, periodNotes, transactions, wishItems } from "../db/schema.ts";
+import { careerExperiences, events, goals, journalEntries, periodNotes, reviewPosts, reviewThreads, transactions, wishItems } from "../db/schema.ts";
 import { textOnly } from "../lib/journal-body.ts";
 import { noteText } from "../lib/rich-note.ts";
 import { eventRepo, noteRepo } from "./calendar.ts";
@@ -11,6 +11,7 @@ import { txRepo } from "./finance.ts";
 import { goalRepo } from "./goals.ts";
 import { entryRepo } from "./journal.ts";
 import type { Ctx } from "./repo.ts";
+import { postRepo, threadRepo } from "./reviews.ts";
 import { likePattern } from "./validate.ts";
 import { wishRepo } from "./wish.ts";
 
@@ -30,13 +31,14 @@ function around(text: string, q: string, n = 40) {
 
 const NOTE_SCOPE = { year: "연", month: "월", week: "주", day: "일", all: "전체" } as const;
 const noteDate = (scope: string, key: string) => (scope === "year" ? `${key}-01-01` : scope === "month" ? `${key}-01` : key);
+const seoulDayOf = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
 const won = (n: number) => `${n.toLocaleString("ko-KR")}원`;
 
 export async function searchAll(ctx: Ctx, raw: string): Promise<Group[]> {
   const q = raw.trim().slice(0, 60);
   if (!q) return [];
   const like = likePattern(q);
-  const [journal, cal, tx, goal, notes, wish, career] = await Promise.all([
+  const [journal, cal, tx, goal, notes, wish, career, threads, posts] = await Promise.all([
     entryRepo.list(ctx, { where: or(ilike(journalEntries.title, like), ilike(journalEntries.bodyMd, like)), orderBy: [sql`${journalEntries.date} desc nulls first`, desc(journalEntries.createdAt)], limit: PER + 1 }),
     eventRepo.list(ctx, { where: or(ilike(events.title, like), ilike(events.location, like), ilike(events.memo, like)), orderBy: [desc(events.startDate)], limit: PER + 1 }),
     txRepo.list(ctx, { where: or(ilike(transactions.title, like), ilike(transactions.memo, like), sql`array_to_string(${transactions.tags}, ' ') ilike ${like}`), orderBy: [desc(transactions.date), desc(transactions.createdAt)], limit: PER + 1 }),
@@ -56,7 +58,11 @@ export async function searchAll(ctx: Ctx, raw: string): Promise<Group[]> {
       orderBy: [desc(careerExperiences.periodStart)],
       limit: PER + 1,
     }),
+    threadRepo.list(ctx, { where: or(ilike(reviewThreads.title, like), ilike(reviewThreads.memo, like)), orderBy: [desc(reviewThreads.createdAt)], limit: 200 }),
+    postRepo.list(ctx, { where: ilike(reviewPosts.body, like), orderBy: [desc(reviewPosts.createdAt)], limit: PER + 1 }),
   ]);
+  // 후기가 든 글타래 이름(목록에 보일 것)
+  const threadNames = new Map((await threadRepo.list(ctx, { limit: 500 })).map((t) => [t.id, t.title]));
   const enc = encodeURIComponent(q);
   const groups: Group[] = [
     {
@@ -67,6 +73,14 @@ export async function searchAll(ctx: Ctx, raw: string): Promise<Group[]> {
         const text = textOnly(e.bodyMd);
         return { id: e.id, title: e.title || text.split("\n")[0].slice(0, 40) || "사진", sub: e.date ?? "날짜 없음", snippet: around(text, q), href: `/records/journal/${e.id}` };
       }),
+    },
+    {
+      key: "reviews",
+      label: "리뷰",
+      hits: [
+        ...threads.map((t) => ({ id: t.id, title: t.title, sub: "글타래", snippet: around(t.memo ?? "", q), href: `/records/reviews/${t.id}` })),
+        ...posts.filter((p) => threadNames.has(p.threadId)).map((p) => ({ id: p.id, title: threadNames.get(p.threadId)!, sub: seoulDayOf(p.createdAt), snippet: around(p.body, q), href: `/records/reviews/${p.threadId}` })),
+      ],
     },
     {
       key: "calendar",

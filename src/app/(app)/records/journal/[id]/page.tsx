@@ -2,22 +2,16 @@
 import { ChevronLeft, Pencil } from "lucide-react";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { Comments } from "@/components/journal/comments";
+import { addCommentAction, removeCommentAction } from "@/app/actions/journal";
+import { ThreadPosts } from "@/components/app/thread-posts";
 import { Button } from "@/components/ui/button";
-import { dateLabel, fromYmd } from "@/lib/format";
+import { dateLabel, fromYmd, seoulWhen } from "@/lib/format";
 import { photoOf } from "@/lib/journal-body";
 import { commentList, entryWithPhotos, topicList } from "@/server/journal";
 import { pageCtx } from "@/server/session";
 import { todayIn } from "@/server/time";
 
-// 댓글 단 때: 한국 시간으로(서버 시간대·언어 데이터와 상관없이 직접 만듦). 예: 2027년 3월 2일 (화) 오후 9:14
-const seoul = (d: Date) => d.toLocaleString("sv-SE", { timeZone: "Asia/Seoul" }); // "2027-03-02 21:14:05"
-const seoulDay = (d: Date) => seoul(d).slice(0, 10);
-function when(d: Date) {
-  const s = seoul(d);
-  const [h, m] = [Number(s.slice(11, 13)), s.slice(14, 16)];
-  return `${+s.slice(0, 4)}년 ${+s.slice(5, 7)}월 ${+s.slice(8, 10)}일 (${"일월화수목금토"[fromYmd(s.slice(0, 10)).getDay()]}) ${h < 12 ? "오전" : "오후"} ${h % 12 || 12}:${m}`;
-}
+const seoulDay = (d: Date) => d.toLocaleDateString("sv-SE", { timeZone: "Asia/Seoul" });
 /** 일기 날짜로부터 얼마 뒤에 단 댓글인지(같은 날이면 없음) */
 function after(entryDate: string | null, at: Date) {
   if (!entryDate) return null;
@@ -88,7 +82,14 @@ export default async function EntryPage({ params }: PageProps<"/records/journal/
           ),
         )}
       </div>
-      <Comments entryId={entry.id} comments={comments.map((c) => ({ id: c.id, body: c.body, when: when(c.createdAt), after: after(entry.date, c.createdAt) }))} />
+      <ThreadPosts
+        title="댓글"
+        placeholder="지금의 내가 이 일기에 한마디"
+        button="댓글 남기기"
+        add={addCommentAction.bind(null, entry.id)}
+        remove={removeCommentAction}
+        posts={comments.map((c) => ({ id: c.id, body: c.body, when: seoulWhen(c.createdAt), after: after(entry.date, c.createdAt) }))}
+      />
     </article>
   );
 }
