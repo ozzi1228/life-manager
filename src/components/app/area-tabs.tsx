@@ -14,7 +14,7 @@ export function AreaTabs({ label, tabs }: { label: string; tabs: Tab[] }) {
   const path = usePathname();
   const sort = useNavOrder(tabs[0].href, tabs, "x");
   return (
-    <nav aria-label={label} className="-mx-4 flex gap-1 overflow-x-auto border-b px-4 md:mx-0 md:px-0">
+    <nav aria-label={label} className="no-scrollbar -mx-4 flex gap-1 overflow-x-auto border-b px-4 md:mx-0 md:px-0">
       {sort.items.map((t) => {
         const on = isOn(path, t);
         return (

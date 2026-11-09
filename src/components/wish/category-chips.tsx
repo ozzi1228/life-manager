@@ -8,7 +8,7 @@ import type { ItemCategory } from "@/server/item-categories";
 
 export function CategoryChips({ categories, value, onChange }: { categories: ItemCategory[]; value: string; onChange: (v: string) => void }) {
   return (
-    <div className="-mx-4 flex items-center gap-1 overflow-x-auto px-4 md:mx-0 md:px-0">
+    <div className="no-scrollbar -mx-4 flex items-center gap-1 overflow-x-auto px-4 md:mx-0 md:px-0">
       <ToggleGroup type="single" variant="outline" size="sm" value={value} onValueChange={(x) => x && onChange(x)} aria-label="분류">
         <ToggleGroupItem value="all">전체</ToggleGroupItem>
         {categories.map((c) => (

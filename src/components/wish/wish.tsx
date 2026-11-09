@@ -260,7 +260,7 @@ function Detail({ w, today, close, edit, refresh }: { w: WishItem; today: string
     <ResponsiveModal open onOpenChange={(o) => !o && close()} title={w.name} footer={footer}>
       <div className="space-y-4 pb-2">
         {w.photos.length > 0 && (
-          <div className="-mx-4 flex snap-x gap-2 overflow-x-auto px-4">
+          <div className="no-scrollbar -mx-4 flex snap-x gap-2 overflow-x-auto px-4">
             {w.photos.map((p) => (
               <a key={p.id} href={`/api/v1/attachments/${p.id}?v=body`} target="_blank" rel="noreferrer" className="shrink-0 snap-start">
                 {/* eslint-disable-next-line @next/next/no-img-element -- 로그인한 본인만 보는 사진(이 서버가 직접 보냄) */}
