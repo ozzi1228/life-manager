@@ -7,7 +7,7 @@ import { z } from "zod";
 import { db } from "../db/index.ts";
 import { uuidv7 } from "../db/id.ts";
 import { calendars, eventExceptions, events, periodNotes } from "../db/schema.ts";
-import { addDays, countBefore, dayOfWeek, daysBetween, expand, parseRule, ruleString, sortKey, type Exception } from "../lib/calendar.ts";
+import { addDays, countBefore, dayOfWeek, daysBetween, expand, parseRule, ruleString, sortKey, weekStartOf, type Exception } from "../lib/calendar.ts";
 import { GOAL_PALETTE } from "../lib/palette.ts";
 import { cleanNote } from "../lib/rich-note.ts";
 import { AppError } from "./errors.ts";
@@ -234,8 +234,8 @@ export type CalendarItem = Awaited<ReturnType<typeof rangeView>>["calendars"][nu
 // ── 기간 메모(연·월·주·일, 일정 화면 위) + 전체 메모 ──
 export const noteRepo = defineRepo(periodNotes, "period_note");
 export type NoteScope = "year" | "month" | "week" | "day" | "all"; // all: 기간과 상관없는 메모 하나(key "all")
-/** 그 날이 든 기간의 key: 연 "2026" · 월 "2026-11" · 주는 그 주 일요일 · 일 */
-export const periodKey = (scope: NoteScope, date: string) => (scope === "year" ? date.slice(0, 4) : scope === "month" ? date.slice(0, 7) : scope === "week" ? addDays(date, -dayOfWeek(date)) : date);
+/** 그 날이 든 기간의 key: 연 "2026" · 월 "2026-11" · 주는 그 주 월요일 · 일 */
+export const periodKey = (scope: NoteScope, date: string) => (scope === "year" ? date.slice(0, 4) : scope === "month" ? date.slice(0, 7) : scope === "week" ? weekStartOf(date) : date);
 const KEY = { year: /^\d{4}$/, month: /^\d{4}-\d{2}$/, week: /^\d{4}-\d{2}-\d{2}$/, day: /^\d{4}-\d{2}-\d{2}$/, all: /^all$/ };
 const checkKey = (scope: NoteScope, key: string) => {
   if (!KEY[scope]?.test(key)) throw new AppError("BAD_REQUEST", "잠시 후 다시 시도해 주세요");

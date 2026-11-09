@@ -37,6 +37,7 @@ import type { GoogleStatus } from "@/server/google-calendar";
 
 type View = "year" | "month" | "week" | "day";
 const WEEK = ["일", "월", "화", "수", "목", "금", "토"];
+const MON_FIRST = [1, 2, 3, 4, 5, 6, 0]; // 화면의 요일 순서(주는 월요일 시작)
 
 const md = (d: string) => `${+d.slice(5, 7)}월 ${+d.slice(8)}일`;
 const dayTitle = (d: string) => `${md(d)} (${WEEK[dayOfWeek(d)]})`;
@@ -136,9 +137,9 @@ function MonthGrid({ from, month, selected, today, items, color, openDay, open, 
   return (
     <div className="rounded-lg border">
       <div className="grid grid-cols-7 border-b text-center text-caption">
-        {WEEK.map((w, i) => (
-          <span key={w} className={cn("py-1.5", i === 0 ? "text-destructive-text" : "text-muted-foreground")}>
-            {w}
+        {MON_FIRST.map((i) => (
+          <span key={i} className={cn("py-1.5", i === 0 ? "text-destructive-text" : "text-muted-foreground")}>
+            {WEEK[i]}
           </span>
         ))}
       </div>
@@ -488,9 +489,9 @@ function EventForm({ draft, edit, calendars, close, done }: { draft: Draft; edit
               </div>
               {custom.freq === "WEEKLY" && (
                 <ToggleGroup type="multiple" variant="outline" size="sm" aria-label="요일" value={custom.byDay.map(String)} onValueChange={(d) => d.length && setCustom((c) => ({ ...c, byDay: d.map(Number).sort() }))}>
-                  {WEEK.map((w, i) => (
-                    <ToggleGroupItem key={w} value={String(i)} className="w-9">
-                      {w}
+                  {MON_FIRST.map((i) => (
+                    <ToggleGroupItem key={i} value={String(i)} className="w-9">
+                      {WEEK[i]}
                     </ToggleGroupItem>
                   ))}
                 </ToggleGroup>

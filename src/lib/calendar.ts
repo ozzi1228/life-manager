@@ -19,6 +19,8 @@ const fromUtc = (t: number) => {
 };
 export const addDays = (d: string, n: number) => fromUtc(toUtc(d) + n * 86_400_000);
 export const dayOfWeek = (d: string) => new Date(toUtc(d)).getUTCDay();
+/** 그 날이 든 주의 월요일(우나의 주는 월요일 시작) */
+export const weekStartOf = (d: string) => addDays(d, -((dayOfWeek(d) + 6) % 7));
 export const daysBetween = (a: string, b: string) => Math.round((toUtc(b) - toUtc(a)) / 86_400_000);
 const daysIn = (y: number, m: number) => new Date(Date.UTC(y, m, 0)).getUTCDate(); // m: 1~12
 const ymdOf = (y: number, m: number, d: number) => `${y}-${pad(m)}-${pad(d)}`;

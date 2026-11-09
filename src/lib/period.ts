@@ -1,15 +1,15 @@
-// 기간(연·월·주·일) key와 이름. key는 일정 기간 메모와 같음(src/server/calendar.ts periodKey): 연 "2026" · 월 "2026-11" · 주는 그 주 일요일 · 일
+// 기간(연·월·주·일) key와 이름. key는 일정 기간 메모와 같음(src/server/calendar.ts periodKey): 연 "2026" · 월 "2026-11" · 주는 그 주 월요일 · 일
 import { addDays, dayOfWeek } from "./calendar.ts";
 
 export type PeriodScope = "year" | "month" | "week" | "day";
 const WEEKDAY = ["일", "월", "화", "수", "목", "금", "토"];
 
-/** 올바른 key인지(주는 일요일이어야 함) */
+/** 올바른 key인지(주는 월요일이어야 함) */
 export function validPeriodKey(scope: PeriodScope, key: string) {
   if (scope === "year") return /^\d{4}$/.test(key);
   if (scope === "month") return /^\d{4}-(0[1-9]|1[0-2])$/.test(key);
   if (!/^\d{4}-\d{2}-\d{2}$/.test(key) || addDays(key, 0) !== key) return false; // 없는 날(2월 30일 등) 거름
-  return scope === "day" || dayOfWeek(key) === 0;
+  return scope === "day" || dayOfWeek(key) === 1;
 }
 
 /** n 기간 앞(+)·뒤(−) key(월·주·일) */
