@@ -1,4 +1,4 @@
-// 전체 검색 (상단 돋보기): ?q= 로 일기·리뷰·일정·수입·지출·목표·메모·위시·커리어를 한 번에. 건강 기록은 빼고(암호화·검색 제외)
+// 전체 검색 (상단 돋보기): ?q= 로 일기·리뷰·메모·일정·수입·지출·목표·메모·위시·커리어를 한 번에. 건강 기록은 빼고(암호화·검색 제외)
 import { Search } from "lucide-react";
 import Link from "next/link";
 import { Page } from "@/components/app/page-shell";
@@ -31,7 +31,7 @@ export default async function SearchPage({ searchParams }: PageProps<"/search">)
     <Page>
       <form action="/search" role="search" className="relative">
         <Search className="text-muted-foreground pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2" />
-        <Input name="q" type="search" defaultValue={q} autoFocus={!q} placeholder="일기·리뷰·일정·지출·목표·메모·위시·커리어에서 찾기" aria-label="전체 검색" className="h-12 pl-9 text-base" />
+        <Input name="q" type="search" defaultValue={q} autoFocus={!q} placeholder="일기·리뷰·메모·일정·지출·목표·위시·커리어에서 찾기" aria-label="전체 검색" className="h-12 pl-9 text-base" />
       </form>
       {!q ? (
         <p className="text-muted-foreground text-sm">찾을 말을 적고 Enter를 눌러 주세요. 건강 기록은 검색에 나오지 않아요.</p>

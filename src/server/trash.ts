@@ -20,8 +20,10 @@ import "./finance.ts";
 import "./goals.ts";
 import "./health.ts";
 import "./journal.ts";
+import "./memos.ts";
 import "./recurring.ts";
 import "./restraint.ts";
+import "./reviews.ts";
 import "./wish.ts";
 
 export const RETENTION_DAYS = 90;
@@ -50,6 +52,7 @@ export const SHOWN: Record<string, { area: string; name: (r: AnyRow, batch: { en
   restraint_entry: { area: "참은 소비", name: (r) => `${r.name} · ${won(r.amount)}` },
   journal_topic: { area: "일기", name: (r) => `${r.name} 분류` },
   journal_entry: { area: "일기", name: (r) => String(r.title || (r.date ? `${r.date} 일기` : "날짜 없는 일기")) },
+  memo: { area: "메모", name: (r) => String(r.title || String(r.body).slice(0, 30) || "제목 없는 메모") },
   review_thread: { area: "리뷰", name: (r) => String(r.title) },
   review_post: { area: "리뷰", name: (r) => `후기 · ${String(r.body).slice(0, 30)}` }, // 글타래와 함께 지웠으면 글타래가 대표
   journal_comment: { area: "일기", name: (r) => `댓글 · ${String(r.body).slice(0, 30)}` }, // 일기와 함께 지웠으면 일기가 대표

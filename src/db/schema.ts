@@ -313,6 +313,13 @@ export const reviewPosts = pgTable(
   (t) => [index("review_posts_thread").on(t.userId, t.threadId, t.createdAt).where(sql`${t.deletedAt} is null`)],
 );
 
+// 메모(기록 > 메모): 게시판 글처럼 제목 + 내용 하나. 목록은 최근에 고친 순
+export const memos = pgTable("memos", {
+  ...userData(),
+  title: text("title").notNull().default(""),
+  body: text("body").notNull().default(""),
+});
+
 // 고정 지출·수입 (06 §5, 14 §4.4). 해지해도 지우지 않고 상태로(이용 중 → 해지 예정(마지막 이용일) → 해지됨)
 export const recurringPayments = pgTable(
   "recurring_payments",
