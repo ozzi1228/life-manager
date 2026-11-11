@@ -10,6 +10,7 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Spinner } from "@/components/ui/spinner";
+import { MemoBody } from "./memo-body";
 
 type Memo = { id: string; version: number; title: string; body: string };
 
@@ -102,14 +103,7 @@ export function MemoEditor({ memo, when }: { memo?: Memo; when?: string }) {
         onChange={(e) => setTitle(e.target.value)}
       />
       {when && <p className="text-muted-foreground text-caption tabular-nums">{when}</p>}
-      <textarea
-        aria-label="내용"
-        maxLength={20000}
-        placeholder="내용을 적어 보세요"
-        className="placeholder:text-muted-foreground min-h-[60vh] w-full resize-none bg-transparent text-base leading-relaxed outline-none [field-sizing:content]"
-        value={body}
-        onChange={(e) => setBody(e.target.value)}
-      />
+      <MemoBody initial={saved.body} onChange={setBody} />
       <AlertDialog open={asking} onOpenChange={setAsking}>
         <AlertDialogContent>
           <AlertDialogHeader>

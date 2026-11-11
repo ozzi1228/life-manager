@@ -21,6 +21,10 @@ const clean = async () => {
   await db.delete(revisions).where(inArray(revisions.userId, users));
 };
 
+const { mdText } = await import("../src/lib/md-text.ts");
+assert.equal(mdText("# 제목\n\n- [x] **우유** 사기\n- `두부`\n\n> 인용 [링크](https://a.b)"), "제목\n우유 사기\n두부\n인용 링크");
+assert.equal(mdText("1. *하나*\n2. ~~둘~~\n\n가\\_나"), "하나\n둘\n가_나");
+
 await clean();
 try {
   assert.equal(await code(createMemo(A, { title: " ", body: "  " })), "VALIDATION_FAILED"); // 둘 다 비면 안 됨

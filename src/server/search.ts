@@ -4,6 +4,7 @@
 import { desc, ilike, or, sql } from "drizzle-orm";
 import { careerExperiences, events, goals, journalEntries, memos, periodNotes, reviewPosts, reviewThreads, transactions, wishItems } from "../db/schema.ts";
 import { textOnly } from "../lib/journal-body.ts";
+import { mdText } from "../lib/md-text.ts";
 import { noteText } from "../lib/rich-note.ts";
 import { eventRepo, noteRepo } from "./calendar.ts";
 import { expRepo } from "./career.ts";
@@ -87,7 +88,10 @@ export async function searchAll(ctx: Ctx, raw: string): Promise<Group[]> {
     {
       key: "memos",
       label: "메모",
-      hits: memoHits.map((m) => ({ id: m.id, title: m.title || m.body.trim().split("\n")[0].slice(0, 40) || "제목 없음", sub: seoulDayOf(m.updatedAt), snippet: around(m.body, q), href: `/records/memos/${m.id}` })),
+      hits: memoHits.map((m) => {
+        const text = mdText(m.body);
+        return { id: m.id, title: m.title || text.split("\n")[0].slice(0, 40) || "제목 없음", sub: seoulDayOf(m.updatedAt), snippet: around(text, q), href: `/records/memos/${m.id}` };
+      }),
     },
     {
       key: "calendar",

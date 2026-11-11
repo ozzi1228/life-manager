@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/app/states";
 import { RecordsTabs } from "@/components/journal/records-tabs";
 import { Button } from "@/components/ui/button";
 import { seoulWhen } from "@/lib/format";
+import { mdText } from "@/lib/md-text";
 import { memoList } from "@/server/memos";
 import { pageCtx } from "@/server/session";
 
@@ -31,15 +32,18 @@ export default async function MemosPage() {
       </div>
       {memos.length ? (
         <ul className="bg-card divide-y rounded-xl border">
-          {memos.map((m) => (
-            <li key={m.id}>
-              <Link href={`/records/memos/${m.id}`} className="hover:bg-accent/40 block space-y-1 p-4">
-                <span className="block truncate font-semibold">{m.title || m.body.trim().split("\n")[0].slice(0, 60) || "제목 없음"}</span>
-                {m.title && m.body.trim() && <span className="text-muted-foreground line-clamp-2 block text-sm">{m.body.slice(0, 200)}</span>}
-                <span className="text-muted-foreground block text-caption tabular-nums">{seoulWhen(m.updatedAt)}</span>
-              </Link>
-            </li>
-          ))}
+          {memos.map((m) => {
+            const text = mdText(m.body);
+            return (
+              <li key={m.id}>
+                <Link href={`/records/memos/${m.id}`} className="hover:bg-accent/40 block space-y-1 p-4">
+                  <span className="block truncate font-semibold">{m.title || text.split("\n")[0].slice(0, 60) || "제목 없음"}</span>
+                  {m.title && text && <span className="text-muted-foreground line-clamp-2 block text-sm">{text.slice(0, 200).replace(/\n/g, " · ")}</span>}
+                  <span className="text-muted-foreground block text-caption tabular-nums">{seoulWhen(m.updatedAt)}</span>
+                </Link>
+              </li>
+            );
+          })}
         </ul>
       ) : (
         <EmptyState pet="hoya" title="아직 메모가 없어요" description="떠오른 생각이나 적어 둘 것들을 제목 달아 남겨 보세요." action={<NewMemo />} />

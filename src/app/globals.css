@@ -268,3 +268,33 @@
     display: none;
   }
 }
+
+/* 메모 내용(memo-body.tsx): 마크다운을 바로 바꿔 보여 주는 칸의 글 모양 */
+@layer components {
+  .memo-doc {
+    @apply text-base leading-relaxed;
+    & > * + * { @apply mt-2; }
+    & h1 { @apply text-title-lg mt-5 font-bold; }
+    & h2 { @apply text-title mt-4 font-bold; }
+    & h3 { @apply mt-3 font-semibold; }
+    & ul { @apply list-disc pl-6; }
+    & ol { @apply list-decimal pl-6; }
+    & li > p { @apply my-0.5; }
+    & ul[data-type="taskList"] { @apply list-none pl-1; }
+    & ul[data-type="taskList"] li { @apply flex items-start gap-2; }
+    & ul[data-type="taskList"] li > label { @apply mt-1 shrink-0; }
+    & ul[data-type="taskList"] li > label input { @apply accent-primary size-4; }
+    & ul[data-type="taskList"] li > div { @apply min-w-0 flex-1; }
+    & li[data-checked="true"] > div { @apply text-muted-foreground line-through; }
+    & blockquote { @apply border-l-4 pl-3 text-muted-foreground; }
+    & code { @apply rounded bg-muted px-1 py-0.5 font-mono text-[0.9em]; }
+    & pre { @apply overflow-x-auto rounded-lg bg-muted p-3 font-mono text-sm; }
+    & pre code { @apply bg-transparent p-0; }
+    & hr { @apply my-4; }
+    & a { @apply text-primary underline underline-offset-2; }
+    & p.is-editor-empty:first-child::before {
+      content: attr(data-placeholder);
+      @apply pointer-events-none float-left h-0 text-muted-foreground;
+    }
+  }
+}
