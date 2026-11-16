@@ -604,6 +604,8 @@ function NotePanel({ note, title, onSaved, bare }: { note: Note; title: string; 
 }
 
 /** 보는 기간의 목표·메모. PC는 위에 나란히, 모바일은 한 줄로 접어 달력이 먼저 보이게 */
+type GoalSet = { scope: "year" | "month" | "week" | "day"; key: string; goals: PeriodGoal[] };
+
 function TopPanels({ label, goals, note, children }: { label: string; goals: PeriodGoal[]; note: Note; children: React.ReactNode }) {
   const mobile = useIsMobile();
   if (!mobile) return <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">{children}</div>;
@@ -724,7 +726,7 @@ function newDraft(calendarId: string, d: string, time?: string): Draft {
 
 type Target = { kind: "day"; day: string; time?: string } | { kind: "ev"; e: Instance } | null;
 
-export function CalendarView({ view, date, from, today, calendars, instances, note, memo, goals, google, startNew }: { view: View; date: string; from: string; today: string; calendars: CalendarItem[]; instances: Instance[]; note: Note; memo: Note; goals: PeriodGoal[]; google: GoogleStatus; startNew?: boolean }) {
+export function CalendarView({ view, date, from, today, calendars, instances, note, memo, goals, google, startNew }: { view: View; date: string; from: string; today: string; calendars: CalendarItem[]; instances: Instance[]; note: Note; memo: Note; goals: GoalSet[]; google: GoogleStatus; startNew?: boolean }) {
   const router = useRouter();
   const mobile = useIsMobile();
   const [selected, setSelected] = useState(date);
@@ -912,7 +914,15 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
       .sort((a, b) => (a.allDay || a.startDate < d ? "" : a.startTime!).localeCompare(b.allDay || b.startDate < d ? "" : b.startTime!));
   // 보는 기간의 목표(목표 메뉴의 기간별 목표와 같은 것): 바로 추가·달성 체크
   const goalLabel = view === "year" ? `${date.slice(0, 4)}년` : view === "month" ? `${+date.slice(5, 7)}월` : view === "week" ? label : md(date);
-  const goalPanel = <PeriodGoals key={`goals-${view}-${note.key}`} scope={view} periodKey={note.key} label={goalLabel} goals={goals} />;
+  // 주·일 보기는 위 단위(월간·주간) 목표도 함께 — 위 단위부터 차례로
+  const setLabel = (s: GoalSet) => (s.scope === view ? goalLabel : s.scope === "month" ? `${+s.key.slice(5, 7)}월` : `${md(s.key)} ~ ${addDays(s.key, 6).slice(5, 7) === s.key.slice(5, 7) ? `${+addDays(s.key, 6).slice(8)}일` : md(addDays(s.key, 6))}`);
+  const goalPanel = (
+    <div className="space-y-3">
+      {goals.map((s) => (
+        <PeriodGoals key={`goals-${s.scope}-${s.key}`} scope={s.scope} periodKey={s.key} label={setLabel(s)} goals={s.goals} />
+      ))}
+    </div>
+  );
   const noteTitle = view === "year" ? `${date.slice(0, 4)}년 메모` : view === "month" ? `${+date.slice(5, 7)}월 메모` : view === "week" ? `${label} 메모` : `${md(date)} 메모`;
   const list = <CalendarList calendars={calendars} hidden={hidden} toggle={toggleCal} google={google} viewLabel={({ year: "연", month: "월", week: "주", day: "일" } as const)[view]} />;
 
@@ -956,7 +966,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
         </div>
 
         {/* 모든 보기: 목표·메모를 맨 위에(모바일은 접어 둠) */}
-        <TopPanels label={goalLabel} goals={goals} note={note}>
+        <TopPanels label={goalLabel} goals={goals.flatMap((s) => s.goals)} note={note}>
           {goalPanel}
           <NotePanel key={note.scope + note.key} note={note} title={noteTitle} />
         </TopPanels>

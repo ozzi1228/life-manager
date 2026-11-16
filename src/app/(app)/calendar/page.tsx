@@ -19,7 +19,10 @@ export default async function CalendarPage({ searchParams }: PageProps<"/calenda
   const from = view === "year" ? `${date.slice(0, 4)}-01-01` : view === "day" ? date : weekStartOf(first);
   const to = view === "year" ? `${date.slice(0, 4)}-12-31` : view === "month" ? addDays(from, 41) : view === "week" ? addDays(from, 6) : date;
   const key = periodKey(view, date);
-  const [{ calendars, instances }, saved, goals, google, all] = await Promise.all([rangeView(ctx, from, to), getNote(ctx, view, key), periodGoals(ctx, view, key), googleStatus(ctx), getNote(ctx, "all", "all")]);
+  // 주는 월간·주간, 일은 월간·주간·일간 목표를 함께(위 단위부터)
+  const scopes = view === "week" ? (["month", "week"] as const) : view === "day" ? (["month", "week", "day"] as const) : [view];
+  const goalSets = Promise.all(scopes.map(async (scope) => ({ scope, key: periodKey(scope, date), goals: await periodGoals(ctx, scope, periodKey(scope, date)) })));
+  const [{ calendars, instances }, saved, goals, google, all] = await Promise.all([rangeView(ctx, from, to), getNote(ctx, view, key), goalSets, googleStatus(ctx), getNote(ctx, "all", "all")]);
   const note = { scope: view, key, id: saved?.id ?? null, version: saved?.version ?? null, body: saved?.body ?? "" };
   const memo = { scope: "all" as const, key: "all", id: all?.id ?? null, version: all?.version ?? null, body: all?.body ?? "" };
   return (
