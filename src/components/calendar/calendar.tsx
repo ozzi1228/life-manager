@@ -915,7 +915,7 @@ export function CalendarView({ view, date, from, today, calendars, instances, no
   // 보는 기간의 목표(목표 메뉴의 기간별 목표와 같은 것): 바로 추가·달성 체크
   const goalLabel = view === "year" ? `${date.slice(0, 4)}년` : view === "month" ? `${+date.slice(5, 7)}월` : view === "week" ? label : md(date);
   // 주·일 보기는 위 단위(월간·주간) 목표도 함께 — 위 단위부터 차례로
-  const setLabel = (s: GoalSet) => (s.scope === view ? goalLabel : s.scope === "month" ? `${+s.key.slice(5, 7)}월` : `${md(s.key)} ~ ${addDays(s.key, 6).slice(5, 7) === s.key.slice(5, 7) ? `${+addDays(s.key, 6).slice(8)}일` : md(addDays(s.key, 6))}`);
+  const setLabel = (s: GoalSet) => (s.scope === view ? goalLabel : s.scope === "month" ? "이번 달" : "이번 주");
   const goalPanel = (
     <div className="space-y-3">
       {goals.map((s) => (
