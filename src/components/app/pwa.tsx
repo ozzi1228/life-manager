@@ -6,14 +6,15 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { HowToTip } from "@/components/app/help";
 
-/** 루트에 한 번: 서비스 워커를 등록하고, 새 버전이 기다리면 "새로고침" 토스트 */
+/** 루트에 한 번: 서비스 워커를 등록하고, 새 버전이 기다리면 "새로고침" 토스트(8초) */
 export function PwaUpdate() {
   useEffect(() => {
     // 개발 서버에서는 캐시가 화면 갱신을 방해하므로 운영에서만
     if (process.env.NODE_ENV !== "production" || !("serviceWorker" in navigator)) return;
     let reloading = false;
     const ask = (w: ServiceWorker) =>
-      toast("새 버전이 있어요", { duration: Infinity, action: { label: "새로고침", onClick: () => w.postMessage("SKIP_WAITING") } });
+      // 잠깐 떴다 사라짐(놓쳐도 다음에 앱을 열면 새 버전으로 바뀜). 같은 알림은 하나만
+      toast("새 버전이 있어요", { id: "sw-update", duration: 8000, action: { label: "새로고침", onClick: () => w.postMessage("SKIP_WAITING") } });
     navigator.serviceWorker.addEventListener("controllerchange", () => {
       if (reloading) return;
       reloading = true;
